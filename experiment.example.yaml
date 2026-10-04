@@ -1,0 +1,40 @@
+apiVersion: gibson.ai/v1alpha1
+kind: Experiment
+
+metadata:
+  name: mini-gibson-hackathon
+  version: DRAFT
+
+model:
+  id: nemotron-base
+  provider: vllm
+  artifact: nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16
+  revision: UNPINNED
+
+agent:
+  id: hermes
+  adapter: UNFROZEN
+
+environment:
+  id: gibson-coding-v0.1
+  completion_authority: gibson
+  max_repairs: 3
+
+benchmark:
+  manifest: bench/manifest.v0.1.json
+  status: DRAFT_DO_NOT_TUNE
+
+run:
+  trials_per_task: UNFROZEN
+  max_steps: UNFROZEN
+  wall_clock_seconds: UNFROZEN
+
+evaluation:
+  primary_metric: verified_task_resolution_rate
+
+reproducibility:
+  require_git_sha: true
+  require_model_revision: true
+  require_benchmark_hash: true
+
+# Freeze only after Kimi K3 / GLM-5.2 / Claude design review.
