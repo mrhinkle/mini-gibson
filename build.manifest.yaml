@@ -1,0 +1,157 @@
+apiVersion: mini-gibson.dev/v1alpha1
+kind: ParallelBuild
+
+metadata:
+  name: mini-gibson-hackathon-build
+  status: DRAFT_UNTIL_DESIGN_FREEZE
+
+integration:
+  owner: claude
+  branch: prep/hackathon-foundation
+  policy:
+    separate_worktree_per_lane: true
+    no_shared_file_edits_by_workers: true
+    independent_review_required: true
+    merge_only_after_lane_acceptance: true
+
+shared_files:
+  owner: claude
+  paths:
+    - README.md
+    - PLAN.md
+    - HYPOTHESIS.md
+    - experiment.example.yaml
+    - pyproject.toml
+    - docs/architecture.md
+    - docs/experiment-protocol.md
+    - docs/agent-conformance.md
+  rule: workers_must_propose_changes_via_handoff_not_edit
+
+lanes:
+  - id: runtime-control-plane
+    coder: codex
+    objective: >
+      Build the executable experiment runtime: manifest loading, GibsonEnv integration,
+      agent adapter boundary, supervisor, immutable run artifacts, evidence gate,
+      and CLI/operator workflow.
+    exclusive_paths:
+      - experiment/**
+      - gibson_env/**
+      - adapters/**
+      - cli/**
+      - telemetry/**
+      - tests/runtime/**
+    inputs:
+      - HYPOTHESIS.md
+      - docs/experiment-protocol.md
+      - docs/agent-conformance.md
+      - experiment.example.yaml
+    deliverables:
+      - experiment manifest parser/validator
+      - run ID and artifact layout
+      - agent adapter base interface
+      - Hermes reference adapter stub/integration
+      - GibsonEnv execution loop
+      - Evidence Gate
+      - supervisor checkpoint/resume
+      - infrastructure-vs-task retry separation
+      - experiment doctor/start/run/resume/report CLI surface
+      - runtime unit/integration tests
+    acceptance:
+      - deterministic smoke task reaches legitimate terminal result
+      - unsupported VERIFIED state is rejected
+      - failed task is not silently retried as success
+      - completed trial artifacts are immutable
+      - resume skips already-complete trials
+      - no undeclared model/tool access
+    cut_first:
+      - cross-agent ecological comparisons
+      - rich terminal UI
+      - advanced scheduling
+
+  - id: data-infra-evaluation
+    coder: grok
+    objective: >
+      Build the reproducible infrastructure and evidence pipeline: vLLM/Brev setup,
+      historical trajectory curation/conversion, Gibson Bench fixtures/scoring,
+      report generation, and judge artifact generation.
+    exclusive_paths:
+      - bench/**
+      - training/**
+      - vllm/**
+      - brev/**
+      - env/**
+      - report/**
+      - presentation/**
+      - scripts/infra/**
+      - scripts/data/**
+      - tests/evaluation/**
+    inputs:
+      - PLAN.md
+      - docs/training-plan.md
+      - docs/brev-plan.md
+      - bench/manifest.v0.1.json
+      - bench/failure-taxonomy.json
+    deliverables:
+      - vLLM serve/smoke setup
+      - Brev Launchable implementation
+      - reproducibility receipt / doctor inputs
+      - historical trajectory validator/converter
+      - 25-candidate inventory format
+      - 10-gold trajectory acceptance workflow
+      - benchmark task schema/runner fixtures
+      - scoring/failure classification
+      - report generator consuming immutable run artifacts
+      - presentation data export consuming same results
+      - evaluation/infrastructure tests
+    acceptance:
+      - fresh environment can prove required revision pins
+      - vLLM base-model smoke passes on validated GPU
+      - dataset validator detects missing provenance/leakage violations
+      - benchmark manifest can be hashed/frozen
+      - report contains no hand-entered benchmark claims
+      - presentation result data derives from the same run artifacts
+    cut_first:
+      - RL training
+      - multi-harness benchmark
+      - elaborate visualization
+      - synthetic-data expansion
+
+handoff:
+  lane_output:
+    required:
+      - exact_head_sha
+      - changed_files
+      - tests_run
+      - acceptance_results
+      - unresolved_risks
+      - integration_notes
+  integration_order:
+    - data-infra-evaluation interfaces validated
+    - runtime-control-plane interfaces validated
+    - shared manifest/config updated by integrator
+    - combined smoke test
+    - independent Claude review
+    - benchmark freeze
+  stop_conditions:
+    - design_freeze_changes_interface
+    - holdout_leakage_detected
+    - shared_file_collision
+    - unverifiable_result_provenance
+
+milestones:
+  - id: M0
+    name: design-freeze
+    required_before_parallel_implementation: true
+  - id: M1
+    name: both-lanes-smoke-green
+  - id: M2
+    name: combined-end-to-end-green
+  - id: M3
+    name: benchmark-frozen
+  - id: M4
+    name: A-B-results
+  - id: M5
+    name: optional-C-results
+  - id: M6
+    name: judge-package-frozen
