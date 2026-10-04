@@ -20,6 +20,20 @@ environment:
   completion_authority: gibson
   max_repairs: 3
 
+decision_services:
+  jev:
+    enabled: false
+    provider: typesafe
+    model: jev-latest
+    endpoint_env: MINI_GIBSON_JEV_ENDPOINT
+    api_key_env: TYPESAFE_API_KEY
+    min_confidence: 0.80
+    causal_policy: outside_scored_loop
+    roles:
+      - supervisor_escalation
+      - tool_risk
+      - benchmark_anomaly_triage
+
 benchmark:
   manifest: bench/manifest.v0.1.json
   status: DRAFT_DO_NOT_TUNE
@@ -37,4 +51,5 @@ reproducibility:
   require_model_revision: true
   require_benchmark_hash: true
 
+# Jev cannot award VERIFIED or become a hidden treatment variable.
 # Freeze only after Kimi K3 / GLM-5.2 / Claude design review.
