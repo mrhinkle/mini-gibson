@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gibson/run-record.v1",
+  "title": "Gibson run record v1",
+  "type": "object",
+  "required": ["schema", "run_id", "repo", "runner", "role", "trace_mode", "trace_status"],
+  "properties": {
+    "schema": { "const": "run-record.v1" },
+    "run_id": { "type": "string" },
+    "repo": { "type": "string" },
+    "issue": { "type": ["string", "null"] },
+    "pr": { "type": ["string", "null"] },
+    "lane": { "type": ["string", "null"] },
+    "role": { "enum": ["builder", "reviewer", "repair", "release", "interactive", "other"] },
+    "runner": { "enum": ["claude", "codex", "grok", "hermes", "devin", "goose", "nemotron", "other"] },
+    "model": { "type": ["string", "null"] },
+    "cwd": { "type": ["string", "null"] },
+    "prompt_sha256": { "type": ["string", "null"] },
+    "head_sha_start": { "type": ["string", "null"] },
+    "head_sha_end": { "type": ["string", "null"] },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "ended_at": { "type": ["string", "null"], "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "timed_out": { "type": ["boolean", "null"] },
+    "trace_mode": { "type": "string" },
+    "trace_status": { "enum": ["ok", "partial", "failed", "disabled"] },
+    "trace_reason": { "type": ["string", "null"] },
+    "cost": {
+      "type": ["object", "null"],
+      "properties": { "usd": { "type": ["number", "null"] }, "input_tokens": { "type": ["integer", "null"] }, "output_tokens": { "type": ["integer", "null"] } }
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "harness": {
+          "type": "object",
+          "properties": {
+            "gate_exit": { "type": ["integer", "null"] },
+            "test_integrity": { "type": ["object", "null"], "properties": { "ok": { "type": "boolean" }, "sensor_sha256": { "type": "string" } } },
+            "truthful_status": { "type": ["object", "null"], "properties": { "ok": { "type": "boolean" }, "sensor_sha256": { "type": "string" } } },
+            "claimed_status": { "enum": ["success", "partial", "blocked", "none", null] },
+            "premature_completion": { "type": ["boolean", "null"] }
+          }
+        },
+        "outcome": {
+          "type": "object",
+          "properties": {
+            "review_verdicts": { "type": "array", "items": { "type": "object", "properties": { "vendor": { "type": "string" }, "level": { "enum": ["E0", "E1", "E2", "E3", "E4"] }, "verdict": { "type": "string" }, "head_sha": { "type": "string" } } } },
+            "merged": { "type": ["boolean", "null"] },
+            "closed_unmerged": { "type": ["boolean", "null"] },
+            "fix_follow": { "type": ["boolean", "null"] },
+            "backfilled_at": { "type": ["string", "null"] }
+          }
+        },
+        "injection_flagged": { "type": "boolean" }
+      }
+    }
+  }
+}
