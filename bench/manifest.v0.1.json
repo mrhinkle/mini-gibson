@@ -1,0 +1,13 @@
+{
+  "schema_version": "gibson-bench/v0.1",
+  "status": "DRAFT_DO_NOT_TUNE",
+  "freeze_required_before_lora": true,
+  "splits": {
+    "development": [],
+    "validation": [],
+    "temporal_gibson_holdout": [],
+    "external_holdout": []
+  },
+  "primary_metric": "verified_task_resolution_rate",
+  "failure_taxonomy": "failure-taxonomy.json"
+}
