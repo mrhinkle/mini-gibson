@@ -110,3 +110,11 @@ Historical LoRA remains optional until A/B works.
 With two independent lanes, roughly 35–50 coding hours should compress substantially because the runtime/control-plane and data/infra/evaluation work can progress concurrently.
 
 Do not optimize for maximum parallelism. Optimize for **zero merge collisions and clear experimental provenance**.
+
+## Optional Jev responsibilities
+
+Jev remains disabled by default and is cuttable without blocking the primary experiment. Mark/Codex owns `adapters/jev.py`, `experiment/manifest.py`, `experiment/decisions.py`, `telemetry/jev.py`, the metadata-only GibsonEnv tool-risk connection, and their runtime tests. This includes environment-only credentials, the pinned typed-question API, deterministic fallback, and fail-closed identical-arm manifest validation.
+
+John/Grok owns future anomaly-hook calls from redacted recorded result summaries and metadata consumption in reports: latency, confidence/fallback/error counts and policy hashes. Advice follows immutable outcomes and never changes scores, promotes adapters or exposes holdouts. Supervisor and benchmark runners do not yet exist; their Jev hooks are exported and the owning lane wires them when those runners are implemented.
+
+Claude remains the independent exact-head reviewer and coordinates shared question/policy/artifact version changes. `integrations/jev.yaml`, `docs/jev.md`, the workflow manifests, example configuration and shared protocol documentation describe this optional interface. Updates to those shared contracts require a bounded owner-approved integration change; routine worker shared-file prohibitions and broader design/benchmark freeze gates remain in force. See [the Jev contract](jev.md) for configuration, implemented limits and acceptance criteria.

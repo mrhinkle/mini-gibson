@@ -40,6 +40,7 @@ dependencies:
   soft:
     - runtime artifact schema from Mark workflow
     - final AgentAdapter telemetry requirements from Mark workflow
+    - optional Jev decision hooks and metadata contract from Mark workflow
 
 exclusive_paths:
   - bench/**
@@ -107,6 +108,30 @@ build_steps:
   - id: evidence-02
     action: implement presentation data export from same run artifacts
     output: judge-facing result dataset
+  - id: jev-evaluation-01
+    action: wire optional anomaly hook when benchmark runner exists
+    output: advice from redacted terminal state failure kind and tool-error count only
+  - id: jev-evaluation-02
+    action: consume Jev metadata after immutable outcome without rescoring
+    output: latency confidence fallback error and policy-hash report fields
+
+optional_integrations:
+  jev:
+    critical_path: false
+    enabled_by_default: false
+    contract: integrations/jev.yaml
+    implementation_owner: Mark and Codex
+    evaluation_owner: John and Grok
+    shared_protocol_owner: Claude
+    current_limit: anomaly_hook_exported_benchmark_runner_not_implemented
+    excluded_policy_anomaly_calls: separate_explicit_noncausal_operator_context
+    scored_policy: excluded_or_frozen_identical_across_every_compared_arm
+    result_authority: immutable_deterministic_outcome_never_jev_advice
+    prohibited_inputs:
+      - hidden_answers
+      - raw_issues_source_and_tool_arguments
+      - credentials
+    broader_design_freeze_gates: remain_in_force
 
 acceptance:
   required:
@@ -119,6 +144,9 @@ acceptance:
     - report_has_no_hand_entered_benchmark_claims
     - presentation_uses_same_result_artifacts
     - handoff_receipt_complete
+    - future_jev_anomaly_calls_follow_frozen_comparison_policy
+    - future_jev_anomaly_advice_cannot_rescore_or_award_verified
+    - future_jev_reports_preserve_failure_fallback_and_latency_receipts
 
 handoff:
   to: Claude integrator
@@ -134,6 +162,7 @@ handoff:
     - unresolved_risks
     - interface_change_requests
     - integration_notes
+    - jev_metadata_consumption_and_future_wiring_limits
 
 stop_conditions:
   - design_freeze_changes_benchmark_or_compute_contract
