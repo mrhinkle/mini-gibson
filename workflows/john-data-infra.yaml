@@ -1,0 +1,149 @@
+apiVersion: mini-gibson.dev/v1alpha1
+kind: HumanOwnedWorkflow
+
+metadata:
+  name: john-data-infra-evaluation
+  owner: John Willis
+  status: DRAFT_UNTIL_DESIGN_FREEZE
+
+mission:
+  outcome: >
+    Deliver the reproducible NVIDIA environment, historical data pipeline,
+    benchmark/evaluation layer, and evidence-to-report path for Mini Gibson.
+  success_tier: silver-critical-path-plus-gold-enabler
+
+people:
+  human_owner:
+    name: John Willis
+    role: infrastructure / reliability / evaluation workflow owner
+    responsibilities:
+      - keep environment reproducible and observable
+      - challenge operational assumptions
+      - accept data/benchmark handoff only with provenance
+      - own go/no-go on infrastructure readiness
+  primary_coder:
+    runtime: Grok
+    role: implementation and data/infrastructure automation
+  integrator_reviewer:
+    runtime: Claude
+    role: independent provenance/leakage/integration review
+
+source:
+  repository: mrhinkle/mini-gibson
+  base_branch: prep/hackathon-foundation
+  work_branch: lane/john-data-infra-evaluation
+  separate_worktree_required: true
+
+dependencies:
+  hard:
+    - design-freeze decisions for benchmark/retry/compute policy
+  soft:
+    - runtime artifact schema from Mark workflow
+    - final AgentAdapter telemetry requirements from Mark workflow
+
+exclusive_paths:
+  - bench/**
+  - training/**
+  - vllm/**
+  - brev/**
+  - env/**
+  - report/**
+  - presentation/**
+  - scripts/infra/**
+  - scripts/data/**
+  - tests/evaluation/**
+
+forbidden_paths:
+  - experiment/**
+  - gibson_env/**
+  - adapters/**
+  - cli/**
+  - telemetry/**
+  - README.md
+  - PLAN.md
+  - HYPOTHESIS.md
+  - experiment.example.yaml
+  - docs/architecture.md
+  - docs/experiment-protocol.md
+  - docs/agent-conformance.md
+
+build_steps:
+  - id: infra-01
+    action: pin and validate vLLM serving path
+    output: reproducible Nemotron base-model endpoint
+  - id: infra-02
+    action: implement vLLM health and structured-tool smoke
+    output: smoke receipt
+  - id: infra-03
+    action: implement Brev Launchable
+    output: fresh-instance reproducibility path
+  - id: infra-04
+    action: implement environment receipt and doctor inputs
+    output: GPU/software/model revision receipt
+  - id: data-01
+    action: implement historical trajectory schema validator
+    output: provenance-aware validator
+  - id: data-02
+    action: implement trajectory converter
+    output: Nemotron-compatible training records
+  - id: data-03
+    action: inventory at least 25 historical candidates
+    output: scored candidate manifest
+  - id: data-04
+    action: establish 10+ gold trajectory acceptance flow
+    output: source-complete gold set
+  - id: bench-01
+    action: implement benchmark task schema and fixture loader
+    output: frozen-task representation
+  - id: bench-02
+    action: implement scoring and failure taxonomy
+    output: machine-readable result scorer
+  - id: bench-03
+    action: implement split/leakage checks and manifest hash
+    output: benchmark-freeze receipt
+  - id: evidence-01
+    action: implement report generator from immutable run artifacts
+    output: technical report data
+  - id: evidence-02
+    action: implement presentation data export from same run artifacts
+    output: judge-facing result dataset
+
+acceptance:
+  required:
+    - fresh_environment_proves_required_revision_pins
+    - vllm_base_model_smoke_passes
+    - launchable_recreates_validated_environment
+    - dataset_validator_rejects_missing_provenance
+    - leakage_check_rejects_holdout_contamination
+    - benchmark_manifest_is_hashable_and_freezable
+    - report_has_no_hand_entered_benchmark_claims
+    - presentation_uses_same_result_artifacts
+    - handoff_receipt_complete
+
+handoff:
+  to: Claude integrator
+  required_fields:
+    - exact_head_sha
+    - changed_files
+    - commands_run
+    - tests_run
+    - acceptance_results
+    - environment_receipt
+    - dataset_provenance_summary
+    - benchmark_hash
+    - unresolved_risks
+    - interface_change_requests
+    - integration_notes
+
+stop_conditions:
+  - design_freeze_changes_benchmark_or_compute_contract
+  - holdout_leakage_detected
+  - source_provenance_incomplete
+  - reproducibility_requires_undocumented_manual_steps
+
+cuts:
+  first:
+    - reinforcement_learning
+    - multi_harness_benchmark
+    - synthetic_data_expansion
+    - elaborate_visualization

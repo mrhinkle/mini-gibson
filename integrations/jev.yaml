@@ -1,0 +1,113 @@
+apiVersion: mini-gibson.dev/v1alpha1
+kind: OptionalDecisionService
+
+metadata:
+  name: jev
+  status: OPTIONAL_NOT_CRITICAL_PATH
+
+provider:
+  product: TypeSafe Jev
+  purpose: typed structured decisions
+  not_a_coding_model: true
+  credentials_env:
+    - TYPESAFE_API_KEY
+
+principle:
+  rule: >
+    Jev may assist bounded operational decisions, routing, classification,
+    or escalation. It must not be hidden generative capacity and must not
+    change only one causal benchmark arm unless explicitly registered as
+    part of that treatment.
+
+allowed_uses:
+  - id: supervisor-escalation
+    state_inputs:
+      - current_run_state
+      - infrastructure_health
+      - retry_history
+    questions:
+      action:
+        type: choice
+        options:
+          - continue
+          - retry_infrastructure
+          - stop
+          - human_escalation
+      needs_human:
+        type: noul
+      run_risk:
+        type: score
+        levels:
+          - low
+          - medium
+          - high
+    authority: advisory
+  - id: tool-call-guard
+    condition: >
+      Use only outside causal benchmark scoring, or identically across all
+      compared arms under a frozen policy.
+    questions:
+      allow_tool_call:
+        type: noul
+      risk:
+        type: score
+        levels:
+          - low
+          - medium
+          - high
+    authority: advisory_or_policy_input
+  - id: benchmark-anomaly-triage
+    state_inputs:
+      - task_result
+      - failure_taxonomy
+      - telemetry_summary
+    questions:
+      anomaly_class:
+        type: choice
+        options:
+          - expected_task_failure
+          - infrastructure_failure
+          - telemetry_corruption
+          - requires_human_review
+    authority: advisory
+  - id: model-or-agent-routing
+    condition: post_hackathon_or_noncausal_operator_mode
+    questions:
+      route:
+        type: choice
+        options:
+          - hermes
+          - codex
+          - claude_code
+          - grok
+          - human
+    authority: advisory
+
+forbidden_uses:
+  - generate_code
+  - replace_nemotron
+  - award_verified
+  - decide_adapter_promotion_without_deterministic_metrics
+  - inspect_hidden_benchmark_answers
+  - retry_failed_tasks_until_pass
+  - silently_change_tool_permissions
+
+causal_experiment_policy:
+  default: excluded_from_scored_loop
+  alternative: identical_across_all_arms
+  required_logging:
+    - request_state_hash
+    - question_set_version
+    - typed_answers
+    - confidence_or_probabilities_if_available
+    - latency
+    - fallback_or_error
+  low_confidence_policy: human_or_deterministic_fallback
+
+integration_options:
+  preferred:
+    - official TypeSafe API or SDK
+    - MCP only if its behavior and version are pinned
+  secret_handling:
+    - server_side_only
+    - never_commit_key

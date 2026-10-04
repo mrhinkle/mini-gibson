@@ -1,0 +1,146 @@
+apiVersion: mini-gibson.dev/v1alpha1
+kind: HumanOwnedWorkflow
+
+metadata:
+  name: mark-runtime-control-plane
+  owner: Mark Hinkle
+  status: DRAFT_UNTIL_DESIGN_FREEZE
+
+mission:
+  outcome: >
+    Deliver the executable Mini Gibson runtime and operator experience:
+    manifest -> agent -> GibsonEnv -> tools -> evidence -> immutable result.
+  success_tier: silver-critical-path
+
+people:
+  human_owner:
+    name: Mark Hinkle
+    role: Forward Deployed Architect / workflow owner
+    responsibilities:
+      - keep product intent and experiment contract aligned
+      - make scope/cut decisions
+      - accept lane handoff only when evidence is complete
+      - escalate shared-interface changes to integrator
+  primary_coder:
+    runtime: Codex
+    role: implementation
+  integrator_reviewer:
+    runtime: Claude
+    role: shared-interface owner and independent reviewer
+
+source:
+  repository: mrhinkle/mini-gibson
+  base_branch: prep/hackathon-foundation
+  work_branch: lane/mark-runtime-control-plane
+  separate_worktree_required: true
+
+dependencies:
+  hard:
+    - design-freeze decisions for baseline/manifest/conformance
+  soft:
+    - vLLM endpoint from John workflow
+    - reference benchmark smoke fixture from John workflow
+
+exclusive_paths:
+  - experiment/**
+  - gibson_env/**
+  - adapters/**
+  - cli/**
+  - telemetry/**
+  - tests/runtime/**
+
+forbidden_paths:
+  - bench/**
+  - training/**
+  - vllm/**
+  - brev/**
+  - env/**
+  - report/**
+  - presentation/**
+  - README.md
+  - PLAN.md
+  - HYPOTHESIS.md
+  - experiment.example.yaml
+  - docs/architecture.md
+  - docs/experiment-protocol.md
+  - docs/agent-conformance.md
+
+inputs:
+  - HYPOTHESIS.md
+  - experiment.example.yaml
+  - docs/architecture.md
+  - docs/experiment-protocol.md
+  - docs/agent-conformance.md
+  - build.manifest.yaml
+
+build_steps:
+  - id: runtime-01
+    action: implement manifest parser and fail-closed validator
+    output: experiment manifest object
+  - id: runtime-02
+    action: implement immutable run ID and artifact layout
+    output: runs/<run-id> structure
+  - id: runtime-03
+    action: implement AgentAdapter base contract
+    output: adapters/base
+  - id: runtime-04
+    action: implement Hermes reference adapter against declared endpoint
+    output: conformant reference path or explicit nonconformance report
+  - id: runtime-05
+    action: wire GibsonEnv execution loop
+    output: reset/step/verify task lifecycle
+  - id: runtime-06
+    action: implement Evidence Gate
+    output: model cannot self-award VERIFIED
+  - id: runtime-07
+    action: implement supervisor checkpoint/resume
+    output: resume without overwriting complete trials
+  - id: runtime-08
+    action: separate infrastructure retry from task/model failure
+    output: frozen retry semantics
+  - id: runtime-09
+    action: implement operator CLI
+    commands:
+      - doctor
+      - start
+      - run
+      - resume
+      - report
+  - id: runtime-10
+    action: implement runtime tests and one deterministic end-to-end smoke
+
+acceptance:
+  required:
+    - manifest_validation_fails_closed
+    - deterministic_smoke_task_reaches_legitimate_terminal_state
+    - unsupported_verified_is_rejected
+    - task_failure_is_not_silently_retried_to_success
+    - complete_trial_artifacts_are_immutable
+    - resume_skips_complete_trials
+    - no_undeclared_model_or_tool_access
+    - handoff_receipt_complete
+
+handoff:
+  to: Claude integrator
+  required_fields:
+    - exact_head_sha
+    - changed_files
+    - commands_run
+    - tests_run
+    - acceptance_results
+    - unresolved_risks
+    - interface_change_requests
+    - integration_notes
+
+stop_conditions:
+  - design_freeze_changes_runtime_interface
+  - shared_file_edit_required
+  - hidden_model_or_tool_dependency_discovered
+  - result_provenance_cannot_be_made_immutable
+
+cuts:
+  first:
+    - rich_terminal_ui
+    - multi_agent_comparison
+    - generalized_scheduler
+    - plugin_marketplace
