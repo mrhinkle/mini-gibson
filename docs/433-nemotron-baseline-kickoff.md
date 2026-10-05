@@ -1,6 +1,6 @@
 # Nemotron baseline collection kickoff (#433)
 
-**Status:** Dataset does **not** exist yet. This repo previously only had LICENSE + stub README. Collection is observation-only via OpenRouter — **do not invent traces**.
+**Status:** Agent handoff kit lives in `docs/433-agent-kit/`. First Mini batch produced **300** real rows (full JSONL stays on the Mini; sample in-repo). Collection remains observation-only via OpenRouter — **do not invent traces**.
 
 Canonical issue: https://github.com/The-AIE/the-gibson/issues/433  
 Env scaffold (draft): https://github.com/The-AIE/the-gibson/pull/416  
