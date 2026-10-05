@@ -1,0 +1,4 @@
+app:
+  name: widget-service
+  # APP_PORT default lives elsewhere — do not assume this file
+  host: 0.0.0.0

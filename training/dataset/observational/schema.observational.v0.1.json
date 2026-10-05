@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mini-gibson/observational-run/v0.1",
+  "title": "Mini Gibson Nemotron observational baseline run (#433)",
+  "type": "object",
+  "required": [
+    "run_id",
+    "task_id",
+    "task_source",
+    "timestamp",
+    "model",
+    "provider",
+    "split",
+    "system_instructions",
+    "agent_runtime_version",
+    "declared_tools",
+    "tool_calls",
+    "files_inspected",
+    "files_edited",
+    "tests_invoked",
+    "tool_errors",
+    "test_failures",
+    "repair_attempts",
+    "retry_count",
+    "final_patch",
+    "completion_claim",
+    "verifier_outcome",
+    "terminal_outcome",
+    "elapsed_ms"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "task_id": {"type": "string"},
+    "task_source": {"type": "string", "description": "DEV fixture id; never a holdout"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "model": {"const": "nvidia/nemotron-3.5-lightning"},
+    "provider": {"type": "string", "minLength": 1},
+    "provider_metadata": {"type": "object"},
+    "split": {"const": "DEV_OBSERVATIONAL"},
+    "system_instructions": {"type": "string"},
+    "agent_runtime_version": {"type": "string"},
+    "declared_tools": {"type": "array", "items": {"type": "string"}},
+    "tool_calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["order", "tool", "arguments"],
+        "properties": {
+          "order": {"type": "integer", "minimum": 1},
+          "tool": {"type": "string"},
+          "arguments": {"type": "object"},
+          "result_summary": {"type": "string"}
+        }
+      }
+    },
+    "files_inspected": {"type": "array", "items": {"type": "string"}},
+    "files_edited": {"type": "array", "items": {"type": "string"}},
+    "tests_invoked": {"type": "array", "items": {"type": "string"}},
+    "tool_errors": {"type": "array", "items": {"type": "object"}},
+    "test_failures": {"type": "array", "items": {"type": "object"}},
+    "diagnosis_after_failure": {"type": ["string", "null"]},
+    "repair_attempts": {"type": "integer", "minimum": 0},
+    "retry_count": {"type": "integer", "minimum": 0},
+    "final_patch": {"type": ["string", "null"]},
+    "completion_claim": {"type": ["string", "null"]},
+    "verifier_outcome": {"type": "string"},
+    "terminal_outcome": {
+      "enum": ["verified", "partial", "failed", "aborted", "timeout_or_infrastructure"]
+    },
+    "failure_labels": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "wrong_tool",
+          "invalid_arguments",
+          "insufficient_investigation",
+          "wrong_file",
+          "incorrect_implementation",
+          "failed_test_ignored",
+          "bad_diagnosis",
+          "unsuccessful_repair",
+          "premature_completion",
+          "verifier_caught_defect",
+          "timeout_or_infrastructure"
+        ]
+      }
+    },
+    "input_tokens": {"type": ["integer", "null"]},
+    "output_tokens": {"type": ["integer", "null"]},
+    "elapsed_ms": {"type": "integer", "minimum": 0},
+    "cost_usd": {"type": ["number", "null"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}
