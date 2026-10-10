@@ -4,27 +4,60 @@ kind: OptionalDecisionService
 metadata:
   name: jev
   status: OPTIONAL_NOT_CRITICAL_PATH
+  implementation: adapters/jev.py
+  contract_documentation: docs/jev.md
 
 provider:
   product: TypeSafe Jev
   purpose: typed structured decisions
   not_a_coding_model: true
+  endpoint: https://api.typesafe.ai/v1/systemone
+  method: POST
+  model: jev-1.13.0
   credentials_env:
     - TYPESAFE_API_KEY
 
+# Contract catalog; experiment.manifest loads integrations.jev from an Experiment.
+configuration:
+  experiment_path: integrations.jev
+  defaults:
+    enabled: false
+    model: jev-1.13.0
+    timeout_seconds: 3.0
+    min_confidence: 0.8
+    scored_loop: excluded_from_scored_loop
+  unknown_fields: reject
+  timeout_contract: socket_per_request_not_total_deadline
+
+ownership:
+  mark_codex:
+    - decision_service_adapter_and_configuration
+    - fairness_validation_and_runtime_tool_risk_hook
+    - telemetry_production_and_runtime_tests
+  john_grok:
+    - future_anomaly_hook_calls_from_redacted_recorded_summaries
+    - immutable_result_metadata_consumption_and_reporting
+    - latency_fallback_and_error_observability
+  claude:
+    - independent_exact_head_review
+    - shared_question_policy_and_artifact_version_coordination
+
 principle:
   rule: >
-    Jev may assist bounded operational decisions, routing, classification,
-    or escalation. It must not be hidden generative capacity and must not
-    change only one causal benchmark arm unless explicitly registered as
-    part of that treatment.
+    Jev provides bounded operational advice only. It must not add hidden
+    generative capacity. Scored comparisons exclude Jev or freeze the same
+    configuration, questions, state projection, and fallback policy in every arm.
 
 allowed_uses:
   - id: supervisor-escalation
+    hook: DecisionService.supervisor_advice
+    integration_status: exported_hook_future_supervisor_owner_wiring
     state_inputs:
-      - current_run_state
-      - infrastructure_health
-      - retry_history
+      - infrastructure_healthy
+      - failure_kind
+      - execution_started
+      - infrastructure_retry_allowed
+      - retry_count
     questions:
       action:
         type: choice
@@ -43,9 +76,12 @@ allowed_uses:
           - high
     authority: advisory
   - id: tool-call-guard
-    condition: >
-      Use only outside causal benchmark scoring, or identically across all
-      compared arms under a frozen policy.
+    hook: DecisionService.classify_tool_risk
+    integration_status: gibson_env_metadata_only_hook
+    state_inputs:
+      - tool
+      - permission_granted
+    condition: excluded_from_scored_loop_or_frozen_identical_policy
     questions:
       allow_tool_call:
         type: noul
@@ -55,12 +91,14 @@ allowed_uses:
           - low
           - medium
           - high
-    authority: advisory_or_policy_input
+    authority: advisory_no_permission_changes
   - id: benchmark-anomaly-triage
+    hook: DecisionService.triage_anomaly
+    integration_status: exported_hook_future_benchmark_owner_wiring
     state_inputs:
-      - task_result
-      - failure_taxonomy
-      - telemetry_summary
+      - terminal_state
+      - failure_kind
+      - tool_error_count
     questions:
       anomaly_class:
         type: choice
@@ -69,9 +107,13 @@ allowed_uses:
           - infrastructure_failure
           - telemetry_corruption
           - requires_human_review
-    authority: advisory
+    authority: advisory_no_rescoring
   - id: model-or-agent-routing
-    condition: post_hackathon_or_noncausal_operator_mode
+    hook: DecisionService.routing_advice
+    condition: explicit_noncausal_operator_mode_only
+    state_inputs:
+      - current_agent
+      - infrastructure_healthy
     questions:
       route:
         type: choice
@@ -81,33 +123,58 @@ allowed_uses:
           - claude_code
           - grok
           - human
-    authority: advisory
+    authority: advisory_no_model_switch_or_adapter_promotion
 
 forbidden_uses:
   - generate_code
   - replace_nemotron
   - award_verified
-  - decide_adapter_promotion_without_deterministic_metrics
+  - replace_or_alter_evidence_gate
+  - decide_adapter_promotion
   - inspect_hidden_benchmark_answers
   - retry_failed_tasks_until_pass
-  - silently_change_tool_permissions
+  - change_tool_permissions
+  - change_recorded_scores
 
 causal_experiment_policy:
   default: excluded_from_scored_loop
   alternative: identical_across_all_arms
+  missing_run_scored: true
+  identical_policy_requires:
+    - complete_comparison_arms_with_at_least_two_unique_ids
+    - explicit_executing_arm_id
+    - every_effective_arm_config_equals_root_config
+    - frozen_comparison_jev_policy_sha256
+  fingerprint_inputs:
+    - effective_configuration
+    - endpoint
+    - questions_and_question_set_version
+    - state_projection_version
+    - fallback_policy_version
+  routing_in_scored_loop: always_excluded
+  runner_obligations:
+    - same_hook_placement_and_state_projection_in_all_arms
+    - immutable_manifests_and_trial_results
+    - consistent_latency_accounting
+  question_set_version: mini-gibson-jev/v1
   required_logging:
-    - request_state_hash
+    - policy_sha256
+    - state_sha256
+    - request_sha256
     - question_set_version
-    - typed_answers
-    - confidence_or_probabilities_if_available
-    - latency
-    - fallback_or_error
-  low_confidence_policy: human_or_deterministic_fallback
+    - typed_answers_and_effective_answers
+    - confidence_and_noul_confidence_policy
+    - latency_ms
+    - fallback_and_error
+  raw_state_and_credentials_logging: forbidden
+  low_confidence_policy: deterministic_human_or_conservative_advice
+  noul_confidence_policy: local_abs_2p_minus_1
 
 integration_options:
-  preferred:
-    - official TypeSafe API or SDK
-    - MCP only if its behavior and version are pinned
+  implemented: official_TypeSafe_REST_API
+  automatic_retries: false
+  live_api_verified: false
   secret_handling:
+    - process_environment_only
     - server_side_only
     - never_commit_key

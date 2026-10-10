@@ -25,6 +25,10 @@ shared_files:
     - docs/architecture.md
     - docs/experiment-protocol.md
     - docs/agent-conformance.md
+    - integrations/jev.yaml
+    - docs/jev.md
+    - workflows/mark-runtime.yaml
+    - workflows/john-data-infra.yaml
   rule: workers_must_propose_changes_via_handoff_not_edit
 
 lanes:
@@ -57,6 +61,9 @@ lanes:
       - infrastructure-vs-task retry separation
       - experiment doctor/start/run/resume/report CLI surface
       - runtime unit/integration tests
+      - optional Jev official decision-service adapter and configuration
+      - Jev fairness validation telemetry deterministic fallback and metadata-only tool-risk hook
+      - exported Jev supervisor and routing hooks for future runner wiring
     acceptance:
       - deterministic smoke task reaches legitimate terminal result
       - unsupported VERIFIED state is rejected
@@ -64,6 +71,9 @@ lanes:
       - completed trial artifacts are immutable
       - resume skips already-complete trials
       - no undeclared model/tool access
+      - Jev disabled and excluded modes make no remote calls
+      - Jev rejects unequal or unfrozen scored comparison policies
+      - Jev cannot change permissions Evidence Gate scores or adapter promotion
     cut_first:
       - cross-agent ecological comparisons
       - rich terminal UI
@@ -104,6 +114,8 @@ lanes:
       - report generator consuming immutable run artifacts
       - presentation data export consuming same results
       - evaluation/infrastructure tests
+      - future Jev anomaly-hook wiring from redacted recorded summaries
+      - future Jev metadata report consumption after immutable outcomes without rescoring
     acceptance:
       - fresh environment can prove required revision pins
       - vLLM base-model smoke passes on validated GPU
@@ -116,6 +128,21 @@ lanes:
       - multi-harness benchmark
       - elaborate visualization
       - synthetic-data expansion
+
+optional_integrations:
+  jev:
+    critical_path: false
+    enabled_by_default: false
+    contract: integrations/jev.yaml
+    runtime_owner: Mark and Codex
+    evaluation_owner: John and Grok
+    shared_protocol_and_independent_review_owner: Claude
+    current_boundary: adapter_validation_telemetry_tool_risk_and_exported_hooks
+    missing_runners: supervisor_and_benchmark
+    scored_policy: excluded_or_frozen_identical_across_every_declared_arm
+    routing_policy: explicit_noncausal_operator_mode_only
+    shared_changes: bounded_owner_approved_optional_extension
+    broader_draft_and_freeze_gates: remain_in_force
 
 handoff:
   lane_output:

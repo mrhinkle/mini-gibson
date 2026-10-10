@@ -72,6 +72,8 @@ inputs:
   - docs/experiment-protocol.md
   - docs/agent-conformance.md
   - build.manifest.yaml
+  - integrations/jev.yaml
+  - docs/jev.md
 
 build_steps:
   - id: runtime-01
@@ -108,6 +110,34 @@ build_steps:
       - report
   - id: runtime-10
     action: implement runtime tests and one deterministic end-to-end smoke
+  - id: jev-runtime-01
+    action: implement optional official TypeSafe REST adapter disabled by default
+    output: pinned typed-question adapter with environment-only credentials
+  - id: jev-runtime-02
+    action: validate excluded or frozen identical Jev policy across scored arms
+    output: fail-closed Jev manifest extension and policy fingerprint
+  - id: jev-runtime-03
+    action: emit safe request/response metadata with deterministic fallback
+    output: append-only Jev telemetry and runtime tests
+  - id: jev-runtime-04
+    action: wire metadata-only GibsonEnv tool-risk hook and export supervisor/routing hooks
+    output: advisory interface without permission or verification changes
+
+optional_integrations:
+  jev:
+    critical_path: false
+    enabled_by_default: false
+    contract: integrations/jev.yaml
+    current_boundary: tool_risk_metadata_and_exported_decision_hooks
+    future_supervisor_wiring_owner: Mark and Codex
+    shared_protocol_owner: Claude
+    prohibited_authority:
+      - code_generation_or_nemotron_replacement
+      - verified_or_evidence_gate_changes
+      - tool_permission_or_adapter_promotion_decisions
+      - retry_execution_or_score_changes
+    shared_file_changes: bounded_owner_approved_integration_handoff_only
+    broader_design_freeze_gates: remain_in_force
 
 acceptance:
   required:
@@ -119,6 +149,11 @@ acceptance:
     - resume_skips_complete_trials
     - no_undeclared_model_or_tool_access
     - handoff_receipt_complete
+    - jev_disabled_and_excluded_modes_make_no_remote_call
+    - jev_unequal_or_unfrozen_scored_policy_is_rejected
+    - jev_errors_and_low_confidence_use_deterministic_fallback
+    - jev_safe_metadata_and_hashes_are_logged
+    - jev_cannot_change_permissions_verified_scores_or_adapter_promotion
 
 handoff:
   to: Claude integrator
@@ -131,6 +166,8 @@ handoff:
     - unresolved_risks
     - interface_change_requests
     - integration_notes
+    - jev_policy_and_question_set_versions
+    - jev_future_runner_wiring_limits
 
 stop_conditions:
   - design_freeze_changes_runtime_interface

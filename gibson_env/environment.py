@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from experiment.decisions import DecisionService
 
 from .schema import Action, Observation, Task, TerminalState, Verification
 
@@ -12,9 +15,10 @@ Verifier = Callable[[Task, list[dict[str, Any]]], Verification]
 class GibsonEnv:
     """Shared environment boundary for benchmark, demo, and future training."""
 
-    def __init__(self, tools: dict[str, Tool], verifier: Verifier):
+    def __init__(self, tools: dict[str, Tool], verifier: Verifier, *, decisions: DecisionService | None = None):
         self._tools = tools
         self._verifier = verifier
+        self._decisions = decisions
         self._task: Task | None = None
         self._events: list[dict[str, Any]] = []
         self._repair_count = 0
@@ -36,6 +40,11 @@ class GibsonEnv:
         task = self._require_task()
         if self._done:
             raise RuntimeError("episode is terminal")
+        if self._decisions is not None:
+            self._decisions.classify_tool_risk(
+                action.tool if action.tool in task.allowed_tools else "undeclared_tool",
+                action.tool in task.allowed_tools,
+            )
         if action.tool not in task.allowed_tools:
             event = {"kind": "tool_error", "error": "PERMISSION_DENIED", "tool": action.tool}
             self._events.append(event)

@@ -34,3 +34,11 @@ The causal protocol is not frozen until the Claude-led Kimi K3 + GLM-5.2 steelma
 - Reproducibility is a deliverable.
 
 Private preparation repo: do not publish holdouts, private historical data, secrets, or training artifacts without an explicit release decision.
+
+## Optional Jev advice
+
+The optional [Jev decision service](docs/jev.md) uses TypeSafe's official typed-decision API, is disabled by default, and never replaces Nemotron or GibsonEnv's completion authority. The implemented tool-risk hook records advice without changing permissions. Supervisor/routing and anomaly hooks are exported for future runner integration. Scored runs exclude remote Jev calls by default; an alternative mode validates a frozen policy identical across every declared arm.
+
+Mark/Codex owns the adapter/configuration, fairness checks, telemetry and runtime tests; John/Grok owns future post-outcome anomaly/report consumption; Claude independently reviews and coordinates shared contracts. The Jev extension does not waive the pending design freeze.
+
+Install with Python >=3.11 (`python -m pip install -e .`) and run `python -m unittest discover -v`. Tests use deterministic API fixtures; no live TypeSafe credential setup or API verification is included.

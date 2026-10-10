@@ -25,9 +25,19 @@ benchmark:
   status: DRAFT_DO_NOT_TUNE
 
 run:
+  scored: true
   trials_per_task: UNFROZEN
   max_steps: UNFROZEN
   wall_clock_seconds: UNFROZEN
+
+# Optional operational advice; absent configuration also defaults to disabled.
+integrations:
+  jev:
+    enabled: false
+    model: jev-1.13.0
+    timeout_seconds: 3.0
+    min_confidence: 0.8
+    scored_loop: excluded_from_scored_loop
 
 evaluation:
   primary_metric: verified_task_resolution_rate
