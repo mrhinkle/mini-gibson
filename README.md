@@ -42,3 +42,19 @@ The optional [Jev decision service](docs/jev.md) uses TypeSafe's official typed-
 Mark/Codex owns the adapter/configuration, fairness checks, telemetry and runtime tests; John/Grok owns future post-outcome anomaly/report consumption; Claude independently reviews and coordinates shared contracts. The Jev extension does not waive the pending design freeze.
 
 Install with Python >=3.11 (`python -m pip install -e .`) and run `python -m unittest discover -v`. Tests use deterministic API fixtures; no live TypeSafe credential setup or API verification is included.
+
+## Agent handoff (#433 observational baseline)
+
+**Agents: start at [`docs/433-agent-kit/README.md`](docs/433-agent-kit/README.md).**
+
+That kit has the workplan, copy-paste prompts (Codex + Claude computer use), Mark/John oversight checklist, portable runners, fixtures, schema, and a sample of real traces.
+
+Related:
+
+- Kickoff notes: [`docs/433-nemotron-baseline-kickoff.md`](docs/433-nemotron-baseline-kickoff.md)
+- Canonical issue: https://github.com/The-AIE/the-gibson/issues/433
+- Data layout: [`training/dataset/observational/`](training/dataset/observational/)
+
+## License
+
+See [LICENSE](LICENSE).

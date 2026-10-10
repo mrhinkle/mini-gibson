@@ -1,8 +1,27 @@
-__pycache__/
-*.py[cod]
-.venv/
-*.egg-info/
-runs/
+# secrets / local env
 .env
 .env.*
 !.env.example
+*.pem
+**/or-key*.env
+**/or-spend*.json
+
+# full observational datasets (keep sample + schema only)
+training/dataset/observational/runs.jsonl
+training/dataset/observational/runs/
+training/dataset/observational/STOP
+training/dataset/observational/**/runner_state.json
+training/dataset/observational/splits/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+runs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

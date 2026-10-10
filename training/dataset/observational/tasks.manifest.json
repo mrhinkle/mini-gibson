@@ -1,0 +1,549 @@
+{
+  "split": "DEV_OBSERVATIONAL",
+  "issue": "https://github.com/The-AIE/the-gibson/issues/433",
+  "model": "nvidia/nemotron-3.5-lightning",
+  "provider_pin": "CoreWeave",
+  "notes": "All fixtures are synthetic local DEV tasks for observational baseline collection.",
+  "tasks": [
+    {
+      "task_id": "dev-fix-off-by-one",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-off-by-one",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "Fix off-by-one in sum_to_n"
+    },
+    {
+      "task_id": "dev-investigate-app-port",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-app-port",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "Locate APP_PORT"
+    },
+    {
+      "task_id": "dev-debug-greeting",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-greeting",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "Diagnose/repair greeting"
+    },
+    {
+      "task_id": "dev-fix-factorial",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-factorial",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-factorial"
+    },
+    {
+      "task_id": "dev-fix-clamp",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-clamp",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-clamp"
+    },
+    {
+      "task_id": "dev-fix-palindrome",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-palindrome",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-palindrome"
+    },
+    {
+      "task_id": "dev-fix-avg",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-avg",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-average"
+    },
+    {
+      "task_id": "dev-fix-unique",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-unique",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-unique-preserve-order"
+    },
+    {
+      "task_id": "dev-fix-fizzbuzz",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-fizzbuzz",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-fizzbuzz"
+    },
+    {
+      "task_id": "dev-fix-binary-search",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-binary-search",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-binary-search"
+    },
+    {
+      "task_id": "dev-fix-slugify",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-slugify",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-slugify"
+    },
+    {
+      "task_id": "dev-fix-js-sum",
+      "kind": "fix",
+      "lang": "javascript",
+      "path": "fixtures/dev-fix-js-sum",
+      "verify_cmd": "node test_sum.js",
+      "synthetic": true,
+      "goal": "fix-js-sum"
+    },
+    {
+      "task_id": "dev-fix-sh-count",
+      "kind": "fix",
+      "lang": "shell",
+      "path": "fixtures/dev-fix-sh-count",
+      "verify_cmd": "bash -c 'test \"$(bash count.sh sample.txt)\" = \"3\"'",
+      "synthetic": true,
+      "goal": "fix-sh-linecount"
+    },
+    {
+      "task_id": "dev-debug-merge-dicts",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-merge-dicts",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-merge-dicts"
+    },
+    {
+      "task_id": "dev-debug-parse-int",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-parse-int",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-parse-ints"
+    },
+    {
+      "task_id": "dev-debug-stack",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-stack",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-stack-pop"
+    },
+    {
+      "task_id": "dev-debug-json-key",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-json-key",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-json-key-case"
+    },
+    {
+      "task_id": "dev-debug-timezone",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-timezone",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-timezone-utc"
+    },
+    {
+      "task_id": "dev-investigate-api-base",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-api-base",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-api-base"
+    },
+    {
+      "task_id": "dev-investigate-feature-flag",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-feature-flag",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-feature-flag"
+    },
+    {
+      "task_id": "dev-investigate-log-level",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-log-level",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-log-level-default"
+    },
+    {
+      "task_id": "dev-investigate-owner",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-owner",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-codeowners-billing"
+    },
+    {
+      "task_id": "dev-investigate-secret-name",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-secret-name",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-k8s-secret-ref"
+    },
+    {
+      "task_id": "dev-refactor-extract-helper",
+      "kind": "refactor",
+      "lang": "python",
+      "path": "fixtures/dev-refactor-extract-helper",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "refactor-extract-normalize"
+    },
+    {
+      "task_id": "dev-refactor-rename",
+      "kind": "refactor",
+      "lang": "python",
+      "path": "fixtures/dev-refactor-rename",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "refactor-rename-calcTax"
+    },
+    {
+      "task_id": "dev-multifile-version-bump",
+      "kind": "multifile",
+      "lang": "mixed",
+      "path": "fixtures/dev-multifile-version-bump",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "multifile-version-bump"
+    },
+    {
+      "task_id": "dev-multifile-rename-module",
+      "kind": "multifile",
+      "lang": "python",
+      "path": "fixtures/dev-multifile-rename-module",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "multifile-rename-module"
+    },
+    {
+      "task_id": "dev-multifile-add-constant",
+      "kind": "multifile",
+      "lang": "python",
+      "path": "fixtures/dev-multifile-add-constant",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "multifile-add-port-constant"
+    },
+    {
+      "task_id": "dev-failing-test-wrong-expect",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-failing-test-wrong-expect",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "failing-test-wrong-expectation"
+    },
+    {
+      "task_id": "dev-fix-counter",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-counter",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-counter-reset"
+    },
+    {
+      "task_id": "dev-fix-retry",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-retry",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-retry-call"
+    },
+    {
+      "task_id": "dev-fix-path-join",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-path-join",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-path-join"
+    },
+    {
+      "task_id": "dev-fix-email-mask",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-email-mask",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-email-mask"
+    },
+    {
+      "task_id": "dev-fix-titlecase",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-titlecase",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-titlecase"
+    },
+    {
+      "task_id": "dev-fix-gcd",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-gcd",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-gcd"
+    },
+    {
+      "task_id": "dev-fix-anagram",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-anagram",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-anagrams"
+    },
+    {
+      "task_id": "dev-fix-csv-header",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-csv-header",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-csv-headers"
+    },
+    {
+      "task_id": "dev-fix-range-inclusive",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-range-inclusive",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-inclusive-range"
+    },
+    {
+      "task_id": "dev-fix-is-even",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-is-even",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-is-even"
+    },
+    {
+      "task_id": "dev-fix-min-index",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-min-index",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-min-index"
+    },
+    {
+      "task_id": "dev-fix-safe-div",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-safe-div",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-safe-div"
+    },
+    {
+      "task_id": "dev-fix-flatten",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-flatten",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-flatten"
+    },
+    {
+      "task_id": "dev-fix-rotate",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-rotate",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-rotate-left"
+    },
+    {
+      "task_id": "dev-fix-chunk",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-chunk",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-chunked"
+    },
+    {
+      "task_id": "dev-investigate-timeout",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-timeout",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-timeout-ms"
+    },
+    {
+      "task_id": "dev-investigate-db-url",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-db-url",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-database-url"
+    },
+    {
+      "task_id": "dev-debug-list-copy",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-list-copy",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-list-copy"
+    },
+    {
+      "task_id": "dev-debug-sort-key",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-sort-key",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-sort-by-age"
+    },
+    {
+      "task_id": "dev-fix-js-greet",
+      "kind": "fix",
+      "lang": "javascript",
+      "path": "fixtures/dev-fix-js-greet",
+      "verify_cmd": "node test_greet.js",
+      "synthetic": true,
+      "goal": "fix-js-greet"
+    },
+    {
+      "task_id": "dev-fix-trim-lines",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-trim-lines",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-trim-lines"
+    },
+    {
+      "task_id": "dev-fix-percent",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-percent",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-percent"
+    },
+    {
+      "task_id": "dev-refactor-constants",
+      "kind": "refactor",
+      "lang": "python",
+      "path": "fixtures/dev-refactor-constants",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "refactor-pricing-constants"
+    },
+    {
+      "task_id": "dev-multifile-config-wire",
+      "kind": "multifile",
+      "lang": "python",
+      "path": "fixtures/dev-multifile-config-wire",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "multifile-wire-theme-config"
+    },
+    {
+      "task_id": "dev-investigate-port-conflict",
+      "kind": "investigate",
+      "lang": "mixed",
+      "path": "fixtures/dev-investigate-port-conflict",
+      "verify_cmd": "true",
+      "synthetic": true,
+      "goal": "investigate-port-conflict"
+    },
+    {
+      "task_id": "dev-fix-leap-year",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-leap-year",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-leap-year"
+    },
+    {
+      "task_id": "dev-fix-kebab",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-fix-kebab",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "fix-to-kebab"
+    },
+    {
+      "task_id": "dev-debug-index-error",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-debug-index-error",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "debug-nth-oob"
+    },
+    {
+      "task_id": "dev-hard-inventory-multibug",
+      "kind": "debug",
+      "lang": "python",
+      "path": "fixtures/dev-hard-inventory-multibug",
+      "verify_cmd": "python3 -m unittest discover -s tests -t . -q",
+      "synthetic": true,
+      "goal": "Make all tests in tests/ pass. There is more than one bug and they are in different files. Do not edit tests."
+    },
+    {
+      "task_id": "dev-hard-dont-edit-tests",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-hard-dont-edit-tests",
+      "verify_cmd": "python3 -m unittest -q && bash check_tests_unchanged.sh",
+      "synthetic": true,
+      "goal": "Make to_roman support subtractive notation so tests pass. Editing test_roman.py is forbidden and is checked."
+    },
+    {
+      "task_id": "dev-hard-lru-cache",
+      "kind": "fix",
+      "lang": "python",
+      "path": "fixtures/dev-hard-lru-cache",
+      "verify_cmd": "python3 -m unittest -q",
+      "synthetic": true,
+      "goal": "Make LRU evict least-recently-used (get and put both refresh recency)."
+    }
+  ]
+}
