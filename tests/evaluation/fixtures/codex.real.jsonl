@@ -1,0 +1,8 @@
+{"type":"thread.started","thread_id":"01a107c3-b559-73f3-87ed-5def0c17cf49"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest."}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"I’ll run `cat note.txt` now.\n"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/bash -lc 'cat note.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/bash -lc 'cat note.txt'","aggregated_output":"hello fixture\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"DONE"}}
+{"type":"turn.completed","usage":{"input_tokens":48611,"cached_input_tokens":24064,"cache_write_input_tokens":0,"output_tokens":51,"reasoning_output_tokens":0}}
