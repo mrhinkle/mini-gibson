@@ -1,0 +1,1095 @@
+diff --git a/scripts/neon-rehearsal-trust.test.mjs b/scripts/neon-rehearsal-trust.test.mjs
+index 7b5fb8a90..51b7e9f8d 100644
+--- a/scripts/neon-rehearsal-trust.test.mjs
++++ b/scripts/neon-rehearsal-trust.test.mjs
+@@ -3515,6 +3515,48 @@ test("mutation (o) added malicious caller of the callee fails the inventory", ()
+   );
+ });
+ 
++test("mutation (r) an unlisted workflow interpolating secrets.NEON_API_KEY fails the inventory", () => {
++  assert.deepEqual(
++    [...NEON_API_KEY_WORKFLOW_ALLOWLIST].sort(),
++    [
++      "neon-preview-cleanup.yml",
++      "neon-rehearsal-baseline-sync.yml",
++      "neon-rehearsal-cow.yml",
++      "neon-schema-rehearsal.yml",
++      "production-migrate.yml",
++    ]
++  );
++  assert.equal(
++    NEON_API_KEY_WORKFLOW_ALLOWLIST.includes(
++      "production-apply-homepage-ata.yml"
++    ),
++    false
++  );
++  assert.equal(
++    existsSync(
++      join(repoRoot, ".github/workflows/production-apply-homepage-ata.yml")
++    ),
++    false
++  );
++  const unlisted = load(
++    [
++      "name: unlisted-neon-key",
++      "on: workflow_dispatch",
++      "jobs:",
++      "  hold:",
++      "    runs-on: ubuntu-latest",
++      "    steps:",
++      "      - run: echo ${{ secrets.NEON_API_KEY }}",
++      "",
++    ].join("\n")
++  );
++  const docs = { ...realWorkflows, "unlisted-neon-key.yml": unlisted };
++  assert.throws(
++    () => assertNeonWorkflowInventory(docs),
++    /unlisted-neon-key\.yml/
++  );
++});
++
+ test("mutation (p) mutable @main pin fails SHA pin", () => {
+   const doc = load(readFileSync(join(FIXTURES, "p-mutable-ref.yml"), "utf8"));
+   assert.throws(() => assertCallerTrustBoundary(doc), /mutable ref|40-hex/);
+diff --git a/scripts/real-content-fixture-branding-sensor.mjs b/scripts/real-content-fixture-branding-sensor.mjs
+index ea457aae7..62ab184ca 100644
+--- a/scripts/real-content-fixture-branding-sensor.mjs
++++ b/scripts/real-content-fixture-branding-sensor.mjs
+@@ -5,27 +5,33 @@
+  */
+ 
+ /**
+- * Inverted real-content sensor (#1465 / #1469 / #1479 / #1576).
++ * Sample-archive sensor (#1465 / #1469 / #1479 / #1576, retargeted for the
++ * open-source tree).
+  *
+- * Write-time guards keep real employers out of invented fixtures. This sensor
+- * is the other direction: every path listed by
+- * `listRealContentSourcePaths()` must stay free of fixture branding from
+- * `src/lib/seed-fictional-company-allowlist.json` (an `allowedExact` name, or
+- * a value starting with `allowedPrefix` "Seed Speaker Co (").
++ * The files listed in `src/lib/seed-real-content-manifest.json` are the
++ * fictional Example Conf sample, provenance-locked by SHA-256. They are not
++ * a sourced archive of a real event. `carriesFixtureBranding` / 
++ * `findFixtureBrandingInRealContent` still report allowlist matches; the
++ * process exit uses `carriesSampleArchiveResidue` instead, because the two
++ * sample employers are themselves on that allowlist.
+  *
+- * It also verifies a SHA-256 digest of each listed file's raw bytes against
+- * the `digests` map in `src/lib/seed-real-content-manifest.json`. A listed
+- * path with no recorded digest is a fail-closed failure, never a silent skip.
+- * Branding and digest checks both run every invocation; either failing is a
+- * sensor failure, and both sets of findings are reported together.
++ * A default run (no injected `paths`) fails closed when the manifest is
++ * missing, unreadable, malformed, or lists no paths. It never treats that
++ * as a pass. A listed file that is zero-length or whitespace-only fails
++ * as `empty-input`. A listed JSON document that is an empty string, an
++ * empty array, or an empty object fails the same way, except an empty
++ * array or empty object whose manifest entry sets `"allowEmpty": true`.
++ * That opt-in does not cover a blank file or an empty string. Digest
++ * checks still fail on a missing digest or a byte mismatch. Residue
++ * checks fail when a listed string is a known real employer, a
++ * retired-tenant identifier, the generic Seed Speaker Co / Seed Fixture
++ * Co placeholder, or any other fictional-allowlist company besides
++ * Northstar Cognition Labs and Cascade Compute.
+  *
+- * Scope limit: digest verification converts unacknowledged archive drift —
+- * a change where nobody ran the updater (accidental corruption, a careless
+- * script, a bad merge, a change nobody meant to make) — from silent to a
+- * loud CI failure. It does not stop a deliberate fabricate-then-run-the-updater
+- * sequence in one PR; that needs a reviewed-change gate (#1465's proposed
+- * `- Archive-data: intentional #<issue>` PR-body marker, or equivalent),
+- * which is out of scope here and tracked in #1576.
++ * Scope limit: digest verification converts unacknowledged byte drift into
++ * a CI failure. A deliberate edit that also runs the digest updater still
++ * has to pass the residue check; the updater does not bless a real employer
++ * or a retired-tenant identifier.
+  *
+  * Usage: node scripts/real-content-fixture-branding-sensor.mjs
+  */
+@@ -39,6 +45,8 @@ import { isMainModule } from "./lib/is-main.mjs";
+ import {
+   isAllowedSeedCompanyName,
+   listRealContentSourcePaths,
++  normalizeCompanyKey,
++  seedTextContainsRealCompany,
+ } from "./lib/seed-fixture-guards.mjs";
+ 
+ const here = path.dirname(fileURLToPath(import.meta.url));
+@@ -80,6 +88,47 @@ export function carriesFixtureBranding(value) {
+   return isAllowedSeedCompanyName(value);
+ }
+ 
++/**
++ * Fictional employers the Example Conf sample is allowed to name.
++ * Any other allowlist company is residue: the digest updater must not be
++ * enough to swap the sample for a different fixture brand.
++ */
++export const SAMPLE_ARCHIVE_COMPANIES = new Set([
++  "northstar cognition labs",
++  "cascade compute",
++]);
++
++/**
++ * Retired-tenant identifiers. The pattern is the check; a hit is a failure,
++ * not a documentation comment.
++ */
++const RETIRED_TENANT_RESIDUE_RE =
++  /allthingsai|all things ai|all-things-ai|all things open|conference-os-ata|\batai\b|ata\/release|events\.allthings|\bATA\b|2025\.allthings|2026\.allthings/i;
++
++const GENERIC_FIXTURE_PLACEHOLDER_RE = /Seed Speaker Co|Seed Fixture Co/;
++
++/**
++ * True when a string must not appear in a provenance-locked sample file.
++ * Empty / whitespace-only is no attribution. The two sample employers are
++ * allowed. Every other allowlisted fictional company, the generic
++ * placeholder, a known real employer, and a retired-tenant identifier are
++ * residue.
++ *
++ * @param {unknown} value
++ * @returns {boolean}
++ */
++export function carriesSampleArchiveResidue(value) {
++  if (typeof value !== "string") return false;
++  if (!value.trim()) return false;
++  if (GENERIC_FIXTURE_PLACEHOLDER_RE.test(value)) return true;
++  if (seedTextContainsRealCompany(value)) return true;
++  if (RETIRED_TENANT_RESIDUE_RE.test(value)) return true;
++  if (isAllowedSeedCompanyName(value)) {
++    return !SAMPLE_ARCHIVE_COMPANIES.has(normalizeCompanyKey(value));
++  }
++  return false;
++}
++
+ /**
+  * Scan listed real-content JSON files for fixture branding.
+  *
+@@ -123,6 +172,233 @@ export function formatFixtureBrandingErrors(findings) {
+   );
+ }
+ 
++/**
++ * @param {string} root
++ * @param {string} rel
++ * @returns {boolean}
++ */
++function pathStaysInRoot(root, rel) {
++  if (typeof rel !== "string" || !rel || path.isAbsolute(rel)) return false;
++  const abs = path.resolve(root, rel);
++  const relative = path.relative(root, abs);
++  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
++}
++
++/**
++ * @param {unknown} value
++ * @returns {Set<string>}
++ */
++function asAllowEmptySet(value) {
++  if (value instanceof Set) return value;
++  if (Array.isArray(value)) return new Set(value);
++  return new Set();
++}
++
++/**
++ * True when the parsed JSON document itself has no content.
++ * Nested empty strings inside a non-empty document are not empty inputs.
++ *
++ * @param {unknown} parsed
++ * @returns {boolean}
++ */
++function isEmptyJsonDocument(parsed) {
++  if (typeof parsed === "string") return parsed.trim().length === 0;
++  if (Array.isArray(parsed)) return parsed.length === 0;
++  if (parsed !== null && typeof parsed === "object") {
++    return Object.keys(parsed).length === 0;
++  }
++  return false;
++}
++
++/**
++ * `allowEmpty` opts in only an empty array or an empty object.
++ * A blank file and an empty or whitespace JSON string stay failures.
++ *
++ * @param {unknown} parsed
++ * @param {string} rel
++ * @param {Set<string>} allowEmpty
++ * @returns {boolean}
++ */
++function emptyDocumentIsOptedIn(parsed, rel, allowEmpty) {
++  if (!allowEmpty.has(rel)) return false;
++  if (Array.isArray(parsed)) return true;
++  return parsed !== null && typeof parsed === "object";
++}
++
++/**
++ * Scan listed sample JSON files for residue.
++ *
++ * A missing, unreadable, malformed, or empty file is a finding. It is not
++ * skipped and it is not treated as clean. `paths` / `root` inject overrides
++ * for tests. `allowEmpty` is the set of paths whose manifest entry set
++ * `allowEmpty: true`.
++ *
++ * @param {{
++ *   paths?: string[],
++ *   root?: string,
++ *   allowEmpty?: Iterable<string>,
++ * }} [options]
++ * @returns {Array<{ file: string, value: string | null, reason: "residue" | "unreadable" | "malformed-json" | "escaped-path" | "empty-input" }>}
++ */
++export function findSampleArchiveResidue(options = {}) {
++  const root = options.root ?? REPO_ROOT;
++  const paths = options.paths ?? listRealContentSourcePaths();
++  const allowEmpty = asAllowEmptySet(options.allowEmpty);
++  /** @type {Array<{ file: string, value: string | null, reason: "residue" | "unreadable" | "malformed-json" | "escaped-path" | "empty-input" }>} */
++  const findings = [];
++
++  for (const rel of paths) {
++    if (!pathStaysInRoot(root, rel)) {
++      findings.push({ file: String(rel), value: null, reason: "escaped-path" });
++      continue;
++    }
++    const abs = path.resolve(root, rel);
++    let raw;
++    try {
++      raw = fs.readFileSync(abs, "utf8");
++    } catch {
++      findings.push({ file: rel, value: null, reason: "unreadable" });
++      continue;
++    }
++    if (raw.trim().length === 0) {
++      findings.push({ file: rel, value: null, reason: "empty-input" });
++      continue;
++    }
++    let parsed;
++    try {
++      parsed = JSON.parse(raw);
++    } catch {
++      findings.push({ file: rel, value: null, reason: "malformed-json" });
++      continue;
++    }
++    if (
++      isEmptyJsonDocument(parsed) &&
++      !emptyDocumentIsOptedIn(parsed, rel, allowEmpty)
++    ) {
++      findings.push({ file: rel, value: null, reason: "empty-input" });
++      continue;
++    }
++    for (const value of collectJsonStrings(parsed)) {
++      if (carriesSampleArchiveResidue(value)) {
++        findings.push({ file: rel, value, reason: "residue" });
++      }
++    }
++  }
++
++  return findings;
++}
++
++/**
++ * @param {Array<{ file: string, value: string | null, reason: string }>} findings
++ * @returns {string[]}
++ */
++export function formatSampleArchiveResidueErrors(findings) {
++  return findings.map(({ file, value, reason }) => {
++    if (reason === "unreadable") {
++      return `${file} could not be read`;
++    }
++    if (reason === "malformed-json") {
++      return `${file} is not valid JSON`;
++    }
++    if (reason === "escaped-path") {
++      return `${file} resolves outside the repository`;
++    }
++    if (reason === "empty-input") {
++      return `${file} is an empty input (empty-input)`;
++    }
++    return `${file} carries disallowed sample residue ${JSON.stringify(value)}`;
++  });
++}
++
++/**
++ * A manifest path is a repo-relative string, or an object entry
++ * `{ path, allowEmpty }`. `allowEmpty: true` is the only opt-in for an
++ * empty array or empty object.
++ *
++ * @param {unknown} entry
++ * @returns {{ path: string, allowEmpty: boolean } | null}
++ */
++function readManifestPathEntry(entry) {
++  if (typeof entry === "string") {
++    if (entry.length === 0) return null;
++    return { path: entry, allowEmpty: false };
++  }
++  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
++  const record = /** @type {{ path?: unknown, allowEmpty?: unknown }} */ (entry);
++  if (typeof record.path !== "string" || record.path.length === 0) return null;
++  if (record.allowEmpty !== undefined && typeof record.allowEmpty !== "boolean") {
++    return null;
++  }
++  return { path: record.path, allowEmpty: record.allowEmpty === true };
++}
++
++/**
++ * Load the manifest for a default (non-injected) sensor run.
++ * Missing, unreadable, malformed, and empty path lists are errors.
++ * They are never an empty success. String path entries stay valid.
++ * An object entry may set `allowEmpty: true`.
++ *
++ * @param {string} root
++ * @returns {{ manifest?: { paths: string[], digests?: unknown, allowEmpty: string[] }, error?: "missing-manifest" | "unreadable-manifest" | "malformed-manifest" | "empty-paths" }}
++ */
++export function loadManifestDocument(root) {
++  const manifestPath = path.join(root, MANIFEST_REL);
++  let raw;
++  try {
++    raw = fs.readFileSync(manifestPath, "utf8");
++  } catch (err) {
++    const code = err && /** @type {{ code?: string }} */ (err).code;
++    if (code === "ENOENT") return { error: "missing-manifest" };
++    return { error: "unreadable-manifest" };
++  }
++  let parsed;
++  try {
++    parsed = JSON.parse(raw);
++  } catch {
++    return { error: "malformed-manifest" };
++  }
++  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
++    return { error: "malformed-manifest" };
++  }
++  const rawPaths = /** @type {{ paths?: unknown }} */ (parsed).paths;
++  if (!Array.isArray(rawPaths)) return { error: "malformed-manifest" };
++  if (rawPaths.length === 0) return { error: "empty-paths" };
++  /** @type {string[]} */
++  const paths = [];
++  /** @type {string[]} */
++  const allowEmpty = [];
++  for (const entry of rawPaths) {
++    const read = readManifestPathEntry(entry);
++    if (!read) return { error: "malformed-manifest" };
++    paths.push(read.path);
++    if (read.allowEmpty) allowEmpty.push(read.path);
++  }
++  return {
++    manifest: /** @type {{ paths: string[], digests?: unknown, allowEmpty: string[] }} */ ({
++      ...parsed,
++      paths,
++      allowEmpty,
++    }),
++  };
++}
++
++/**
++ * @param {string} error
++ * @returns {string}
++ */
++function formatManifestError(error) {
++  if (error === "missing-manifest") {
++    return `${MANIFEST_REL} is missing`;
++  }
++  if (error === "unreadable-manifest") {
++    return `${MANIFEST_REL} could not be read`;
++  }
++  if (error === "empty-paths") {
++    return `${MANIFEST_REL} lists no paths`;
++  }
++  return `${MANIFEST_REL} is malformed`;
++}
++
+ /**
+  * @param {unknown} value
+  * @returns {Record<string, string>}
+@@ -202,22 +478,32 @@ function hashFileSha256(absPath) {
+  *   digests?: Record<string, string>,
+  *   manifest?: { digests?: unknown },
+  * }} [options]
+- * @returns {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" }>}
++ * @returns {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" | "unreadable" | "escaped-path" }>}
+  */
+ export function verifyRealContentDigests(options = {}) {
+   const root = options.root ?? REPO_ROOT;
+   const paths = options.paths ?? listRealContentSourcePaths();
+   const recorded = resolveDigestMap(options) ?? {};
+-  /** @type {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" }>} */
++  /** @type {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" | "unreadable" | "escaped-path" }>} */
+   const findings = [];
+ 
+   for (const rel of paths) {
++    if (!pathStaysInRoot(root, rel)) {
++      findings.push({ file: String(rel), reason: "escaped-path" });
++      continue;
++    }
+     const expected = recorded[rel];
+     if (typeof expected !== "string" || expected.length === 0) {
+       findings.push({ file: rel, reason: "missing-digest" });
+       continue;
+     }
+-    const actual = hashFileSha256(path.resolve(root, rel));
++    let actual;
++    try {
++      actual = hashFileSha256(path.resolve(root, rel));
++    } catch {
++      findings.push({ file: rel, reason: "unreadable" });
++      continue;
++    }
+     if (actual !== expected) {
+       findings.push({ file: rel, reason: "digest-mismatch" });
+     }
+@@ -227,7 +513,7 @@ export function verifyRealContentDigests(options = {}) {
+ }
+ 
+ /**
+- * @param {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" }>} findings
++ * @param {Array<{ file: string, reason: "missing-digest" | "digest-mismatch" | "unreadable" | "escaped-path" }>} findings
+  * @returns {string[]}
+  */
+ export function formatDigestErrors(findings) {
+@@ -235,6 +521,12 @@ export function formatDigestErrors(findings) {
+     if (reason === "missing-digest") {
+       return `${file} has no recorded digest in the real-content manifest`;
+     }
++    if (reason === "unreadable") {
++      return `${file} could not be read for digest verification`;
++    }
++    if (reason === "escaped-path") {
++      return `${file} resolves outside the repository`;
++    }
+     return `${file} digest does not match the recorded real-content manifest digest`;
+   });
+ }
+@@ -253,24 +545,57 @@ export function formatDigestErrors(findings) {
+ export function runRealContentFixtureBrandingSensor(options = {}) {
+   const log = options.log ?? console.log;
+   const error = options.error ?? console.error;
+-  const paths = options.paths ?? listRealContentSourcePaths();
+-  const branding = findFixtureBrandingInRealContent({
+-    paths,
+-    root: options.root,
+-  });
+-  const digestMap = resolveDigestMap(options, { allowSkip: true });
++  const injectedPaths = Object.hasOwn(options, "paths");
++  const root = options.root ?? REPO_ROOT;
++
++  /** @type {string[]} */
++  let paths;
++  /** @type {Iterable<string> | undefined} */
++  let allowEmpty;
++  /** @type {{ digests?: unknown, manifest?: { digests?: unknown }, paths?: string[], root?: string }} */
++  let digestOptions = options;
++
++  if (!injectedPaths) {
++    const loaded = loadManifestDocument(root);
++    if (loaded.error) {
++      error(`::error::${formatManifestError(loaded.error)}`);
++      return 1;
++    }
++    paths = loaded.manifest.paths;
++    allowEmpty = loaded.manifest.allowEmpty;
++    if (root === REPO_ROOT) {
++      const imported = listRealContentSourcePaths();
++      if (JSON.stringify(paths) !== JSON.stringify(imported)) {
++        error(
++          "::error::real-content manifest paths do not match the guard module's loaded path list"
++        );
++        return 1;
++      }
++    }
++    digestOptions = { ...options, manifest: loaded.manifest, paths };
++  } else {
++    paths = options.paths ?? [];
++  }
++
++  if (!Array.isArray(paths) || paths.length === 0) {
++    error("::error::real-content sensor was given no paths");
++    return 1;
++  }
++
++  const residue = findSampleArchiveResidue({ paths, root, allowEmpty });
++  const digestMap = resolveDigestMap(digestOptions, { allowSkip: injectedPaths });
+   const digestFindings =
+     digestMap === null
+       ? []
+       : verifyRealContentDigests({
+           paths,
+-          root: options.root,
++          root,
+           digests: digestMap,
+         });
+ 
+   let failed = false;
+-  if (branding.length > 0) {
+-    for (const line of formatFixtureBrandingErrors(branding)) {
++  if (residue.length > 0) {
++    for (const line of formatSampleArchiveResidueErrors(residue)) {
+       error(`::error::${line}`);
+     }
+     failed = true;
+diff --git a/scripts/real-content-fixture-branding-sensor.test.mjs b/scripts/real-content-fixture-branding-sensor.test.mjs
+index 80fccced6..11b4b9bf7 100644
+--- a/scripts/real-content-fixture-branding-sensor.test.mjs
++++ b/scripts/real-content-fixture-branding-sensor.test.mjs
+@@ -4,7 +4,7 @@
+  */
+ 
+ import assert from "node:assert/strict";
+-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import path from "node:path";
+ import { describe, it } from "node:test";
+@@ -15,10 +15,14 @@ import { createHash } from "node:crypto";
+ import { listRealContentSourcePaths } from "./lib/seed-fixture-guards.mjs";
+ import {
+   carriesFixtureBranding,
++  carriesSampleArchiveResidue,
+   collectJsonStrings,
+   findFixtureBrandingInRealContent,
++  findSampleArchiveResidue,
+   formatDigestErrors,
+   formatFixtureBrandingErrors,
++  formatSampleArchiveResidueErrors,
++  loadManifestDocument,
+   runRealContentFixtureBrandingSensor,
+   verifyRealContentDigests,
+ } from "./real-content-fixture-branding-sensor.mjs";
+@@ -93,6 +97,7 @@ describe("real-content-fixture-branding-sensor (#1465)", () => {
+     assert.match(errors[0], /^::error::/);
+     assert.match(errors[0], /planted-fixture\.json/);
+     assert.match(errors[0], /Seed Fixture Co/);
++    assert.match(errors[0], /carries disallowed sample residue/);
+     assert.match(
+       formatFixtureBrandingErrors(findings)[0],
+       /carries fixture branding "Seed Fixture Co"/
+@@ -120,15 +125,24 @@ describe("real-content-fixture-branding-sensor (#1465)", () => {
+   it("PASSES on the real tree's manifest-listed files", () => {
+     const listed = listRealContentSourcePaths();
+     assert.ok(listed.length > 0, "manifest must list at least one path");
++    assert.ok(listed.includes("prisma/seed-data/speakers-2026.json"));
++    assert.ok(listed.includes("prisma/seed-data/sessions-2026.json"));
++    assert.ok(listed.includes("prisma/seed-data/past-events.json"));
+ 
+-    const findings = findFixtureBrandingInRealContent();
++    const speakers = JSON.parse(
++      readFileSync(path.join(ROOT, "prisma/seed-data/speakers-2026.json"), "utf8")
++    );
++    assert.ok(
++      speakers.some((row) => row.company === "Northstar Cognition Labs"),
++      "the pass must be the Example Conf sample, not an empty file"
++    );
++
++    const residue = findSampleArchiveResidue();
+     assert.deepEqual(
+-      findings,
++      residue,
+       [],
+-      `real archive carries fixture branding:\n${formatFixtureBrandingErrors(
+-        findings
+-      )
+-        .map((l) => `  - ${l}`)
++      `sample archive carries residue:\n${formatSampleArchiveResidueErrors(residue)
++        .map((line) => `  - ${line}`)
+         .join("\n")}`
+     );
+ 
+@@ -182,13 +196,38 @@ function independentSha256(absPath) {
+   return createHash("sha256").update(readFileSync(absPath)).digest("hex");
+ }
+ 
++/**
++ * @param {string} dir
++ */
++function runSensor(dir) {
++  const errors = [];
++  const logs = [];
++  const code = runRealContentFixtureBrandingSensor({
++    root: dir,
++    log: (line) => logs.push(line),
++    error: (line) => errors.push(line),
++  });
++  return { code, errors, logs };
++}
++
++/**
++ * Record digests with the sanctioned updater, then return the sensor result.
++ * Digest success must not hide an empty input.
++ *
++ * @param {string} dir
++ */
++function sealDigestsAndRun(dir) {
++  updateRealContentManifestDigests({ root: dir, log: () => {} });
++  return runSensor(dir);
++}
++
+ describe("real-content digest verification (#1479 / #1576)", () => {
+-  it("unacknowledged fabrication is caught; updater-run fabrication is not", () => {
++  it("unacknowledged byte drift is caught, and the digest updater does not bless a real employer", () => {
+     const original = [
+       {
+-        name: "Ada Lovelace",
+-        company: "Mistral AI",
+-        bio: "Mathematician.",
++        name: "Avery Quinn",
++        company: "Northstar Cognition Labs",
++        bio: "Fixture host.",
+       },
+     ];
+     const { dir, rel, archivePath } = makeDigestTree(original);
+@@ -222,16 +261,13 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+       JSON.stringify(fabricated, null, 2) + "\n"
+     );
+ 
+-    assert.equal(carriesFixtureBranding("Anthropic"), false);
+-    const branding = findFixtureBrandingInRealContent({
++    assert.equal(carriesSampleArchiveResidue("Anthropic"), true);
++    const residue = findSampleArchiveResidue({
+       root: dir,
+       paths: [rel],
+     });
+-    assert.deepEqual(
+-      branding,
+-      [],
+-      "fixture-branding check must not catch a fabricated speaker at a real company"
+-    );
++    assert.equal(residue.length, 1);
++    assert.equal(residue[0].value, "Anthropic");
+ 
+     const digestFindings = verifyRealContentDigests({
+       root: dir,
+@@ -249,12 +285,28 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+       error: (line) => errors.push(line),
+     });
+     assert.equal(code, 1);
+-    assert.equal(errors.length, 1);
+-    assert.match(errors[0], /^::error::/);
+-    assert.match(errors[0], /speakers-archive\.json/);
+-    assert.match(errors[0], /digest does not match/);
++    assert.equal(errors.length, 2);
++    assert.match(errors[0], /carries disallowed sample residue "Anthropic"/);
++    assert.match(errors[1], /digest does not match/);
+     assert.doesNotMatch(errors.join("\n"), /[a-f0-9]{64}/);
+ 
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const blessed = [];
++    const blessedCode = runRealContentFixtureBrandingSensor({
++      root: dir,
++      paths: [rel],
++      log: () => {},
++      error: (line) => blessed.push(line),
++    });
++    assert.equal(
++      blessedCode,
++      1,
++      "running the digest updater must not bless a real employer"
++    );
++    assert.match(blessed.join("\n"), /Anthropic/);
++    assert.doesNotMatch(blessed.join("\n"), /digest does not match/);
++
++    writeFileSync(archivePath, JSON.stringify(original, null, 2) + "\n");
+     updateRealContentManifestDigests({ root: dir, log: () => {} });
+     const afterAck = [];
+     const ackCode = runRealContentFixtureBrandingSensor({
+@@ -269,7 +321,7 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+ 
+   it("missing digest entry fails closed, not a silent pass", () => {
+     const { dir, rel } = makeDigestTree([
+-      { name: "Ada Lovelace", company: "Mistral AI" },
++      { name: "Avery Quinn", company: "Northstar Cognition Labs" },
+     ]);
+ 
+     const findings = verifyRealContentDigests({
+@@ -302,7 +354,7 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+ 
+   it("reports branding and digest findings together without short-circuit", () => {
+     const { dir, rel, archivePath } = makeDigestTree([
+-      { name: "Ada Lovelace", company: "Mistral AI" },
++      { name: "Avery Quinn", company: "Northstar Cognition Labs" },
+     ]);
+     const stale = independentSha256(archivePath);
+     writeFileSync(
+@@ -320,13 +372,13 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+     });
+     assert.equal(code, 1);
+     assert.equal(errors.length, 2);
+-    assert.match(errors[0], /carries fixture branding "Seed Fixture Co"/);
++    assert.match(errors[0], /carries disallowed sample residue "Seed Fixture Co"/);
+     assert.match(errors[1], /digest does not match/);
+     assert.doesNotMatch(errors.join("\n"), /[a-f0-9]{64}/);
+   });
+ 
+   it("incidental re-formatting of the same JSON values trips the digest check", () => {
+-    const value = [{ name: "Ada Lovelace", company: "Mistral AI" }];
++    const value = [{ name: "Avery Quinn", company: "Northstar Cognition Labs" }];
+     const { dir, rel, archivePath } = makeDigestTree(value);
+     updateRealContentManifestDigests({ root: dir, log: () => {} });
+ 
+@@ -340,3 +392,332 @@ describe("real-content digest verification (#1479 / #1576)", () => {
+     assert.equal(findings[0].reason, "digest-mismatch");
+   });
+ });
++
++describe("sample-archive residue and manifest fail-closed (#2235)", () => {
++  it("allows the two Example Conf employers and rejects everything else in the class", () => {
++    assert.equal(carriesSampleArchiveResidue("Northstar Cognition Labs"), false);
++    assert.equal(carriesSampleArchiveResidue("Cascade Compute"), false);
++    assert.equal(carriesSampleArchiveResidue("  northstar cognition labs  "), false);
++    assert.equal(carriesSampleArchiveResidue("Demo Corp"), true);
++    assert.equal(carriesSampleArchiveResidue("Seed Fixture Co"), true);
++    assert.equal(carriesSampleArchiveResidue("Seed Speaker Co (avery-quinn)"), true);
++    assert.equal(carriesSampleArchiveResidue("Mistral AI"), true);
++    assert.equal(carriesSampleArchiveResidue("IBM"), true);
++    assert.equal(carriesSampleArchiveResidue(""), false);
++    assert.equal(carriesSampleArchiveResidue("   "), false);
++    assert.equal(carriesSampleArchiveResidue(null), false);
++    assert.equal(carriesFixtureBranding("Northstar Cognition Labs"), true);
++    assert.equal(carriesFixtureBranding("Demo Corp"), true);
++  });
++
++  it("a missing manifest fails, and writing a valid one passes", () => {
++    const { dir, rel, manifestRel, archivePath } = makeDigestTree([
++      { company: "Northstar Cognition Labs" },
++    ]);
++    const manifestPath = path.join(dir, manifestRel);
++    // makeDigestTree wrote a manifest. Remove it: cannot evaluate is not a pass.
++    rmSync(manifestPath);
++    assert.equal(loadManifestDocument(dir).error, "missing-manifest");
++    const missing = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: () => {},
++        error: (line) => missing.push(line),
++      }),
++      1
++    );
++    assert.match(missing.join("\n"), /is missing/);
++
++    writeFileSync(
++      manifestPath,
++      JSON.stringify({ paths: [rel], digests: {} }, null, 2) + "\n"
++    );
++    const noDigest = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: () => {},
++        error: (line) => noDigest.push(line),
++      }),
++      1
++    );
++    assert.match(noDigest.join("\n"), /has no recorded digest/);
++
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    assert.equal(independentSha256(archivePath).length, 64);
++    const logs = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: (line) => logs.push(line),
++        error: (line) => logs.push(line),
++      }),
++      0
++    );
++    assert.match(logs.join("\n"), /PASS/);
++  });
++
++  it("a malformed manifest fails, an empty path list fails, and a restored manifest passes", () => {
++    const { dir, manifestRel } = makeDigestTree([
++      { company: "Cascade Compute" },
++    ]);
++    const manifestPath = path.join(dir, manifestRel);
++    const valid = readFileSync(manifestPath, "utf8");
++    writeFileSync(manifestPath, "{not json");
++    assert.equal(loadManifestDocument(dir).error, "malformed-manifest");
++    const errors = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: () => {},
++        error: (line) => errors.push(line),
++      }),
++      1
++    );
++    assert.match(errors.join("\n"), /malformed/);
++
++    writeFileSync(manifestPath, JSON.stringify({ paths: [] }));
++    assert.equal(loadManifestDocument(dir).error, "empty-paths");
++    const empty = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: () => {},
++        error: (line) => empty.push(line),
++      }),
++      1
++    );
++    assert.match(empty.join("\n"), /lists no paths/);
++
++    writeFileSync(manifestPath, valid);
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const logs = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: (line) => logs.push(line),
++        error: (line) => logs.push(line),
++      }),
++      0
++    );
++    assert.match(logs.join("\n"), /PASS/);
++  });
++
++  it("an unreadable listed file fails, and writing that file passes", () => {
++    const missing = "prisma/seed-data/does-not-exist-sample.json";
++    const findings = findSampleArchiveResidue({
++      root: ROOT,
++      paths: [missing],
++    });
++    assert.equal(findings.length, 1);
++    assert.equal(findings[0].reason, "unreadable");
++    const errors = [];
++    const code = runRealContentFixtureBrandingSensor({
++      root: ROOT,
++      paths: [missing],
++      digests: { [missing]: "a".repeat(64) },
++      log: () => {},
++      error: (line) => errors.push(line),
++    });
++    assert.equal(code, 1);
++    assert.match(errors.join("\n"), /could not be read/);
++
++    const { dir, rel, archivePath } = makeDigestTree([
++      { company: "Northstar Cognition Labs" },
++    ]);
++    rmSync(archivePath);
++    const gone = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        log: () => {},
++        error: (line) => gone.push(line),
++      }),
++      1
++    );
++    assert.match(gone.join("\n"), /could not be read/);
++    writeFileSync(
++      archivePath,
++      JSON.stringify([{ company: "Northstar Cognition Labs" }], null, 2) + "\n"
++    );
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const logs = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        paths: [rel],
++        log: (line) => logs.push(line),
++        error: (line) => logs.push(line),
++      }),
++      0
++    );
++    assert.match(logs.join("\n"), /PASS/);
++  });
++
++  it("a retired-tenant identifier still fails after the digest updater runs", () => {
++    const clean = [{ company: "Northstar Cognition Labs", site: "https://example.org" }];
++    const { dir, rel, archivePath } = makeDigestTree(clean);
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        paths: [rel],
++        log: () => {},
++        error: () => {},
++      }),
++      0
++    );
++
++    const planted = [{ company: "Northstar Cognition Labs", site: "https://2026.allthingsai.org" }];
++    writeFileSync(archivePath, JSON.stringify(planted, null, 2) + "\n");
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const errors = [];
++    const code = runRealContentFixtureBrandingSensor({
++      root: dir,
++      paths: [rel],
++      log: () => {},
++      error: (line) => errors.push(line),
++    });
++    assert.equal(code, 1);
++    assert.match(errors.join("\n"), /disallowed sample residue/);
++    assert.doesNotMatch(errors.join("\n"), /digest does not match/);
++
++    writeFileSync(archivePath, JSON.stringify(clean, null, 2) + "\n");
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const logs = [];
++    assert.equal(
++      runRealContentFixtureBrandingSensor({
++        root: dir,
++        paths: [rel],
++        log: (line) => logs.push(line),
++        error: (line) => logs.push(line),
++      }),
++      0
++    );
++    assert.match(logs.join("\n"), /PASS/);
++  });
++});
++
++describe("empty listed inputs fail closed (#2235)", () => {
++  it("a zero-length listed file fails with empty-input even after its digest is recorded", () => {
++    const { dir, rel, archivePath, manifestRel } = makeDigestTree([
++      { company: "Northstar Cognition Labs" },
++    ]);
++    writeFileSync(archivePath, "");
++    const result = sealDigestsAndRun(dir);
++    assert.equal(result.code, 1);
++    assert.match(result.errors.join("\n"), /empty-input/);
++    assert.doesNotMatch(result.errors.join("\n"), /digest does not match/);
++    assert.doesNotMatch(result.errors.join("\n"), /has no recorded digest/);
++    const findings = findSampleArchiveResidue({ root: dir, paths: [rel] });
++    assert.equal(findings.length, 1);
++    assert.equal(findings[0].reason, "empty-input");
++    assert.match(formatSampleArchiveResidueErrors(findings)[0], /empty-input/);
++
++    const manifestPath = path.join(dir, manifestRel);
++    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++    manifest.paths = [{ path: rel, allowEmpty: true }];
++    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
++    const opted = runSensor(dir);
++    assert.equal(opted.code, 1);
++    assert.match(opted.errors.join("\n"), /empty-input/);
++  });
++
++  it("a whitespace-only listed file fails with empty-input", () => {
++    const { dir, rel, archivePath } = makeDigestTree([
++      { company: "Cascade Compute" },
++    ]);
++    writeFileSync(archivePath, " \n\t  \n");
++    const result = sealDigestsAndRun(dir);
++    assert.equal(result.code, 1);
++    assert.match(result.errors.join("\n"), /empty-input/);
++    assert.doesNotMatch(result.errors.join("\n"), /malformed/);
++    const findings = findSampleArchiveResidue({ root: dir, paths: [rel] });
++    assert.equal(findings[0].reason, "empty-input");
++  });
++
++  it("a listed JSON empty array fails when allowEmpty is absent", () => {
++    const { dir, rel } = makeDigestTree([]);
++    const result = sealDigestsAndRun(dir);
++    assert.equal(result.code, 1);
++    assert.match(result.errors.join("\n"), /empty-input/);
++    assert.doesNotMatch(result.errors.join("\n"), /digest does not match/);
++    assert.doesNotMatch(result.errors.join("\n"), /has no recorded digest/);
++    const findings = findSampleArchiveResidue({ root: dir, paths: [rel] });
++    assert.equal(findings[0].reason, "empty-input");
++  });
++
++  it("a listed JSON empty object fails when allowEmpty is absent", () => {
++    const { dir, rel } = makeDigestTree({});
++    const result = sealDigestsAndRun(dir);
++    assert.equal(result.code, 1);
++    assert.match(result.errors.join("\n"), /empty-input/);
++    const findings = findSampleArchiveResidue({ root: dir, paths: [rel] });
++    assert.equal(findings[0].reason, "empty-input");
++  });
++
++  it("a listed JSON empty or whitespace string fails with empty-input", () => {
++    for (const value of ["", "   "]) {
++      const { dir, rel, manifestRel } = makeDigestTree(value);
++      const result = sealDigestsAndRun(dir);
++      assert.equal(result.code, 1, JSON.stringify(value));
++      assert.match(result.errors.join("\n"), /empty-input/);
++      const findings = findSampleArchiveResidue({ root: dir, paths: [rel] });
++      assert.equal(findings[0].reason, "empty-input");
++
++      const manifestPath = path.join(dir, manifestRel);
++      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++      manifest.paths = [{ path: rel, allowEmpty: true }];
++      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
++      const opted = runSensor(dir);
++      assert.equal(opted.code, 1, JSON.stringify(value));
++      assert.match(opted.errors.join("\n"), /empty-input/);
++    }
++  });
++
++  it("an empty array passes when its manifest entry sets allowEmpty true", () => {
++    const { dir, rel, manifestRel } = makeDigestTree([]);
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++
++    const absent = runSensor(dir);
++    assert.equal(absent.code, 1);
++    assert.match(absent.errors.join("\n"), /empty-input/);
++
++    const manifestPath = path.join(dir, manifestRel);
++    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++    assert.equal(manifest.paths[0], rel);
++    manifest.paths = [{ path: rel, allowEmpty: true }];
++    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
++
++    const loaded = loadManifestDocument(dir);
++    assert.equal(loaded.error, undefined);
++    assert.deepEqual(loaded.manifest.allowEmpty, [rel]);
++
++    const opted = runSensor(dir);
++    assert.equal(opted.code, 0, opted.errors.join("\n"));
++    assert.match(opted.logs.join("\n"), /PASS/);
++    assert.doesNotMatch(opted.logs.join("\n") + opted.errors.join("\n"), /empty-input/);
++
++    const withoutOptIn = findSampleArchiveResidue({ root: dir, paths: [rel] });
++    assert.equal(withoutOptIn[0].reason, "empty-input");
++    const withOptIn = findSampleArchiveResidue({
++      root: dir,
++      paths: [rel],
++      allowEmpty: [rel],
++    });
++    assert.deepEqual(withOptIn, []);
++  });
++
++  it("an empty object passes when its manifest entry sets allowEmpty true", () => {
++    const { dir, rel, manifestRel } = makeDigestTree({});
++    updateRealContentManifestDigests({ root: dir, log: () => {} });
++    const manifestPath = path.join(dir, manifestRel);
++    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++    manifest.paths = [{ path: rel, allowEmpty: true }];
++    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
++    const opted = runSensor(dir);
++    assert.equal(opted.code, 0, opted.errors.join("\n"));
++    assert.match(opted.logs.join("\n"), /PASS/);
++  });
++});
+diff --git a/src/lib/seed-real-content-manifest.json b/src/lib/seed-real-content-manifest.json
+index 18cf02e5d..969dfd4a8 100644
+--- a/src/lib/seed-real-content-manifest.json
++++ b/src/lib/seed-real-content-manifest.json
+@@ -1,27 +1,18 @@
+ {
+-  "description": "Seed-data paths that hold real, sourced conference content — not invented fixtures. Fictional-company allowlist rules apply only to Space Jam, Orbital Summit, demo shop-window, and the invented 2027 seed speakers. The inverted sensor fails if any listed file carries fixture branding (#1465 / #1469).",
++  "description": "Provenance-locked Example Conf sample files. These are fictional seed data (example.org, Northstar Cognition Labs, Cascade Compute), not a sourced archive of a real event. Writes may copy a string out of a listed file only when that exact string occurs in the file. The sample-archive sensor fails if a listed file contains a known real employer, a retired-tenant identifier, the generic Seed Speaker Co / Seed Fixture Co placeholder, or any other fictional-allowlist company besides the two sample employers. It also fails when the manifest is missing or malformed, or when a digest is missing or does not match the file bytes.",
+   "provenanceNotes": [
+-    "speakers-2026.json / sessions-2026.json: All Things AI 2026 archive. Real named speakers, real employers (Mistral AI, Netskope, Intuit, AWS, Microsoft, …), real bios, real headshots at https://allthingsai.org/2026/speakers/*.jpg. Labelled in prisma/seed.ts as 'real All Things AI 2026 content — showcase/recap mode'. Restored byte-for-byte from d53edfa1^1 after PR #1449 fictionalized them.",
+-    "ata-2025-import.json: generatedFrom allthingsai-org 2025 archive modules + https://2025.allthingsai.org/schedule embedded JSON and /talk/<slug>/ speaker cards (cached 2026-07-22). Sample employers are real (Peripety Labs, Elastic, Amazon Web Services, Walmart, Twilio).",
+-    "talk-speakers-2025.json: speaker cards with photos at https://2025.allthingsai.org/wp-content/uploads/… — WordPress 2025 site, not a fixture.",
+-    "wp-schedule-2025.json: WordPress timetable scrape of the 2025 program (real talk titles and speaker names).",
+-    "past-events.json: real past events with explicit source URLs (2025.allthingsai.org/about, Meetup, buildanagent.io). Included because it is sourced history, not a demo fixture.",
+-    "NOT listed (invented / named fixtures): eventbrite-attendees.fixture.json (filename says fixture); rcc-booth-inventory.csv (booth layout helper, not speaker/employer archive)."
++    "speakers-2026.json / sessions-2026.json: fictional Example Conf 2026 sample. Two speakers (Avery Quinn at Northstar Cognition Labs, Jordan Hale at Cascade Compute) and two sessions. Photos and links are https://example.org placeholders.",
++    "past-events.json: fictional earlier Example Conf rows. Not a sourced listing.",
++    "Deleted import files from the retired tenant are not listed. Other invented fixtures that are not listed: eventbrite-attendees.fixture.json and rcc-booth-inventory.csv."
+   ],
+   "paths": [
+     "prisma/seed-data/speakers-2026.json",
+     "prisma/seed-data/sessions-2026.json",
+-    "prisma/seed-data/ata-2025-import.json",
+-    "prisma/seed-data/talk-speakers-2025.json",
+-    "prisma/seed-data/wp-schedule-2025.json",
+     "prisma/seed-data/past-events.json"
+   ],
+   "digests": {
+-    "prisma/seed-data/speakers-2026.json": "30993933362ff73a5e0f7a90a755dfce083edc42147015402a31c5eae643f110",
+-    "prisma/seed-data/sessions-2026.json": "2251a6cc3802cedd2401f99a19ab215afcdf500416b71483ccb1dd3e7e78b686",
+-    "prisma/seed-data/ata-2025-import.json": "1cc192030e4794a8540188cd9ec1f6d7d2e26a3bd42541b1a71c2c75f69191f4",
+-    "prisma/seed-data/talk-speakers-2025.json": "bcba194bbe727bafa3b93696dd901aeba41e838da75da67674f64a81172eb9cf",
+-    "prisma/seed-data/wp-schedule-2025.json": "7fccd6cb2c9905245b8c17b42a79c31111a87b16c8e4ad32204daa59f2d7f462",
+-    "prisma/seed-data/past-events.json": "317f290bcd7974014a0d346069afd84a482d1d9f9511764d7c606b9856b525eb"
++    "prisma/seed-data/speakers-2026.json": "94980d6480f8d34350cea059b14bfe35eb588720dff533f79c101b70392c707c",
++    "prisma/seed-data/sessions-2026.json": "a91ec4ac44449bcedd1413465f494eac1228a8ed10ac166cedc767edce8f69a7",
++    "prisma/seed-data/past-events.json": "2466d7c11ebda03835c4da23a78ae3ddfd8d8fd96884f4253dd73f5713a96cea"
+   }
+ }

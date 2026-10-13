@@ -1,0 +1,53 @@
+diff --git a/src/app/(public)/events/[eventSlug]/schedule/page.tsx b/src/app/(public)/events/[eventSlug]/schedule/page.tsx
+index 3994225af..304c9b85a 100644
+--- a/src/app/(public)/events/[eventSlug]/schedule/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/schedule/page.tsx
+@@ -13,6 +13,7 @@ import {
+   isFeatureEnabled,
+ } from '@/lib/event-features';
+ import { resolveVisualTemplate } from '@/lib/visual-templates';
++import { buildEventMetadata } from '@/lib/event-metadata';
+ import ScheduleClient from './schedule-client';
+ 
+ interface SchedulePageProps {
+@@ -27,10 +28,36 @@ export async function generateMetadata({
+   params: Promise<{ eventSlug: string }>;
+ }) {
+   const { eventSlug } = await params;
+-  const event = await prisma.event.findUnique({ where: { slug: eventSlug } });
+-  return {
+-    title: event ? `Schedule — ${event.name}` : 'Schedule',
+-  };
++  const event = await prisma.event.findUnique({
++    where: { slug: eventSlug },
++    select: {
++      name: true,
++      slug: true,
++      description: true,
++      bannerUrl: true,
++      logoUrl: true,
++      startDate: true,
++      endDate: true,
++      websiteUrl: true,
++      customDomain: true,
++      venue: { select: { city: true, state: true, name: true } },
++      pageConfig: { select: { heroImageUrl: true } },
++    },
++  });
++
++  if (!event) {
++    return {
++      title: 'Schedule',
++    };
++  }
++
++  return buildEventMetadata(
++    {
++      ...event,
++      heroImageUrl: event.pageConfig?.heroImageUrl ?? null,
++    },
++    { section: 'Schedule', path: `/events/${event.slug}/schedule` }
++  );
+ }
+ 
+ export default async function SchedulePage({ params }: SchedulePageProps) {

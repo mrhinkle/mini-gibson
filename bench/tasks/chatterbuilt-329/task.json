@@ -1,0 +1,42 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "chatterbuilt-329",
+  "repo": "chatterbuilt",
+  "repo_url": "https://github.com/The-AIE/chatterbuilt",
+  "pr": 329,
+  "base_sha": "9b5758070a4fda007e99ceeacc44e89ec8db067a",
+  "merge_sha": "16b66edb4af8e6452e06b735e36a6cf6e6007551",
+  "issue_number": 325,
+  "issue_title": "Presets: emit industry-appropriate itemTypes so customer contact forms don't fall back to the generic default list",
+  "problem_statement": "Presets: emit industry-appropriate itemTypes so customer contact forms don't fall back to the generic default list\n\nSplit from #316 (residual 4 of its 2026-08-01 diagnosis \u2014 filed there as \"undecided\"; this issue is the decision surface plus the build once settled).\n\n## Problem\n\n0 of 8 presets in `apps/mcp/content/presets/` declare `itemTypes` (verified against main @ 52db1d1). The template's contact route consumes `site.itemTypes` for its dropdown and fail-closed validation; without it, every preset-rendered customer site serves the generic default list \u2014 DR#2 showed this is also what red-ed the contact-route test fixtures before template#15 decoupled them.\n\n## Contract sketch (session-sized once shaped)\n\n- Each of the 8 presets gains an `itemTypes` array appropriate to its industry (e.g. hvac: repair / installation / maintenance-plan / estimate-request classes), flowing through `render_site_ts` into the rendered config.\n- Renderer/schema: confirm `render_site_ts` passes `itemTypes` through (add if missing) and `validateSiteConfig` accepts it (it does \u2014 top-level optional).\n- Sensor: presets test asserting every preset ships a non-empty `itemTypes`; render test asserting pass-through.\n\n## Judgment-call note for the implementer/reviewer\n\nThese strings are customer-facing dropdown copy on rendered sites. Presets already carry driver-authored customer-facing strings (services, FAQ), so this stays a driver-workable Tier B lane \u2014 but the reviewer should read the strings as copy, not just data. Unrelated and untouched: the Beehiiv \"Visibility waitlist\" itemType label (standing do-not-touch, lesson 26).\n\n## Acceptance criteria\n\n1. All 8 presets ship non-empty industry-appropriate `itemTypes`.\n2. Pass-through verified render \u2192 template contact route (config-parity style test).\n3. Full gate green both packages.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --config vitest.config.ts --root apps/mcp --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/issue-325-preset-itemtypes.test.ts"
+    ],
+    "test_ids": [
+      "apps/mcp/lib/issue-325-preset-itemtypes.test.ts::issue #325 \u2014 every preset ships itemTypes UNIT-325-all-presets-nonempty: all 8 presets declare a non-empty itemTypes array",
+      "apps/mcp/lib/issue-325-preset-itemtypes.test.ts::issue #325 \u2014 every preset ships itemTypes UNIT-325-derivation-rule: itemTypes = the preset's own service names + 'Other' (mechanical, no invented copy)"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --config vitest.config.ts --root apps/mcp --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/issue-325-preset-itemtypes.test.ts"
+    ],
+    "test_ids": [
+      "apps/mcp/lib/issue-325-preset-itemtypes.test.ts::issue #325 \u2014 every preset ships itemTypes UNIT-325-no-placeholder-tokens: no itemTypes entry carries a {PLACEHOLDER} token",
+      "apps/mcp/lib/issue-325-preset-itemtypes.test.ts::issue #325 \u2014 itemTypes passes through render_site_ts UNIT-325-render-passthrough: a filled config's itemTypes lands verbatim in rendered site.ts (contact-route parity)"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

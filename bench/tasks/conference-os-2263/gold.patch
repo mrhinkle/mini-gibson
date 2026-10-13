@@ -1,0 +1,695 @@
+diff --git a/.env.example b/.env.example
+index efab55a11..401814cbb 100644
+--- a/.env.example
++++ b/.env.example
+@@ -33,10 +33,17 @@ DATABASE_URL="postgresql://user:password@ep-xxx-pooler.us-east-1.aws.neon.tech/n
+ # else gitignored config/install-database-map.json, else the fictional example.
+ # GitHub Actions (production-migrate, neon-preview-cleanup) reads
+ # secrets.INSTALL_DATABASE_MAP_JSON and vars.INSTALL_DATABASE_MAP_PATH.
+-# A missing, unparseable, or example map fails closed in CI and on Vercel.
++# A missing or unparseable map fails closed on Vercel and in CI.
++# The example map fails closed on Vercel. CI may use it only with the
++# opt-in below, and only against a local database.
+ # Do not commit a real map. Leave both empty locally to use the example.
+ INSTALL_DATABASE_MAP_JSON=""
+ INSTALL_DATABASE_MAP_PATH=""
++# CI only; never set on Vercel or production-migrate.
++# Allows the fictional example map only when this value is exactly 1,
++# VERCEL is not 1, VERCEL_ENV is not production or preview, and every
++# DATABASE_URL host field is local. Any other value refuses.
++# ALLOW_EXAMPLE_INSTALL_MAP=1
+ 
+ # Canonical URL for this environment. No trailing slash.
+ NEXT_PUBLIC_APP_URL="http://localhost:3111"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index b1e82ccae..329d884de 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -270,6 +270,10 @@ jobs:
+     env:
+       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cos_ci
+       NEXT_PUBLIC_APP_URL: http://localhost:3000
++      # CI only; never set on Vercel or production-migrate.
++      # Exactly "1". Lets seed, next build, and the app boot use the
++      # fictional example map against this job's local Postgres.
++      ALLOW_EXAMPLE_INSTALL_MAP: "1"
+     services:
+       postgres:
+         image: postgres:16
+diff --git a/config/install-database-map.example.json b/config/install-database-map.example.json
+index 869e2b10e..428d6fe1f 100644
+--- a/config/install-database-map.example.json
++++ b/config/install-database-map.example.json
+@@ -1,6 +1,6 @@
+ {
+   "_example": true,
+-  "_comment": "FICTIONAL. This file is the open-source sample, not a live install. Neon project ids and endpoint fingerprints use the example- / ep-example- sentinels and must not be copied into a real map. Runtime resolution order: INSTALL_DATABASE_MAP_JSON (the JSON document), else INSTALL_DATABASE_MAP_PATH (an uncommitted file), else config/install-database-map.json (gitignored local file), else this example. In a Vercel build (VERCEL=1, or VERCEL_ENV production|preview — even when VITEST is set) or in CI when VERCEL_ENV is absent and the unit runner is not running, a missing, unparseable, or example-valued map fails the database guard. Local npm run dev warns and continues. The install keys match .github/workflows/production-migrate.yml choice options; renaming a key without that workflow (lane C2, not this change) fails assertCommittedWorkflowInstallChoices. The pinned entry's vercelProject is example-install; its key stays conference-os-ata until lane C2 renames the workflow choice. pinBranch and branchPrefix are neutral. PROTECTED_DATABASE_HOSTS may only add hosts.",
++  "_comment": "FICTIONAL. This file is the open-source sample, not a live install. Neon project ids and endpoint fingerprints use the example- / ep-example- sentinels and must not be copied into a real map. Runtime resolution order: INSTALL_DATABASE_MAP_JSON (the JSON document), else INSTALL_DATABASE_MAP_PATH (an uncommitted file), else config/install-database-map.json (gitignored local file), else this example. In a Vercel build (VERCEL=1, or VERCEL_ENV production|preview — even when VITEST is set) or in CI when VERCEL_ENV is absent and the unit runner is not running, a missing or unparseable map fails the database guard. An example-valued map fails too unless ALLOW_EXAMPLE_INSTALL_MAP is exactly 1, the process is not on Vercel, and DATABASE_URL is a local host. production-migrate must not set that variable. Local npm run dev warns and continues. The install keys match .github/workflows/production-migrate.yml choice options; renaming a key without that workflow (lane C2, not this change) fails assertCommittedWorkflowInstallChoices. The pinned entry's vercelProject is example-install; its key stays conference-os-ata until lane C2 renames the workflow choice. pinBranch and branchPrefix are neutral. PROTECTED_DATABASE_HOSTS may only add hosts.",
+   "neonOrgId": "org-example-00000000",
+   "defaultDatabaseName": "neondb",
+   "installs": {
+diff --git a/scripts/install-database-map.d.ts b/scripts/install-database-map.d.ts
+index 28f4a572c..7d6d662c0 100644
+--- a/scripts/install-database-map.d.ts
++++ b/scripts/install-database-map.d.ts
+@@ -5,12 +5,28 @@
+ 
+ export const INSTALL_DATABASE_MAP_JSON_ENV: string;
+ export const INSTALL_DATABASE_MAP_PATH_ENV: string;
++export const ALLOW_EXAMPLE_INSTALL_MAP_ENV: string;
++export const CI_POSTGRES_SERVICE_HOST: string;
+ export const EXAMPLE_INSTALL_MAP_REFUSAL: string;
+ export const EXAMPLE_INSTALL_DATABASE_MAP_PATH: string;
+ export const LOCAL_INSTALL_DATABASE_MAP_PATH: string;
+ 
+ export function isTruthyEnv(value: unknown): boolean;
+ 
++export function isExampleOptInLocalHost(hostname: string | null | undefined): boolean;
++
++export function connectionTargetsForExampleOptIn(databaseUrl: string | undefined): {
++  authorityHost: string;
++  driverHost: string;
++  hostaddr: string;
++  neonEndpoints: string[];
++} | null;
++
++export function exampleInstallMapOptInAllows(
++  map: object | null | undefined,
++  env: NodeJS.ProcessEnv | Record<string, string | undefined> | null | undefined,
++): boolean;
++
+ export function isDeploymentGuardContext(
+   env?: NodeJS.ProcessEnv | Record<string, string | undefined>,
+ ): boolean;
+diff --git a/scripts/install-database-map.mjs b/scripts/install-database-map.mjs
+index c2f1f3df6..ba9dda744 100644
+--- a/scripts/install-database-map.mjs
++++ b/scripts/install-database-map.mjs
+@@ -24,6 +24,16 @@
+  * returned. Callers that decide "is this host production?" must treat a
+  * refusal string as failure, never as "not production".
+  *
++ * One exception: ALLOW_EXAMPLE_INSTALL_MAP exactly "1" allows the example
++ * map when VERCEL is not "1", VERCEL_ENV is not production or preview, and
++ * every host-bearing field of DATABASE_URL is local. Local means the same
++ * hosts isLocalDatabaseHost accepts, plus the CI service label "postgres"
++ * (the build-e2e job publishes Postgres on localhost; the service id is
++ * the other name a job container can use). Any other opt-in value, Vercel,
++ * a missing or unparseable URL, a non-local field, an endpoint selector,
++ * or a production fingerprint still refuses. The opt-in does not make a
++ * missing map usable. production-migrate must not set the variable.
++ *
+  * Real maps must not set `_example: true` and must not use ids that start with
+  * `example-`, `ep-example-`, or `org-example`.
+  */
+@@ -31,12 +41,26 @@
+ import { existsSync, readFileSync } from "node:fs";
+ import path from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
++import { parse as parsePgConnectionString } from "pg-connection-string";
+ 
+ export const INSTALL_DATABASE_MAP_JSON_ENV = "INSTALL_DATABASE_MAP_JSON";
+ export const INSTALL_DATABASE_MAP_PATH_ENV = "INSTALL_DATABASE_MAP_PATH";
+ 
++/**
++ * Exact opt-in that lets CI use the fictional example map. The value must
++ * be the string "1". Truthy aliases ("true", "yes") do not count.
++ */
++export const ALLOW_EXAMPLE_INSTALL_MAP_ENV = "ALLOW_EXAMPLE_INSTALL_MAP";
++
++/**
++ * GitHub Actions service hostname for the `postgres` service container.
++ * Port-mapped jobs use localhost; container jobs reach the service by
++ * this label. It is local for the example-map opt-in only.
++ */
++export const CI_POSTGRES_SERVICE_HOST = "postgres";
++
+ export const EXAMPLE_INSTALL_MAP_REFUSAL =
+-  "Install database map is the fictional example, so this process cannot tell a production database from any other host. Set INSTALL_DATABASE_MAP_JSON to the real JSON document, or INSTALL_DATABASE_MAP_PATH to an uncommitted file, on every Vercel project and in CI, before this build. Refusing to continue.";
++  "Install database map is the fictional example, so this process cannot tell a production database from any other host. Set INSTALL_DATABASE_MAP_JSON to the real JSON document, or INSTALL_DATABASE_MAP_PATH to an uncommitted file, on every Vercel project and in CI, before this build. A local CI database may set ALLOW_EXAMPLE_INSTALL_MAP=1; that opt-in is refused on Vercel and for any non-local host. Refusing to continue.";
+ 
+ /**
+  * `node scripts/…` has a file URL. Vitest evaluates this module for client
+@@ -71,6 +95,197 @@ export function isTruthyEnv(value) {
+   return text === "1" || text === "true" || text === "yes";
+ }
+ 
++/**
++ * Percent-decode, lowercase, strip one trailing dot and IPv6 brackets.
++ * Returns null when percent-decoding throws. No IDNA: a homoglyph of
++ * localhost stays non-local here, which refuses the opt-in.
++ *
++ * @param {string | null | undefined} host
++ * @returns {string | null}
++ */
++function shapeOptInHost(host) {
++  if (host == null) return "";
++  let value = String(host).trim();
++  if (!value) return "";
++  try {
++    value = decodeURIComponent(value);
++  } catch {
++    return null;
++  }
++  value = value.toLowerCase();
++  if (value.endsWith(".")) value = value.slice(0, -1);
++  if (value.startsWith("[") && value.endsWith("]")) value = value.slice(1, -1);
++  return value;
++}
++
++/**
++ * Local hosts for the example-map opt-in. Mirrors
++ * `isLocalDatabaseHost` in scripts/protected-database-hosts.mjs
++ * (localhost, 127.0.0.1, ::1, 0.0.0.0, *.localhost) and also the CI
++ * Postgres service label. A null shape (bad percent-encoding) is not local.
++ *
++ * @param {string | null | undefined} hostname
++ * @returns {boolean}
++ */
++export function isExampleOptInLocalHost(hostname) {
++  const host = shapeOptInHost(hostname);
++  if (host === null || !host) return false;
++  if (
++    host === "localhost" ||
++    host === "127.0.0.1" ||
++    host === "::1" ||
++    host === "0.0.0.0" ||
++    host === CI_POSTGRES_SERVICE_HOST
++  ) {
++    return true;
++  }
++  return host.endsWith(".localhost");
++}
++
++/**
++ * Neon `options=endpoint=` / `options=project=` selectors. Same extraction
++ * as scripts/database-env-guard.mjs: a selector is another host-bearing field.
++ *
++ * @param {unknown} options
++ * @returns {string[]}
++ */
++function extractNeonEndpointSelectors(options) {
++  if (options == null || !String(options).trim()) return [];
++  const out = [];
++  const re = /(?:endpoint|project)=([^\s,]+)/gi;
++  let match = re.exec(String(options));
++  while (match) {
++    const value = String(match[1] ?? "").trim();
++    if (value) out.push(value);
++    match = re.exec(String(options));
++  }
++  return out;
++}
++
++/**
++ * Host-bearing fields the postgres driver can connect to. Null means the
++ * URL is missing, not a postgres URL, or rejected by the driver parser.
++ * A parse error is null: "cannot read the host" is not "local".
++ *
++ * Kept aligned with extractDatabaseConnectionTargets in
++ * scripts/database-env-guard.mjs. The opt-in test compares the two.
++ *
++ * @param {string | undefined} databaseUrl
++ * @returns {{
++ *   authorityHost: string,
++ *   driverHost: string,
++ *   hostaddr: string,
++ *   neonEndpoints: string[],
++ * } | null}
++ */
++export function connectionTargetsForExampleOptIn(databaseUrl) {
++  if (!databaseUrl || !String(databaseUrl).trim()) return null;
++  const raw = String(databaseUrl);
++
++  let authorityHost = "";
++  let whatwgParsed = false;
++  try {
++    authorityHost = new URL(raw).hostname || "";
++    whatwgParsed = true;
++  } catch {
++    authorityHost = "";
++  }
++
++  let parsed;
++  try {
++    parsed = parsePgConnectionString(raw);
++  } catch {
++    return null;
++  }
++
++  let driverHost = parsed?.host != null ? String(parsed.host).trim() : "";
++  const hostaddr = parsed?.hostaddr != null ? String(parsed.hostaddr).trim() : "";
++  const neonEndpoints = extractNeonEndpointSelectors(parsed?.options);
++
++  const looksLikePostgresUri = /^(postgres(ql)?):/i.test(raw.trim());
++  if (!whatwgParsed && !looksLikePostgresUri && driverHost === "base") {
++    driverHost = "";
++  }
++
++  if (!authorityHost && !driverHost && !hostaddr && neonEndpoints.length === 0) {
++    return null;
++  }
++
++  return { authorityHost, driverHost, hostaddr, neonEndpoints };
++}
++
++/**
++ * Production endpoint fingerprints on `map`. Null when the map has no
++ * installs object or any install omits the fingerprint: a missing
++ * fingerprint cannot prove the URL is not production.
++ *
++ * @param {object | null | undefined} map
++ * @returns {string[] | null}
++ */
++function productionFingerprintsOf(map) {
++  const installs = map?.installs;
++  if (!installs || typeof installs !== "object" || Array.isArray(installs)) {
++    return null;
++  }
++  const out = [];
++  for (const entry of Object.values(installs)) {
++    const fingerprint = entry?.neon?.production?.endpointFingerprint;
++    if (fingerprint == null || !String(fingerprint).trim()) return null;
++    out.push(String(fingerprint).trim().toLowerCase());
++  }
++  if (out.length === 0) return null;
++  return out;
++}
++
++/**
++ * True only when the example map may be used in a deployment context.
++ * Every condition is required. A missing URL, an unparseable URL, a
++ * non-local field, a production fingerprint, Vercel, or any opt-in value
++ * other than exactly "1" returns false. False means refuse.
++ *
++ * @param {object | null | undefined} map
++ * @param {NodeJS.ProcessEnv | Record<string, string | undefined> | null | undefined} env
++ * @returns {boolean}
++ */
++export function exampleInstallMapOptInAllows(map, env) {
++  if (!env || env[ALLOW_EXAMPLE_INSTALL_MAP_ENV] !== "1") return false;
++  if (String(env.VERCEL ?? "").trim() === "1") return false;
++  const vercelEnv = String(env.VERCEL_ENV ?? "").trim().toLowerCase();
++  if (vercelEnv === "production" || vercelEnv === "preview") return false;
++
++  const targets = connectionTargetsForExampleOptIn(env.DATABASE_URL);
++  if (!targets) return false;
++  // An endpoint or project selector is a Neon routing key, not a TCP host.
++  // "localhost" as a selector is still not the local Postgres service.
++  if (targets.neonEndpoints.length > 0) return false;
++  const fields = [targets.authorityHost, targets.driverHost, targets.hostaddr].filter(
++    (field) => String(field ?? "").trim(),
++  );
++  if (fields.length === 0) return false;
++
++  const shaped = [];
++  for (const field of fields) {
++    if (!isExampleOptInLocalHost(field)) return false;
++    const needle = shapeOptInHost(field);
++    if (needle === null || !needle) return false;
++    shaped.push(needle);
++  }
++
++  const fingerprints = productionFingerprintsOf(map);
++  if (!fingerprints) return false;
++  const extras = String(env.PROTECTED_DATABASE_HOSTS ?? "")
++    .split(",")
++    .map((entry) => entry.trim().toLowerCase())
++    .filter(Boolean);
++  const markers = fingerprints.concat(extras);
++  for (const needle of shaped) {
++    if (markers.some((fingerprint) => fingerprint && needle.includes(fingerprint))) {
++      return false;
++    }
++  }
++  return true;
++}
++
+ /**
+  * Vitest sets VITEST. The node:test child sets NODE_TEST_CONTEXT and is
+  * started with --test-isolation. The quality job runs both under CI=true.
+diff --git a/scripts/install-database-map.test.mjs b/scripts/install-database-map.test.mjs
+index 113ea65c4..22450cec9 100644
+--- a/scripts/install-database-map.test.mjs
++++ b/scripts/install-database-map.test.mjs
+@@ -9,9 +9,11 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import path from "node:path";
+ import test from "node:test";
++import { load as loadYaml } from "js-yaml";
+ 
+ import {
+   EXAMPLE_INSTALL_MAP_REFUSAL,
++  connectionTargetsForExampleOptIn,
+   isDeploymentGuardContext,
+   isExampleInstallDatabaseMap,
+   loadInstallDatabaseMap,
+@@ -21,10 +23,14 @@ import {
+ import {
+   deriveProtectedDatabaseHosts,
+   installMapDeploymentRefusal,
++  isLocalDatabaseHost,
+   matchesProtectedDatabaseHost,
+   refuseInstallMapInDeployment,
+ } from "./protected-database-hosts.mjs";
+-import { validateNonProductionDatabaseIsolation } from "./database-env-guard.mjs";
++import {
++  extractDatabaseConnectionTargets,
++  validateNonProductionDatabaseIsolation,
++} from "./database-env-guard.mjs";
+ 
+ const REAL_MAP = {
+   installs: {
+@@ -381,3 +387,232 @@ test("canonical preview project id is resolved from the map and fails closed (#2
+   assert.ok(skip >= 0 && resolve > skip, "map resolution must follow the missing-key skip");
+   assert.match(workflow, /could not be resolved from the install database map/);
+ });
++
++const CI_LOCAL_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/cos_ci";
++const OPT_IN_ENV = "ALLOW_EXAMPLE_INSTALL_MAP";
++
++function ciOptInEnv(extra = {}) {
++  return {
++    CI: "true",
++    DATABASE_URL: CI_LOCAL_DATABASE_URL,
++    [OPT_IN_ENV]: "1",
++    ...extra,
++  };
++}
++
++/**
++ * Walk a parsed YAML document. Comments are not nodes, so a mention that
++ * exists only in a comment does not count. A key or a string value does.
++ *
++ * @param {unknown} value
++ * @param {string} name
++ * @returns {boolean}
++ */
++function parsedTreeHasName(value, name) {
++  if (typeof value === "string") return value.includes(name);
++  if (Array.isArray(value)) return value.some((entry) => parsedTreeHasName(entry, name));
++  if (value && typeof value === "object") {
++    for (const [key, child] of Object.entries(value)) {
++      if (key === name || parsedTreeHasName(child, name)) return true;
++    }
++  }
++  return false;
++}
++
++test("CI example-map opt-in allows only a local host off Vercel", () => {
++  assert.equal(isDeploymentGuardContext(ciOptInEnv()), true);
++  assert.equal(installMapDeploymentRefusal(ciOptInEnv()), null);
++  assert.equal(
++    validateNonProductionDatabaseIsolation(CI_LOCAL_DATABASE_URL, {
++      env: ciOptInEnv(),
++    }),
++    null,
++  );
++  for (const databaseUrl of [
++    "postgresql://postgres:postgres@127.0.0.1:5432/cos_ci",
++    "postgresql://postgres:postgres@[::1]:5432/cos_ci",
++    "postgresql://postgres:postgres@0.0.0.0:5432/cos_ci",
++    "postgresql://postgres:postgres@db.localhost:5432/cos_ci",
++  ]) {
++    assert.equal(
++      installMapDeploymentRefusal(ciOptInEnv({ DATABASE_URL: databaseUrl })),
++      null,
++      databaseUrl,
++    );
++  }
++});
++
++test("CI example-map opt-in still refuses on Vercel", () => {
++  for (const extra of [
++    { VERCEL: "1" },
++    { VERCEL_ENV: "production" },
++    { VERCEL_ENV: "preview" },
++    { VERCEL: "1", VERCEL_ENV: "development" },
++  ]) {
++    assert.equal(
++      installMapDeploymentRefusal(ciOptInEnv(extra)),
++      EXAMPLE_INSTALL_MAP_REFUSAL,
++      JSON.stringify(extra),
++    );
++  }
++});
++
++test("CI example-map opt-in still refuses a non-local or production-fingerprint host", () => {
++  const refused = [
++    "postgresql://u:p@ep-example-prod.us-east-1.aws.neon.tech/db",
++    "postgresql://u:p@db.example.org/db",
++    "postgresql://u:p@localhost/db?host=ep-example-prod.us-east-1.aws.neon.tech",
++    "postgresql://u:p@localhost/db?options=endpoint%3Dep-example-prod",
++    "postgresql://u:p@localhost/db?options=endpoint%3Dlocalhost",
++    "postgresql://u:p@localhost/db?options=project%3Dpostgres",
++    "postgresql://u:p@localhost/db?hostaddr=8.8.8.8",
++    "postgresql://u:p@ep-example-prod.localhost/db",
++    "postgresql://u:p@localhost.example.org/db",
++    "",
++    "not a postgres url",
++  ];
++  for (const databaseUrl of refused) {
++    const env = ciOptInEnv();
++    if (databaseUrl === "") delete env.DATABASE_URL;
++    else env.DATABASE_URL = databaseUrl;
++    assert.equal(
++      installMapDeploymentRefusal(env),
++      EXAMPLE_INSTALL_MAP_REFUSAL,
++      databaseUrl || "(absent)",
++    );
++  }
++  assert.equal(
++    installMapDeploymentRefusal(
++      ciOptInEnv({ PROTECTED_DATABASE_HOSTS: "localhost" }),
++    ),
++    EXAMPLE_INSTALL_MAP_REFUSAL,
++  );
++});
++
++test("CI example-map opt-in absent keeps today's refusal", () => {
++  const env = ciOptInEnv();
++  delete env[OPT_IN_ENV];
++  assert.equal(installMapDeploymentRefusal(env), EXAMPLE_INSTALL_MAP_REFUSAL);
++  assert.equal(
++    installMapDeploymentRefusal({ CI: "true", DATABASE_URL: CI_LOCAL_DATABASE_URL }),
++    EXAMPLE_INSTALL_MAP_REFUSAL,
++  );
++});
++
++test("CI example-map opt-in does not launder a missing or unparseable map", () => {
++  assert.match(
++    installMapDeploymentRefusal(
++      ciOptInEnv({
++        INSTALL_DATABASE_MAP_PATH: "/tmp/conference-os-missing-install-map.json",
++      }),
++    ),
++    /could not be read/,
++  );
++  assert.match(
++    installMapDeploymentRefusal(ciOptInEnv({ INSTALL_DATABASE_MAP_JSON: "{" })),
++    /not valid JSON/,
++  );
++});
++
++test("CI example-map opt-in accepts only the exact value 1", () => {
++  for (const value of ["true", "yes", "0", "", "1 ", " 1", "TRUE", "2"]) {
++    assert.equal(
++      installMapDeploymentRefusal(ciOptInEnv({ [OPT_IN_ENV]: value })),
++      EXAMPLE_INSTALL_MAP_REFUSAL,
++      JSON.stringify(value),
++    );
++  }
++});
++
++test("example opt-in does not waive a missing or unparseable map", () => {
++  assert.match(
++    installMapDeploymentRefusal(
++      ciOptInEnv({ INSTALL_DATABASE_MAP_JSON: "{" }),
++    ),
++    /not valid JSON/,
++  );
++  assert.match(
++    installMapDeploymentRefusal(
++      ciOptInEnv({
++        INSTALL_DATABASE_MAP_PATH: "/tmp/conference-os-missing-install-map.json",
++      }),
++    ),
++    /could not be read/,
++  );
++});
++
++test("CI postgres service host is local for the opt-in and not for the global local check", () => {
++  assert.equal(isLocalDatabaseHost("postgres"), false);
++  assert.equal(
++    installMapDeploymentRefusal(
++      ciOptInEnv({
++        DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/cos_ci",
++      }),
++    ),
++    null,
++  );
++  assert.equal(
++    installMapDeploymentRefusal(
++      ciOptInEnv({
++        DATABASE_URL: "postgresql://u:p@postgres.example.org/db",
++      }),
++    ),
++    EXAMPLE_INSTALL_MAP_REFUSAL,
++  );
++});
++
++test("opt-in host parsing matches the database env guard", () => {
++  const urls = [
++    CI_LOCAL_DATABASE_URL,
++    "postgresql://postgres:postgres@127.0.0.1:5432/cos_ci",
++    "postgresql://postgres:postgres@[::1]:5432/cos_ci",
++    "postgresql://u:p@localhost/db?host=ep-example-prod.us-east-1.aws.neon.tech",
++    "postgresql://u:p@localhost/db?options=endpoint%3Dep-example-prod",
++    "postgresql://u:p@localhost/db?options=endpoint%3Dlocalhost",
++    "postgresql://u:p@localhost/db?options=project%3Dpostgres",
++    "postgresql://u:p@localhost/db?hostaddr=8.8.8.8",
++    "postgresql://postgres:postgres@postgres:5432/cos_ci",
++  ];
++  for (const databaseUrl of urls) {
++    const guard = extractDatabaseConnectionTargets(databaseUrl);
++    const optIn = connectionTargetsForExampleOptIn(databaseUrl);
++    assert.ok(guard && !guard.parseError, databaseUrl);
++    assert.deepEqual(
++      {
++        authorityHost: optIn?.authorityHost,
++        driverHost: optIn?.driverHost,
++        hostaddr: optIn?.hostaddr,
++        neonEndpoints: optIn?.neonEndpoints,
++      },
++      {
++        authorityHost: guard.authorityHost,
++        driverHost: guard.driverHost,
++        hostaddr: guard.hostaddr,
++        neonEndpoints: guard.neonEndpoints,
++      },
++      databaseUrl,
++    );
++  }
++  assert.equal(connectionTargetsForExampleOptIn("not a postgres url"), null);
++  assert.equal(connectionTargetsForExampleOptIn(""), null);
++  assert.equal(connectionTargetsForExampleOptIn(undefined), null);
++});
++
++test("production-migrate never sets the example-map opt-in, and CI sets it only on build-e2e", () => {
++  const root = new URL("..", import.meta.url);
++  const migrate = loadYaml(
++    readFileSync(new URL(".github/workflows/production-migrate.yml", root), "utf8"),
++  );
++  assert.equal(parsedTreeHasName(migrate, OPT_IN_ENV), false);
++
++  const ci = loadYaml(readFileSync(new URL(".github/workflows/ci.yml", root), "utf8"));
++  assert.equal(ci.env?.[OPT_IN_ENV], undefined);
++  assert.equal(ci.jobs["build-e2e"].env[OPT_IN_ENV], "1");
++  for (const [jobId, job] of Object.entries(ci.jobs)) {
++    if (jobId === "build-e2e") continue;
++    assert.equal(parsedTreeHasName(job, OPT_IN_ENV), false, jobId);
++  }
++  // Required check names are the job id when name is unset, else job.name.
++  assert.equal(ci.jobs.quality.name, undefined);
++  assert.equal(ci.jobs["build-e2e-required"].name, "build-e2e-required");
++});
+diff --git a/scripts/protected-database-hosts.mjs b/scripts/protected-database-hosts.mjs
+index 776d80393..29de0d1d6 100644
+--- a/scripts/protected-database-hosts.mjs
++++ b/scripts/protected-database-hosts.mjs
+@@ -42,6 +42,7 @@
+ import { domainToASCII } from "node:url";
+ import {
+   EXAMPLE_INSTALL_MAP_REFUSAL,
++  exampleInstallMapOptInAllows,
+   isDeploymentGuardContext,
+   isExampleInstallDatabaseMap,
+   loadInstallDatabaseMap,
+@@ -282,8 +283,10 @@ export function resolveProtectedDatabaseHosts(env = process.env) {
+ 
+ /**
+  * Deployment contexts refuse before a "no match" can be read as "not
+- * production". A missing, unparseable, example, or empty map is a refusal.
+- * Outside that context this returns null.
++ * production". A missing, unparseable, or empty map is a refusal. The
++ * example map is a refusal unless ALLOW_EXAMPLE_INSTALL_MAP is exactly
++ * "1", the process is not on Vercel, and every DATABASE_URL host field
++ * is local. Outside a deployment context this returns null.
+  *
+  * `map` is the document the caller will actually use (env loader or an
+  * explicit `--map` file). Content sentinels (`_example`, `example-` ids,
+@@ -298,7 +301,12 @@ export function refuseInstallMapInDeployment(map, env = process.env) {
+   if (!map || typeof map !== "object") {
+     return "install database map unavailable; refusing to treat that as an empty denylist";
+   }
+-  if (isExampleInstallDatabaseMap(map)) return EXAMPLE_INSTALL_MAP_REFUSAL;
++  if (
++    isExampleInstallDatabaseMap(map) &&
++    !exampleInstallMapOptInAllows(map, env)
++  ) {
++    return EXAMPLE_INSTALL_MAP_REFUSAL;
++  }
+   try {
+     const hosts = deriveProtectedDatabaseHosts(map);
+     if (!hosts.length) return "derived protected-host set is empty";
+@@ -325,7 +333,9 @@ export function installMapDeploymentRefusal(env = process.env) {
+       "install database map unavailable; refusing to treat that as an empty denylist"
+     );
+   }
+-  if (loaded.example) return EXAMPLE_INSTALL_MAP_REFUSAL;
++  if (loaded.example && !exampleInstallMapOptInAllows(loaded.map, env)) {
++    return EXAMPLE_INSTALL_MAP_REFUSAL;
++  }
+   return refuseInstallMapInDeployment(loaded.map, env);
+ }
+ 
+diff --git a/src/lib/protected-database-hosts.ts b/src/lib/protected-database-hosts.ts
+index 20d54836d..c2dacd63c 100644
+--- a/src/lib/protected-database-hosts.ts
++++ b/src/lib/protected-database-hosts.ts
+@@ -43,6 +43,7 @@ import { domainToASCII } from "node:url";
+ 
+ import {
+   EXAMPLE_INSTALL_MAP_REFUSAL,
++  exampleInstallMapOptInAllows,
+   isDeploymentGuardContext,
+   isExampleInstallDatabaseMap,
+   loadInstallDatabaseMap,
+@@ -228,8 +229,10 @@ export function resolveProtectedDatabaseHosts(
+ 
+ /**
+  * Deployment contexts refuse before a "no match" can be read as "not
+- * production". A missing, unparseable, example, or empty map is a refusal.
+- * Outside that context this returns null.
++ * production". A missing, unparseable, or empty map is a refusal. The
++ * example map is a refusal unless ALLOW_EXAMPLE_INSTALL_MAP is exactly
++ * "1", the process is not on Vercel, and every DATABASE_URL host field
++ * is local. Outside a deployment context this returns null.
+  */
+ export function refuseInstallMapInDeployment(
+   map: InstallDatabaseMap | null | undefined,
+@@ -239,7 +242,12 @@ export function refuseInstallMapInDeployment(
+   if (!map || typeof map !== "object") {
+     return "install database map unavailable; refusing to treat that as an empty denylist";
+   }
+-  if (isExampleInstallDatabaseMap(map)) return EXAMPLE_INSTALL_MAP_REFUSAL;
++  if (
++    isExampleInstallDatabaseMap(map) &&
++    !exampleInstallMapOptInAllows(map, env)
++  ) {
++    return EXAMPLE_INSTALL_MAP_REFUSAL;
++  }
+   try {
+     const hosts = deriveProtectedDatabaseHosts(map);
+     if (!hosts.length) return "derived protected-host set is empty";
+@@ -263,7 +271,9 @@ export function installMapDeploymentRefusal(
+       "install database map unavailable; refusing to treat that as an empty denylist"
+     );
+   }
+-  if (loaded.example) return EXAMPLE_INSTALL_MAP_REFUSAL;
++  if (loaded.example && !exampleInstallMapOptInAllows(loaded.map, env)) {
++    return EXAMPLE_INSTALL_MAP_REFUSAL;
++  }
+   return refuseInstallMapInDeployment(loaded.map as InstallDatabaseMap, env);
+ }
+ 

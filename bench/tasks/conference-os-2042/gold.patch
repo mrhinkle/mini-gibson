@@ -1,0 +1,482 @@
+diff --git a/src/app/(public)/events/[eventSlug]/get-involved/page.tsx b/src/app/(public)/events/[eventSlug]/get-involved/page.tsx
+new file mode 100644
+index 000000000..edf7d6d8d
+--- /dev/null
++++ b/src/app/(public)/events/[eventSlug]/get-involved/page.tsx
+@@ -0,0 +1,128 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import Link from 'next/link';
++import { notFound } from 'next/navigation';
++import { prisma } from '@/lib/db';
++import { eventPageTitle } from '@/lib/page-title';
++import { publicEventParticipateLinks, type NavLink } from '@/lib/public-event-nav';
++import { getPublicBrand } from '@/lib/public-brand';
++
++interface Props {
++  params: Promise<{ eventSlug: string }>;
++}
++
++const DESCRIPTIONS: Record<string, string> = {
++  cfp: 'Share your practical experience with an audience of operators and builders.',
++  register: 'Join us for the full event experience and connect with the community.',
++  scholarships: 'Apply for support that helps make the event accessible to you.',
++  volunteers: 'Help make the event welcoming, useful, and memorable for everyone.',
++  'sponsors/prospectus': 'Explore ways to support the event and reach its community.',
++};
++
++// Card actions say what happens, so no link repeats its card heading.
++const ACTIONS: Record<string, string> = {
++  cfp: 'Send a talk proposal',
++  register: 'Get tickets',
++  scholarships: 'Start an application',
++  volunteers: 'Sign up to volunteer',
++  'sponsors/prospectus': 'See the sponsorship prospectus',
++};
++
++function kindFor(link: NavLink): string | undefined {
++  if (link.external) return 'register';
++  const match = link.href.match(/\/events\/[^/]+\/(.+)$/);
++  return match?.[1];
++}
++
++function descriptionFor(link: NavLink): string | undefined {
++  const kind = kindFor(link);
++  return kind ? DESCRIPTIONS[kind] : undefined;
++}
++
++function actionFor(link: NavLink): string {
++  const kind = kindFor(link);
++  return (kind && ACTIONS[kind]) || `Go to ${link.label}`;
++}
++
++export async function generateMetadata({ params }: Props) {
++  const { eventSlug } = await params;
++  const event = await prisma.event.findUnique({ where: { slug: eventSlug }, select: { name: true } });
++  return {
++    title: event ? eventPageTitle('Get Involved', event.name) : 'Get Involved',
++    description: event ? `Find your way to contribute to ${event.name}.` : 'Find your way to contribute.',
++  };
++}
++
++export default async function GetInvolvedPage({ params }: Props) {
++  const { eventSlug } = await params;
++  const [event, brand] = await Promise.all([
++    prisma.event.findUnique({
++      where: { slug: eventSlug },
++      select: { name: true, slug: true, status: true },
++    }),
++    // Same registration rule as the SSR header CTA (src/app/(public)/layout.tsx):
++    // a signed-in attendee who already holds a ticket sees no Register card.
++    getPublicBrand(eventSlug, { respectViewerRegistration: true }),
++  ]);
++
++  if (!event || !brand) notFound();
++
++  if (event.status === 'CANCELLED') {
++    return (
++      <div className="mx-auto max-w-xl px-4 py-16 text-center">
++        <h1 className="text-3xl font-semibold text-gray-900">Get involved</h1>
++        <p className="mt-4 text-gray-600">{event.name} has been cancelled.</p>
++        <Link href={`/events/${event.slug}`} className="mt-8 inline-block font-medium text-nebula-600 hover:underline">
++          Back to event
++        </Link>
++      </div>
++    );
++  }
++
++  const links = publicEventParticipateLinks(event.slug, {
++    cfpOpen: brand.cfpOpen,
++    showRegister: brand.showRegisterCta,
++    externalTicketUrl: brand.externalTicketUrl,
++  });
++
++  return (
++    // A div, not <main>: events/[eventSlug]/layout.tsx already owns the main landmark.
++    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-nebula-50/40">
++      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:py-16">
++        <nav className="mb-8 text-sm text-gray-500">
++          <Link href={`/events/${event.slug}`} className="hover:text-nebula-600 hover:underline">← {event.name}</Link>
++        </nav>
++        <header className="mb-10">
++          <p className="font-mono text-xs uppercase tracking-wider text-nebula-600">{event.name}</p>
++          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Get involved</h1>
++          <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-600">
++            Choose the path that fits you and help make {event.name} stronger.
++          </p>
++        </header>
++        <div className="grid gap-5 sm:grid-cols-2">
++          {links.map((link) => {
++            const description = descriptionFor(link);
++            return (
++              <article key={link.href} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
++                <h2 className="text-xl font-semibold text-gray-900">{link.label}</h2>
++                {description ? <p className="mt-2 text-sm leading-relaxed text-gray-600">{description}</p> : null}
++                <Link
++                  href={link.href}
++                  target={link.external ? '_blank' : undefined}
++                  rel={link.external ? 'noopener noreferrer' : undefined}
++                  className="mt-5 inline-flex min-h-11 items-center rounded-md bg-nebula-600 px-4 text-sm font-semibold text-white hover:bg-nebula-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nebula-600 focus-visible:ring-offset-2"
++                >
++                  {actionFor(link)}
++                </Link>
++              </article>
++            );
++          })}
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/app/(public)/public-layout-client.tsx b/src/app/(public)/public-layout-client.tsx
+index df798a2fc..94bce40d8 100644
+--- a/src/app/(public)/public-layout-client.tsx
++++ b/src/app/(public)/public-layout-client.tsx
+@@ -10,6 +10,7 @@ import Link from 'next/link';
+ import { ConditionalUserButton } from '@/components/clerk-provider-wrapper';
+ import { ContextualHelpPanel } from '@/components/contextual-help-panel';
+ import { SearchForm } from '@/components/search-form';
++import { SearchToggle } from '@/components/search-toggle';
+ import { AtaiWordmarkFilter } from '@/components/atai-wordmark-filter';
+ import parentBarStyles from '@/components/atai-parent-bar.module.css';
+ import eventBarStyles from '@/components/atai-event-bar.module.css';
+@@ -616,15 +617,14 @@ export default function PublicLayoutClient({
+             </div>
+           </nav>
+           <div className="public-parent-utilities ml-auto flex shrink-0 items-center gap-1 sm:gap-2 xl:ml-2" data-testid="parent-site-utilities">
+-            <SearchForm
++            <SearchToggle
+               action="/search"
+               placeholder="Search"
+               variant="public"
+-              compact
+-              enableShortcut
+-              className="hidden w-36 sm:flex lg:w-44 [&_input]:placeholder:text-slate-500 [&_svg]:text-slate-500"
++              headerTone="light"
++              className="hidden sm:inline-flex"
+             />
+-            <ContextualHelpPanel headerTone="light" />
++            <ContextualHelpPanel headerTone="light" iconOnly />
+             <ConditionalUserButton
+               signInClassName={`inline-flex min-h-11 items-center rounded-md px-2 text-sm font-medium whitespace-nowrap text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 ${parentBarFocusClass}`}
+             />
+diff --git a/src/components/contextual-help-panel.tsx b/src/components/contextual-help-panel.tsx
+index 928112df4..ac36fc86e 100644
+--- a/src/components/contextual-help-panel.tsx
++++ b/src/components/contextual-help-panel.tsx
+@@ -27,10 +27,12 @@ interface HelpApiResponse {
+ 
+ interface ContextualHelpPanelProps {
+   headerTone?: "dark" | "light";
++  iconOnly?: boolean;
+ }
+ 
+ export function ContextualHelpPanel({
+   headerTone = "dark",
++  iconOnly = false,
+ }: ContextualHelpPanelProps) {
+   const pathname = usePathname();
+   return (
+@@ -38,6 +40,7 @@ export function ContextualHelpPanel({
+       key={pathname}
+       pathname={pathname}
+       headerTone={headerTone}
++      iconOnly={iconOnly}
+     />
+   );
+ }
+@@ -45,9 +48,11 @@ export function ContextualHelpPanel({
+ function RouteContextualHelpPanel({
+   pathname,
+   headerTone,
++  iconOnly,
+ }: {
+   pathname: string;
+   headerTone: "dark" | "light";
++  iconOnly: boolean;
+ }) {
+   const routeHelp = getContextualHelp(pathname);
+   const [featureOverride, setFeatureOverride] = useState<string | null>(null);
+@@ -148,7 +153,7 @@ function RouteContextualHelpPanel({
+         <Dialog.Trigger asChild>
+           <button
+             type="button"
+-            className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 sm:px-3 ${
++            className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 ${iconOnly ? 'rounded-full' : 'rounded-md px-2.5 sm:px-3'} transition-colors focus-visible:outline-none focus-visible:ring-2 ${
+               headerTone === "light"
+                 ? "text-stone-700 hover:bg-stone-900/5 hover:text-stone-950 focus-visible:ring-nebula-600"
+                 : "text-gray-300 hover:bg-white/10 hover:text-white focus-visible:ring-blue-400"
+@@ -157,7 +162,7 @@ function RouteContextualHelpPanel({
+             title={routeHelp.title}
+           >
+             <CircleHelp className="size-5" aria-hidden="true" />
+-            <span className="hidden text-sm font-semibold sm:inline">Help</span>
++            {!iconOnly && <span className="hidden text-sm font-semibold sm:inline">Help</span>}
+           </button>
+         </Dialog.Trigger>
+       ) : null}
+diff --git a/src/components/search-form.tsx b/src/components/search-form.tsx
+index a05110d1d..13a4704f3 100644
+--- a/src/components/search-form.tsx
++++ b/src/components/search-form.tsx
+@@ -5,7 +5,7 @@
+  * via any medium, is strictly prohibited.
+  */
+ 
+-import { useCallback, useEffect, useId, useRef, useState } from 'react';
++import { useCallback, useEffect, useId, useRef, useState, type Ref } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { Search } from 'lucide-react';
+ import { MIN_SEARCH_QUERY_LENGTH } from '@/lib/search';
+@@ -24,6 +24,9 @@ interface SearchFormProps {
+   enableShortcut?: boolean;
+   className?: string;
+   id?: string;
++  /** Escape hatches for composed controls such as SearchToggle. */
++  inputRef?: Ref<HTMLInputElement>;
++  autoFocus?: boolean;
+ }
+ 
+ const VARIANT_STYLES: Record<
+@@ -65,9 +68,11 @@ export function SearchForm({
+   enableShortcut = false,
+   className = '',
+   id,
++  inputRef,
++  autoFocus = false,
+ }: SearchFormProps) {
+   const router = useRouter();
+-  const inputRef = useRef<HTMLInputElement>(null);
++  const internalInputRef = useRef<HTMLInputElement>(null);
+   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   const reactId = useId();
+   const inputId = id ?? `site-search-${reactId}`;
+@@ -93,7 +98,7 @@ export function SearchForm({
+     const onKey = (event: KeyboardEvent) => {
+       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+         event.preventDefault();
+-        inputRef.current?.focus();
++        internalInputRef.current?.focus();
+       }
+     };
+     window.addEventListener('keydown', onKey);
+@@ -137,7 +142,7 @@ export function SearchForm({
+         Search
+       </label>
+       <input
+-        ref={inputRef}
++        ref={inputRef ?? internalInputRef}
+         id={inputId}
+         name="q"
+         type="search"
+@@ -149,6 +154,7 @@ export function SearchForm({
+         autoComplete="off"
+         enterKeyHint="search"
+         className={styles.input}
++        autoFocus={autoFocus}
+       />
+       <button type="submit" className={styles.button}>
+         Search
+diff --git a/src/components/search-toggle.tsx b/src/components/search-toggle.tsx
+new file mode 100644
+index 000000000..49dd1dd74
+--- /dev/null
++++ b/src/components/search-toggle.tsx
+@@ -0,0 +1,109 @@
++'use client';
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { Search } from 'lucide-react';
++import { useEffect, useId, useRef, useState } from 'react';
++import { SearchForm, type SearchFormVariant } from '@/components/search-form';
++
++/** False when the element or any ancestor is display: none (e.g. `hidden sm:inline-flex` on a phone). */
++function isRendered(element: HTMLElement | null): boolean {
++  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
++    if (window.getComputedStyle(node).display === 'none') return false;
++  }
++  return element !== null;
++}
++
++interface SearchToggleProps {
++  action: string;
++  placeholder?: string;
++  variant?: SearchFormVariant;
++  headerTone?: 'light' | 'dark';
++  className?: string;
++}
++
++export function SearchToggle({
++  action,
++  placeholder = 'Search…',
++  variant = 'public',
++  headerTone = 'dark',
++  className = '',
++}: SearchToggleProps) {
++  const [open, setOpen] = useState(false);
++  const buttonRef = useRef<HTMLButtonElement>(null);
++  const inputRef = useRef<HTMLInputElement>(null);
++  const wasOpenRef = useRef(false);
++  const panelId = `search-panel-${useId()}`;
++
++  useEffect(() => {
++    if (open) inputRef.current?.focus();
++    else if (wasOpenRef.current) buttonRef.current?.focus();
++    wasOpenRef.current = open;
++  }, [open]);
++
++  useEffect(() => {
++    const onKeyDown = (event: KeyboardEvent) => {
++      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
++        // Hidden below its breakpoint (display: none): leave the shortcut alone
++        // so it never opens a panel nobody can see.
++        if (!isRendered(buttonRef.current)) return;
++        event.preventDefault();
++        // Already open: the effect below won't rerun, so pull focus back to the field.
++        if (open) inputRef.current?.focus();
++        else setOpen(true);
++      }
++      if (event.key === 'Escape' && open) {
++        event.preventDefault();
++        setOpen(false);
++        buttonRef.current?.focus();
++      }
++    };
++    const onPointerDown = (event: PointerEvent) => {
++      if (!(event.target instanceof Node) || buttonRef.current?.parentElement?.contains(event.target)) return;
++      setOpen(false);
++    };
++    window.addEventListener('keydown', onKeyDown);
++    document.addEventListener('pointerdown', onPointerDown);
++    return () => {
++      window.removeEventListener('keydown', onKeyDown);
++      document.removeEventListener('pointerdown', onPointerDown);
++    };
++  }, [open]);
++
++  const light = headerTone === 'light';
++  return (
++    <div className={`relative ${className}`}>
++      <button
++        ref={buttonRef}
++        type="button"
++        className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 ${
++          light
++            ? 'text-stone-700 hover:bg-stone-900/5 hover:text-stone-950 focus-visible:ring-nebula-600'
++            : 'text-gray-300 hover:bg-white/10 hover:text-white focus-visible:ring-blue-400'
++        }`}
++        aria-label="Search"
++        aria-expanded={open}
++        aria-controls={open ? panelId : undefined}
++        title="Search (⌘K)"
++        onClick={() => setOpen((value) => !value)}
++      >
++        <Search className="size-5" aria-hidden="true" />
++      </button>
++      {open ? (
++        <div id={panelId} className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
++          <SearchForm
++            action={action}
++            placeholder={placeholder}
++            variant={variant}
++            enableShortcut={false}
++            inputRef={inputRef}
++            autoFocus
++          />
++        </div>
++      ) : null}
++    </div>
++  );
++}
+diff --git a/src/lib/nav-href-validate.ts b/src/lib/nav-href-validate.ts
+index 452b5500b..316372640 100644
+--- a/src/lib/nav-href-validate.ts
++++ b/src/lib/nav-href-validate.ts
+@@ -90,6 +90,7 @@ const EVENT_SUBROUTE_STATIC = new Set<string>([
+   'confirmation',
+   'directory',
+   'faq',
++  'get-involved',
+   'me',
+   'me/agenda',
+   'me/directory',
+diff --git a/src/lib/public-event-nav.ts b/src/lib/public-event-nav.ts
+index 109232f6c..1dc14fb06 100644
+--- a/src/lib/public-event-nav.ts
++++ b/src/lib/public-event-nav.ts
+@@ -80,6 +80,35 @@ export const publicEventNav = (
+   eventSlug: string,
+   options: PublicEventNavOptions = {}
+ ): NavEntry[] => {
++  const participateChildren = publicEventParticipateLinks(eventSlug, options);
++  return [
++    {
++      label: 'Participate',
++      children: participateChildren,
++    },
++    // Schedule is the single entry point for session listings (#719).
++    // /events/[slug]/sessions permanently redirects to /schedule.
++    { href: `/events/${eventSlug}/schedule`, label: 'Schedule' },
++    { href: `/events/${eventSlug}/speakers`, label: 'Speakers' },
++    // exact: /sponsors/prospectus belongs to Participate now, and a prefix
++    // match here would light both up on that page.
++    { href: `/events/${eventSlug}/sponsors`, label: 'Sponsors', exact: true },
++    // #736: dedicated Partners destination (community-partner tier logos).
++    { href: `/events/${eventSlug}/partners`, label: 'Partners' },
++    {
++      label: 'Event Info',
++      children: [
++        { href: `/events/${eventSlug}/venue`, label: 'Venue & Travel' },
++        { href: `/events/${eventSlug}/faq`, label: 'FAQ' },
++      ],
++    },
++  ];
++};
++
++export function publicEventParticipateLinks(
++  eventSlug: string,
++  options: PublicEventNavOptions = {}
++): NavLink[] {
+   const showRegister = options.showRegister !== false;
+   const cfpOpen = options.cfpOpen === true;
+   const external = options.externalTicketUrl?.trim() || null;
+@@ -115,29 +144,8 @@ export const publicEventNav = (
+     },
+   ];
+ 
+-  return [
+-    {
+-      label: 'Participate',
+-      children: participateChildren,
+-    },
+-    // Schedule is the single entry point for session listings (#719).
+-    // /events/[slug]/sessions permanently redirects to /schedule.
+-    { href: `/events/${eventSlug}/schedule`, label: 'Schedule' },
+-    { href: `/events/${eventSlug}/speakers`, label: 'Speakers' },
+-    // exact: /sponsors/prospectus belongs to Participate now, and a prefix
+-    // match here would light both up on that page.
+-    { href: `/events/${eventSlug}/sponsors`, label: 'Sponsors', exact: true },
+-    // #736: dedicated Partners destination (community-partner tier logos).
+-    { href: `/events/${eventSlug}/partners`, label: 'Partners' },
+-    {
+-      label: 'Event Info',
+-      children: [
+-        { href: `/events/${eventSlug}/venue`, label: 'Venue & Travel' },
+-        { href: `/events/${eventSlug}/faq`, label: 'FAQ' },
+-      ],
+-    },
+-  ];
+-};
++  return participateChildren;
++}
+ 
+ export function isNavItemActive(
+   pathname: string,

@@ -1,0 +1,276 @@
+diff --git a/src/app/(public)/public-layout-client.tsx b/src/app/(public)/public-layout-client.tsx
+index 92ca2704f..45630a436 100644
+--- a/src/app/(public)/public-layout-client.tsx
++++ b/src/app/(public)/public-layout-client.tsx
+@@ -769,9 +769,9 @@ export default function PublicLayoutClient({
+                 className="vt-events-identity flex min-h-11 min-w-0 flex-1 flex-wrap content-center items-baseline gap-x-3 text-sm xl:max-w-sm xl:flex-none"
+                 data-testid="events-bar-identity"
+               >
+-                {brandReady && currentBrand?.logoUrl && (
++                {(barEvent.logoUrl || (brandReady && currentBrand?.logoUrl)) && (
+                   // eslint-disable-next-line @next/next/no-img-element
+-                  <img src={currentBrand.logoUrl} alt="" className="h-8 w-auto max-w-24 object-contain" />
++                  <img src={barEvent.logoUrl || currentBrand?.logoUrl || undefined} alt="" className="h-8 w-auto max-w-24 object-contain" />
+                 )}
+                 <span className="max-w-full truncate font-medium">{barEvent.name}</span>
+                 {eventBarDetails(barEvent) ? (
+@@ -950,6 +950,10 @@ export default function PublicLayoutClient({
+                 className="vt-events-identity flex min-h-11 min-w-0 flex-1 flex-wrap content-center items-baseline gap-x-3 text-sm sm:text-base xl:max-w-sm xl:flex-none"
+                 data-testid="events-bar-identity"
+               >
++                {eventSlug && (barEvent.logoUrl || (brandReady && currentBrand?.logoUrl)) && (
++                  // eslint-disable-next-line @next/next/no-img-element
++                  <img src={barEvent.logoUrl || currentBrand?.logoUrl || undefined} alt="" className="h-8 w-auto max-w-24 object-contain" />
++                )}
+                 <span className={`max-w-full truncate font-medium ${isBroadside ? 'text-stone-900' : 'text-white'}`}>
+                   {barEvent.name}
+                 </span>
+@@ -1117,7 +1121,7 @@ export default function PublicLayoutClient({
+                 there now, and `/events` is a 308 back to it (#657). */}
+             <Link
+               href={eventSlug ? `/events/${eventSlug}` : '/'}
+-              className="vt-nav-brand flex min-h-11 min-w-0 shrink-0 items-center gap-2"
++              className="vt-nav-brand flex min-h-11 min-w-0 max-w-[35vw] shrink-0 items-center gap-2 sm:max-w-[22rem]"
+               aria-label={logoLabel}
+             >
+               {/* #837: 56px tall. max-w rises with it — at the old 8rem a
+@@ -1132,12 +1136,15 @@ export default function PublicLayoutClient({
+                   457px at 360–414px wide and hid the menu button; 35vw fits
+                   brand + Sign in + help + menu at 360, 375, 390 and 414px. */}
+               {brandLogoUrl ? (
+-                // eslint-disable-next-line @next/next/no-img-element
++                <>
++                {/* eslint-disable-next-line @next/next/no-img-element */}
+                 <img
+                   src={brandLogoUrl}
+-                  alt={brandName}
+-                  className="h-14 w-auto max-w-[35vw] object-contain sm:max-w-[15rem]"
++                  alt={eventSlug ? '' : brandName}
++                  className={eventSlug ? 'h-8 w-auto max-w-[40%] shrink-0 object-contain' : 'h-14 w-auto max-w-[35vw] object-contain sm:max-w-[15rem]'}
+                 />
++                {eventSlug && <span className="min-w-0 truncate text-sm font-medium">{brandName}</span>}
++                </>
+               ) : currentBrand && brandName ? (
+                 <span
+                   className={`flex h-14 max-w-[35vw] items-center truncate text-base font-medium sm:max-w-[15rem] ${
+diff --git a/src/app/(public)/upcoming-events/page.tsx b/src/app/(public)/upcoming-events/page.tsx
+new file mode 100644
+index 000000000..95d91d108
+--- /dev/null
++++ b/src/app/(public)/upcoming-events/page.tsx
+@@ -0,0 +1,9 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle
++ * SPDX-License-Identifier: AGPL-3.0-or-later
++ */
++import { EventDirectoryPage } from '@/components/event-directory-page';
++export const revalidate = 60;
++export default function UpcomingEvents() {
++  return <EventDirectoryPage mode="upcoming" />;
++}
+diff --git a/src/components/atai-site-header.tsx b/src/components/atai-site-header.tsx
+index df874cdff..ad76abbcb 100644
+--- a/src/components/atai-site-header.tsx
++++ b/src/components/atai-site-header.tsx
+@@ -30,8 +30,8 @@ import styles from './atai-site-header.module.css';
+ export const ATAI_HEADER_LOGO_SRC = '/brand/allthingsai-horizontal.png';
+ 
+ const topLinkClass = (active: boolean) =>
+-  `inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-[14px] xl:text-[15px] font-medium whitespace-nowrap text-white transition-colors duration-150 hover:bg-[#104fc8] ${
+-    active ? 'border-[#8bbcff]' : 'border-transparent'
++  `inline-flex min-h-11 items-center gap-1 px-3 text-[14px] xl:text-[15px] font-medium whitespace-nowrap text-white underline-offset-4 transition-colors duration-150 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 ${
++    active ? 'underline' : ''
+   }`;
+ 
+ const iconButtonClass =
+@@ -50,12 +50,15 @@ function DesktopGroup({
+ }) {
+   const buttonRef = useRef<HTMLButtonElement>(null);
+   const panelId = `atai-site-menu-${group.label.toLowerCase().replace(/\W+/g, '-')}`;
+-  const active = group.href === '/' ? pathname === '/' || pathname.startsWith('/events/') || pathname === '/past-events' : group.children.some((child) => isAtaiLinkCurrent(pathname, child));
++  const active = group.href === '/' ? pathname === '/' || pathname.startsWith('/events/') || pathname === '/past-events' || pathname === '/upcoming-events' : group.children.some((child) => isAtaiLinkCurrent(pathname, child));
++  if (group.href) {
++    return <AtaiChromeAnchor link={{ label: group.label, href: group.href }} current={pathname === group.href} className={topLinkClass(pathname === group.href)} onClick={() => onOpenChange(false)}>{group.label}</AtaiChromeAnchor>;
++  }
+   return (
+     <div
+       className="relative flex items-center"
+-      onMouseEnter={group.href ? undefined : () => onOpenChange(true)}
+-      onMouseLeave={group.href ? undefined : () => onOpenChange(false)}
++      onMouseEnter={() => onOpenChange(true)}
++      onMouseLeave={() => onOpenChange(false)}
+       onBlur={(event) => {
+         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onOpenChange(false);
+       }}
+@@ -66,18 +69,16 @@ function DesktopGroup({
+         buttonRef.current?.focus();
+       }}
+     >
+-      {group.href && <AtaiChromeAnchor link={{ label: group.label, href: group.href }} current={pathname === group.href} className={topLinkClass(active)} onClick={() => onOpenChange(false)}>{group.label}</AtaiChromeAnchor>}
+       <button
+         ref={buttonRef}
+         type="button"
+         className={topLinkClass(active)}
+-        aria-label={group.href ? `Browse ${group.label.toLowerCase()}` : undefined}
+         aria-expanded={open}
+         aria-controls={panelId}
+         aria-current={active ? 'true' : undefined}
+         onClick={() => onOpenChange(!open)}
+       >
+-        {group.href ? null : group.label}
++        {group.label}
+         <ChevronDown
+           size={14}
+           aria-hidden="true"
+@@ -89,7 +90,7 @@ function DesktopGroup({
+           data-nav-panel=""
+           className="min-w-[15rem] rounded-lg border border-[#0F172A]/5 bg-white py-2 shadow-[0_8px_30px_rgba(15,23,42,0.12)]"
+         >
+-          {group.children.map((child) => {
++          {(group.href ? [] : group.children).map((child) => {
+             const current = isAtaiLinkCurrent(pathname, child);
+             return (
+               <AtaiChromeAnchor
+@@ -232,7 +233,7 @@ export function AtaiMobileSiteMenu({ pathname, onNavigate }: { pathname: string;
+       {ATAI_HEADER_GROUPS.map((group) => (
+         <div key={group.label} className="border-b border-[#0F172A]/5 py-3">
+           <h2 className="mb-1 block text-[11px] tracking-widest text-[#0F172A]/65 uppercase">{group.href ? <AtaiChromeAnchor link={{ label: group.label, href: group.href }} current={pathname === group.href} onClick={onNavigate} className="inline-flex min-h-11 items-center">{group.label}</AtaiChromeAnchor> : group.label}</h2>
+-          {group.children.map((child) => {
++          {(group.href ? [] : group.children).map((child) => {
+             const current = isAtaiLinkCurrent(pathname, child);
+             return (
+               <AtaiChromeAnchor
+diff --git a/src/components/event-directory-page.tsx b/src/components/event-directory-page.tsx
+index 0606b8b9d..dfeca9d0c 100644
+--- a/src/components/event-directory-page.tsx
++++ b/src/components/event-directory-page.tsx
+@@ -28,7 +28,7 @@ export async function EventDirectoryPage({ mode }: { mode: 'upcoming' | 'past' }
+             <p className="mt-3 text-gray-300">{mode === 'upcoming' ? 'Find your next event.' : 'Explore previous events and available recordings.'}</p>
+           </div>
+           <nav aria-label="Event listings" className="flex flex-wrap gap-4 text-sm font-medium">
+-            <Link href="/" aria-current={mode === 'upcoming' ? 'page' : undefined} className="inline-flex min-h-11 items-center text-nebula-300 underline underline-offset-4">Upcoming events</Link>
++            <Link href="/upcoming-events" aria-current={mode === 'upcoming' ? 'page' : undefined} className="inline-flex min-h-11 items-center text-nebula-300 underline underline-offset-4">Upcoming events</Link>
+             <Link href="/past-events" id={mode === 'upcoming' ? 'past' : undefined} aria-current={mode === 'past' ? 'page' : undefined} className="inline-flex min-h-11 items-center text-nebula-300 underline underline-offset-4">Past events</Link>
+           </nav>
+         </div>
+diff --git a/src/components/events-directory.tsx b/src/components/events-directory.tsx
+index 4b9c04d78..25eeeeaae 100644
+--- a/src/components/events-directory.tsx
++++ b/src/components/events-directory.tsx
+@@ -144,16 +144,17 @@ export async function EventsDirectory({ mode = 'all' }: { mode?: 'all' | 'upcomi
+       eventCardFeatureImageUrl(event) ?? (recordingId ? youtubeThumbnailUrl(recordingId) : null);
+     const presenter = recordingId ? event.sessions[0]?.speakerName?.trim() || null : null;
+ 
++    // A full event navigation loads the matching public-layout brand seed.
+     // #2037: no aria-label. `${primaryCta}: ${event.name}` hid the chip, date,
+     // location, and CTA from the accessible name (WCAG 2.5.3). Name comes from
+     // the wrapping Link's visible contents; href / target / rel stay as below.
+     return (
+-      <Link
++      <a
+         href={href}
+         {...linkProps}
+-        className="group relative flex flex-col rounded-xl border border-white/10 bg-space-800 p-6 shadow-sm transition-all hover:border-nebula-400/60 hover:shadow-lg hover:shadow-nebula-900/40"
++        className={`group relative rounded-xl border border-white/10 bg-space-800 p-6 shadow-sm transition-all hover:border-nebula-400/60 hover:shadow-lg hover:shadow-nebula-900/40 ${showRegisterCta ? "grid gap-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : "flex flex-col"}`}
+       >
+-        <div className="mb-4 aspect-[16/9] w-full overflow-hidden rounded-lg bg-space-700">
++        <div className={`aspect-[16/9] w-full overflow-hidden rounded-lg bg-space-700 ${showRegisterCta ? "self-start" : "mb-4"}`}>
+           {featureImageUrl ? (
+             // eslint-disable-next-line @next/next/no-img-element
+             <img
+@@ -183,9 +184,10 @@ export async function EventsDirectory({ mode = 'all' }: { mode?: 'all' | 'upcomi
+             </div>
+           )}
+         </div>
++        <div className="flex min-w-0 flex-1 flex-col">
+         <div className="flex-1">
+           <div className="mb-2 flex flex-wrap items-center gap-2">
+-            <div className="inline-flex rounded-full bg-rocket-400/15 px-2.5 py-0.5 text-xs font-medium text-rocket-300">
++            <div className={showRegisterCta ? "text-xs font-medium text-rocket-300" : "inline-flex rounded-full bg-rocket-400/15 px-2.5 py-0.5 text-xs font-medium text-rocket-300"}>
+               {typeChip}
+             </div>
+             {recordingId && (
+@@ -239,7 +241,8 @@ export async function EventsDirectory({ mode = 'all' }: { mode?: 'all' | 'upcomi
+         <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-nebula-300 transition-all group-hover:gap-2">
+           {primaryCta} <ArrowRight className="h-4 w-4" />
+         </div>
+-      </Link>
++        </div>
++      </a>
+     );
+   }
+ 
+@@ -250,8 +253,12 @@ export async function EventsDirectory({ mode = 'all' }: { mode?: 'all' | 'upcomi
+             read twice in a row to screen readers (PR #830 review). Meetups
+             and Archive keep theirs — the page doesn't title those. */}
+         {mode !== 'past' && <section aria-label="Upcoming events">
++          {mode === 'all' && <nav aria-label="Event listings" className="mb-6 flex flex-wrap gap-6 text-sm font-medium">
++            <Link href="/upcoming-events" className="inline-flex min-h-11 items-center text-nebula-300 underline-offset-4 hover:underline">Upcoming events</Link>
++            <Link href="/past-events" className="inline-flex min-h-11 items-center text-nebula-300 underline-offset-4 hover:underline">Past events</Link>
++          </nav>}
+           {upcoming.length > 0 ? (
+-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
++            <div className="grid grid-cols-1 gap-6">
+               {upcoming.map((event) => (
+                 <EventCard key={event.id} event={event} showRegisterCta />
+               ))}
+diff --git a/src/lib/public-brand.ts b/src/lib/public-brand.ts
+index 7f856c7fb..8a202a784 100644
+--- a/src/lib/public-brand.ts
++++ b/src/lib/public-brand.ts
+@@ -359,6 +359,7 @@ async function loadEventBrand(
+     event: {
+       slug: event.slug,
+       name: event.name,
++      logoUrl: event.logoUrl,
+       dates: formatEventBarDates(event.startDate, event.endDate, event.timezone),
+       city: event.venue?.city?.trim() || null,
+     },
+diff --git a/src/lib/public-family-nav-query.ts b/src/lib/public-family-nav-query.ts
+index 579ce34ae..4c83eb9dd 100644
+--- a/src/lib/public-family-nav-query.ts
++++ b/src/lib/public-family-nav-query.ts
+@@ -37,11 +37,11 @@ export function pastEventsNavWhere(
+ export async function loadPastEventsNav(
+   featuredEventId: string | null,
+   now: Date = new Date()
+-): Promise<Array<{ slug: string; name: string }>> {
++): Promise<Array<{ slug: string; name: string; logoUrl?: string | null }>> {
+   try {
+     return await prisma.event.findMany({
+       where: pastEventsNavWhere(now, featuredEventId),
+-      select: { slug: true, name: true },
++      select: { slug: true, name: true, logoUrl: true },
+       orderBy: [{ endDate: 'desc' }, { id: 'desc' }],
+       take: PAST_EVENTS_NAV_LIMIT,
+     });
+diff --git a/src/lib/public-header-nav.ts b/src/lib/public-header-nav.ts
+index 6bc3c16a8..e5f15ad03 100644
+--- a/src/lib/public-header-nav.ts
++++ b/src/lib/public-header-nav.ts
+@@ -23,6 +23,7 @@ import type { PublicBrandPayload } from '@/lib/public-brand';
+ export type PublicFamilyEvent = {
+   slug: string;
+   name: string;
++  logoUrl?: string | null;
+   /** "Apr 18–21" in the event's own timezone; null when dates are unusable. */
+   dates: string | null;
+   city: string | null;
+@@ -45,7 +46,7 @@ export type PublicFamilyNav = {
+    */
+   featured: FeaturedEventsBar | null;
+   /** Recent public event identities for soft navigation; does not add menu entries. */
+-  pastEvents: Array<{ slug: string; name: string }>;
++  pastEvents: Array<{ slug: string; name: string; logoUrl?: string | null }>;
+ };
+ 
+ /** What the events bar shows: identity, the event's own nav, its ticket CTA. */
+@@ -254,7 +255,7 @@ export function resolveEventsBar(
+   if (featured && featured.event.slug === route.slug) return featured;
+   const listed = family.pastEvents.find((event) => event.slug === route.slug);
+   return {
+-    event: listed ? { slug: listed.slug, name: listed.name, dates: null, city: null } : null,
++    event: listed ? { ...listed, dates: null, city: null } : null,
+     eventNav: route.nav,
+     cta: route.cta,
+   };

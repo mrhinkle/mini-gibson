@@ -1,0 +1,284 @@
+diff --git a/tests/unit/public-two-bar-header.test.ts b/tests/unit/public-two-bar-header.test.ts
+index 069f2e688..53879f733 100644
+--- a/tests/unit/public-two-bar-header.test.ts
++++ b/tests/unit/public-two-bar-header.test.ts
+@@ -16,7 +16,7 @@ import { createRoot, type Root } from 'react-dom/client';
+ import { renderToStaticMarkup } from 'react-dom/server';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+-const nav = vi.hoisted(() => ({ pathname: '/', eventSlug: '' }));
++const nav = vi.hoisted(() => ({ pathname: '/', eventSlug: '', signedIn: false }));
+ 
+ vi.mock('next/navigation', () => ({
+   useParams: () => (nav.eventSlug ? { eventSlug: nav.eventSlug } : {}),
+@@ -24,9 +24,14 @@ vi.mock('next/navigation', () => ({
+   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+ }));
+ vi.mock('@/components/clerk-provider-wrapper', () => ({
+-  ConditionalUserButton: () => createElement('div', { 'data-testid': 'user-button' }),
++  ConditionalUserButton: () => nav.signedIn
++    ? createElement('button', { 'data-testid': 'user-button' }, 'Account')
++    : createElement('a', { href: '/sign-in', 'data-testid': 'user-button' }, 'Sign in'),
++}));
++vi.mock('@/components/contextual-help-panel', () => ({
++  ContextualHelpPanel: ({ headerTone }: { headerTone: string }) =>
++    createElement('button', { 'data-testid': 'help-button', 'data-tone': headerTone }, 'Help'),
+ }));
+-vi.mock('@/components/contextual-help-panel', () => ({ ContextualHelpPanel: () => null }));
+ vi.mock('@/components/search-form', () => ({
+   SearchForm: () => createElement('div', { 'data-testid': 'search-form' }),
+ }));
+@@ -40,6 +45,8 @@ vi.mock('lucide-react', () => ({
+ 
+ import PublicLayoutClient from '../../src/app/(public)/public-layout-client';
+ import type { PublicBrandPayload } from '../../src/lib/public-brand';
++import { buildNavTree, seedRowsFromNavEntries } from '../../src/lib/nav-items';
++import { validateNavHref } from '../../src/lib/nav-href-validate';
+ import {
+   featuredEventBarState,
+   type PublicFamilyEvent,
+@@ -179,13 +186,14 @@ describe('public shell: two bars, one family (#1983)', () => {
+     const eventsNav = container.querySelector('nav[aria-label="Brand 2027"]') as HTMLElement;
+     expect(eventsNav).not.toBeNull();
+     expect(eventsNav.querySelector('a[href="/events/brand-2027/schedule"]')?.textContent).toBe('Schedule');
+-    expect(eventsNav.querySelector('a[href="/speakers"]')?.textContent).toBe('Past speakers');
++    expect(eventsNav.querySelector('a[href="/speakers"]')).toBeNull();
+     expect(
+       container.querySelector('a[aria-label="Buy tickets for this event"]')?.getAttribute('href')
+     ).toBe('/events/brand-2027/register');
+   }
+ 
+   beforeEach(() => {
++    nav.signedIn = false;
+     container = document.createElement('div');
+     document.body.appendChild(container);
+     root = createRoot(container);
+@@ -232,7 +240,7 @@ describe('public shell: two bars, one family (#1983)', () => {
+     await render(featuredEventSeed(), '/events/brand-2027', 'brand-2027');
+     const parentNav = container.querySelector('nav[aria-label="Brand"]') as HTMLElement;
+     expect(parentNav).not.toBeNull();
+-    expect([...parentNav.querySelectorAll(':scope > a')].map((a) => a.textContent)).toEqual(['News']);
++    expect([...parentNav.querySelectorAll(':scope > div > a')].map((a) => a.textContent)).toEqual(['News']);
+ 
+     const toggle = parentNav.querySelector(
+       'button[aria-controls="parent-nav-group-get-involved"]'
+@@ -254,12 +262,12 @@ describe('public shell: two bars, one family (#1983)', () => {
+     expect(container.querySelector('#event-nav-group-participate')).not.toBeNull();
+   });
+ 
+-  it('leads the events bar with the featured event on site-level pages, then its nav, Past events, Past speakers', async () => {
++  it('leads with the featured event and its nav without adding archive links', async () => {
+     await render(siteBrand(family()), '/news', '');
+ 
+     expectFeaturedEventsBar();
+     const eventsNav = container.querySelector('nav[aria-label="Brand 2027"]') as HTMLElement;
+-    const labels = [...eventsNav.querySelectorAll(':scope > a, :scope > div > button')].map((el) =>
++    const labels = [...eventsNav.querySelectorAll(':scope > div > a, :scope > div > div > button')].map((el) =>
+       el.textContent?.trim()
+     );
+     expect(labels).toEqual([
+@@ -269,24 +277,98 @@ describe('public shell: two bars, one family (#1983)', () => {
+       'Sponsors',
+       'Partners',
+       'Event Info',
+-      'Past events',
+-      'Past speakers',
+     ]);
+     expect(eventsNav.querySelector('a[href="/news"]')).toBeNull();
+ 
+-    const past = container.querySelector('#event-nav-group-past-events') as HTMLElement;
+-    expect([...past.querySelectorAll('a')].map((a) => [a.getAttribute('href'), a.textContent])).toEqual([
+-      ['/events/brand-2026', 'Brand 2026'],
+-      ['/events/other-2025', 'Other 2025'],
+-    ]);
++    expect(container.querySelector('#event-nav-group-past-events')).toBeNull();
++    expect(container.querySelector('#event-mobile-navigation a[href="/speakers"]')).toBeNull();
++    expect(container.querySelector('#event-mobile-navigation a[href="/events/brand-2026"]')).toBeNull();
++  });
++
++  it.each(['orbit', 'broadside'] as const)('puts search, Help and signed-out/in controls in the white parent bar (%s)', async (template) => {
++    for (const signedIn of [false, true]) {
++      nav.signedIn = signedIn;
++      await render(featuredEventSeed(template), '/events/brand-2027', 'brand-2027');
++      const utilities = container.querySelector('[data-testid="parent-site-utilities"]')!;
++      expect(utilities.closest('[data-testid="parent-site-bar"]')).not.toBeNull();
++      expect(utilities.querySelector('[data-testid="search-form"]')).not.toBeNull();
++      expect(utilities.querySelector('[data-testid="help-button"]')?.getAttribute('data-tone')).toBe('light');
++      expect(utilities.querySelector('[data-testid="user-button"]')?.textContent).toBe(signedIn ? 'Account' : 'Sign in');
++      expect(container.querySelectorAll('[data-testid="user-button"]')).toHaveLength(1);
++      const eventHeader = container.querySelector('[data-header-layout="events-bar"]')!;
++      expect(eventHeader.querySelector('[data-testid="help-button"]')).toBeNull();
++      expect(eventHeader.querySelector('[data-testid="user-button"]')).toBeNull();
++    }
++  });
++
++  it('keeps event identity, navigation and ticket action in one row', async () => {
++    await render(featuredEventSeed(), '/events/brand-2027', 'brand-2027');
++    const identity = container.querySelector('[data-testid="events-bar-identity"]')!;
++    const eventsNav = container.querySelector('nav[aria-label="Brand 2027"]')!;
++    const tickets = container.querySelector('a[aria-label="Buy tickets for this event"]')!;
++    expect(eventsNav.parentElement).toBe(identity.parentElement);
++    expect(tickets.parentElement).toBe(identity.parentElement);
++    expect(identity.textContent).toContain('Apr 18–21, Raleigh');
+   });
+ 
+-  it('omits Past events when there are none and marks Past speakers current on /speakers', async () => {
++  it('keeps the featured event navigation on the speaker archive without adding archive links', async () => {
+     await render(siteBrand(family({ pastEvents: [] })), '/speakers', '');
+     expect(container.querySelector('#event-nav-group-past-events')).toBeNull();
+-    expect(
+-      container.querySelector('nav[aria-label="Brand 2027"] a[href="/speakers"]')?.getAttribute('aria-current')
+-    ).toBe('page');
++    expectFeaturedEventsBar();
++  });
++
++  it.each(['orbit', 'broadside'] as const)('honors editor visibility, order and optional archive groups on event and site pages (%s)', async (template) => {
++    // The real editor row shape feeds the same tree used by the public brand.
++    const rows = seedRowsFromNavEntries([
++      { href: '/events/brand-2027/schedule', label: 'Program' },
++      { href: '/events/brand-2027/partners', label: 'Partners' },
++      { label: 'Past events', children: [{ href: 'https://events.brand.example.org/events/brand-2026', label: 'Brand 2026', external: true }] },
++      { href: 'https://events.brand.example.org/speakers', label: 'Past speakers', external: true },
++    ]).map((row) => ({
++      ...row,
++      visible: row.label !== 'Partners',
++      order: row.label === 'Past speakers' ? -1 : row.order,
++    }));
++    for (const row of rows) expect(validateNavHref('EVENT', row.href, row.external, 'brand-2027')).toEqual({ ok: true });
++    const customBrand = { ...eventBrand('brand-2027', template), eventNavOverride: buildNavTree(rows) };
++    const fam = family({
++      routeEvent: IDENTITY_2027,
++      featured: { event: IDENTITY_2027, ...featuredEventBarState(customBrand) },
++    });
++    const cases: Array<[PublicBrandPayload, string, string]> = [
++      [{ ...customBrand, family: fam }, '/events/brand-2027', 'brand-2027'],
++      [{ ...siteBrand(fam), visualTemplate: template }, '/speakers', ''],
++    ];
++    for (const [brand, pathname, slug] of cases) {
++      await render(brand, pathname, slug);
++      const desktop = container.querySelector('nav[aria-label="Brand 2027"]')!;
++      expect([...desktop.querySelectorAll(':scope > div > a, :scope > div > div > button')].map((el) => el.textContent?.trim())).toEqual([
++        'Past speakers', 'Program', 'Past events',
++      ]);
++      const mobile = container.querySelector('nav[aria-labelledby="event-mobile-heading"]')!;
++      for (const menu of [desktop, mobile]) {
++        expect([...menu.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
++          'https://events.brand.example.org/speakers', '/events/brand-2027/schedule', 'https://events.brand.example.org/events/brand-2026',
++        ]);
++        expect(menu.querySelector('a[href="/events/other-2025"]')).toBeNull();
++      }
++      expect(desktop.querySelector('a[href="https://events.brand.example.org/speakers"]')?.getAttribute('target')).toBe('_blank');
++    }
++  });
++
++  it.each(['orbit', 'broadside'] as const)('respects an all-hidden editor configuration without resurrecting links (%s)', async (template) => {
++    const rows = seedRowsFromNavEntries([{ href: '/events/brand-2027/schedule', label: 'Program' }]);
++    const customBrand = { ...eventBrand('brand-2027', template), eventNavOverride: buildNavTree(rows.map((row) => ({ ...row, visible: false }))) };
++    const fam = family({ routeEvent: IDENTITY_2027, featured: { event: IDENTITY_2027, ...featuredEventBarState(customBrand) } });
++    for (const [brand, pathname, slug] of [
++      [{ ...customBrand, family: fam }, '/events/brand-2027', 'brand-2027'],
++      [{ ...siteBrand(fam), visualTemplate: template }, '/', ''],
++    ] as const) {
++      await render(brand, pathname, slug);
++      expect(container.querySelector('nav[aria-label="Brand 2027"]')?.querySelectorAll('a, button')).toHaveLength(0);
++      expect(container.querySelector('nav[aria-labelledby="event-mobile-heading"]')?.querySelectorAll('a, button')).toHaveLength(0);
++      expect(container.querySelector('[data-testid="events-bar-identity"]')?.textContent).toContain('Brand 2027');
++    }
+   });
+ 
+   it('shows the event page identity and marks the current event link', async () => {
+@@ -307,13 +389,11 @@ describe('public shell: two bars, one family (#1983)', () => {
+       const bar = container.querySelector('[data-testid="parent-site-bar"]');
+       expectFeaturedEventsBar();
+ 
+-      // Same seed, new route params: what a client-side Past speakers click does.
++      // Same seed, new route params: follow a speaker archive link in page content.
+       await render(seed, '/speakers', '');
+       expect(container.querySelector('[data-testid="parent-site-bar"]')).toBe(bar);
+       expectFeaturedEventsBar();
+-      expect(
+-        container.querySelector('nav[aria-label="Brand 2027"] a[href="/speakers"]')?.getAttribute('aria-current')
+-      ).toBe('page');
++      expect(container.querySelector('nav[aria-label="Brand 2027"] a[href="/speakers"]')).toBeNull();
+     });
+ 
+     it('site page → featured event page: the identity, event nav and CTA stay', async () => {
+@@ -459,11 +539,11 @@ describe('public shell: two bars, one family (#1983)', () => {
+     header.style.transform = 'translateZ(0)';
+     header.getBoundingClientRect = () => rect(45, 0, 118, 1440);
+     const eventToggle = container.querySelector(
+-      'button[aria-controls="event-nav-group-past-events"]'
++      'button[aria-controls="event-nav-group-event-info"]'
+     ) as HTMLButtonElement;
+     eventToggle.getBoundingClientRect = () => rect(106, 575, 44, 105);
+     await act(async () => eventToggle.click());
+-    const eventPanel = container.querySelector('#event-nav-group-past-events') as HTMLElement;
++    const eventPanel = container.querySelector('#event-nav-group-event-info') as HTMLElement;
+     expect(eventPanel.style.top).toBe('109px');
+     expect(eventPanel.style.left).toBe('575px');
+ 
+@@ -476,6 +556,34 @@ describe('public shell: two bars, one family (#1983)', () => {
+     expect((container.querySelector('#parent-nav-group-get-involved') as HTMLElement).style.top).toBe('48px');
+   });
+ 
++  it('keeps a rightmost dropdown inside the viewport and reclamps when its strip scrolls', async () => {
++    await render(featuredEventSeed(), '/events/brand-2027', 'brand-2027');
++    const rect = (left: number, width: number) =>
++      ({ top: 45, left, bottom: 89, right: left + width, height: 44, width, x: left, y: 45, toJSON: () => ({}) }) as DOMRect;
++    const header = container.querySelector('[data-header-layout="events-bar"]') as HTMLElement;
++    header.style.transform = 'translateZ(0)';
++    header.getBoundingClientRect = () => rect(24, window.innerWidth - 48);
++    const toggle = container.querySelector('button[aria-controls="event-nav-group-event-info"]') as HTMLButtonElement;
++    const panel = container.querySelector('#event-nav-group-event-info') as HTMLElement;
++    panel.getBoundingClientRect = () => rect(0, 208);
++    toggle.getBoundingClientRect = () => rect(window.innerWidth - 100, 90);
++    await act(async () => toggle.click());
++    expect(panel.style.left).toBe(`${window.innerWidth - 208 - 8 - 24}px`);
++    toggle.getBoundingClientRect = () => rect(-80, 90);
++    await act(async () => toggle.closest('nav')!.dispatchEvent(new Event('scroll')));
++    expect(panel.style.left).toBe('-16px'); // 8px viewport gutter, minus containing block's 24px offset.
++    // Classic scrollbars consume layout width even though innerWidth includes them.
++    const viewport = vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(window.innerWidth - 16);
++    try {
++      toggle.getBoundingClientRect = () => rect(window.innerWidth - 100, 90);
++      await act(async () => window.dispatchEvent(new Event('resize')));
++      expect(panel.style.left).toBe(`${window.innerWidth - 16 - 208 - 8 - 24}px`);
++      expect(panel.style.maxWidth).toBe(`${window.innerWidth - 32}px`);
++    } finally {
++      viewport.mockRestore();
++    }
++  });
++
+   it('server-renders the parent bar at a fixed height, after the skip link and before the sticky header', () => {
+     nav.pathname = '/';
+     nav.eventSlug = '';
+diff --git a/tests/unit/public-two-bar-nav.test.ts b/tests/unit/public-two-bar-nav.test.ts
+index 4ef65976f..c0b61d2bb 100644
+--- a/tests/unit/public-two-bar-nav.test.ts
++++ b/tests/unit/public-two-bar-nav.test.ts
+@@ -49,8 +49,6 @@ import {
+ } from '../../src/lib/public-family-nav-query';
+ import { publicEventNav } from '../../src/lib/public-event-nav';
+ import {
+-  PAST_SPEAKERS_LINK,
+-  buildEventsBarEntries,
+   familyParentEntries,
+   featuredEventBarState,
+   formatEventBarDates,
+@@ -295,16 +293,6 @@ describe('two-bar helpers (#1983)', () => {
+     expect(formatEventBarDates('not a date', null)).toBeNull();
+   });
+ 
+-  it('appends Past events (omitted when empty) and Past speakers after the event nav', () => {
+-    const eventNav = [{ href: '/events/x/schedule', label: 'Schedule' }];
+-    expect(buildEventsBarEntries(eventNav, [])).toEqual([...eventNav, PAST_SPEAKERS_LINK]);
+-    expect(buildEventsBarEntries(eventNav, [{ slug: 'x-2026', name: 'X 2026' }])).toEqual([
+-      ...eventNav,
+-      { label: 'Past events', children: [{ href: '/events/x-2026', label: 'X 2026' }] },
+-      { href: '/speakers', label: 'Past speakers' },
+-    ]);
+-  });
+-
+   it('opens parent-site and subdomain links in the same tab, and everything else as configured', () => {
+     const parent = 'https://www.brand.example.org';
+     expect(isFamilyHref('https://brand.example.org/about', parent)).toBe(true);

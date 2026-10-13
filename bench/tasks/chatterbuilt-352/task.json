@@ -1,0 +1,62 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "chatterbuilt-352",
+  "repo": "chatterbuilt",
+  "repo_url": "https://github.com/The-AIE/chatterbuilt",
+  "pr": 352,
+  "base_sha": "ffe707a3aaa491685b1a3efd1ab2ae1141be8847",
+  "merge_sha": "d119fc7d60ca8a2778c46421e80dbdc5a63b9ee4",
+  "issue_number": 351,
+  "issue_title": "prepare_agent_suggestion residual honesty: align with #309 identity model + #308 App prep status",
+  "problem_statement": "prepare_agent_suggestion residual honesty: align with #309 identity model + #308 App prep status\n\nPart of #26 (post-rescope residual). Does **not** close the parent (L-013).\n\n## Context\n\nAfter #12/#18 closed and children #308 (update-bot registration package) + #309 (identity reconciliation) shipped, `prepare_agent_suggestion` still emits residual lines that read as if #18 is open and as if \"per-agent identity under one license\" is the model. That is **docs\u2260reality** for continuous agents (Hermes/OpenClaw) reading the tool surface.\n\n## Scope (fleet mcpcore: `apps/mcp/lib/**` only; app only if tool description strings need a one-line align)\n\n- `apps/mcp/lib/prepare-agent-suggestion.ts` residual + notice strings\n- Matching unit sensors in `apps/mcp/lib/prepare-agent-suggestion.test.ts` (UNIT-26-2-*)\n- Optional: contract comment maps that still say \"deferred #18 residual\"\n\n**Out of scope (other lane or later child):**\n\n- `apps/mcp/content/docs/**` residual wording (external-autonomous-agents, agent-facing-layer) \u2014 fleet mcpcore must not edit content; note for docs/marketing lane\n- GitHub App code, webhooks, secrets, registration\n- Roles/entitlement implementation (design is #309; build is a later child)\n- Chat merge/approve tools\n\n## Sprint contract\n\n| AC | Evidence |\n|---|---|\n| Residual no longer cites open **#18 residual** as the App tracker | Strings name Mark-gated App registration; #308 package shipped, registration still pending |\n| Residual no longer claims **per-agent identity under one license** | States person-licensed + agent-as-delegate (`driver` label); site roles not built yet (#309) |\n| UNIT-26-2 residual sensors pass on the new wording | `prepare-agent-suggestion.test.ts` updated; gate green |\n| No secrets, no App code, no entitlements schema, no package.json | Diff limited to lib residual honesty + tests |\n| Parent #26 stays OPEN | PR body: `Related to #26` + `Closes #<this>`; no `Closes #26` |\n\n## Tier\n\nA (honesty strings + unit sensors on existing tool).\n\n## Dependencies\n\nNone \u2014 pure string/sensor realignment against closed #308/#309.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --config vitest.config.ts --root apps/mcp --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/prepare-agent-suggestion.test.ts"
+    ],
+    "test_ids": [
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::buildPrBody names Hermes/OpenClaw and owner gate",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::formatPrepareAgentSuggestionResult UNIT-26-2-format-overlap: surfaces soft-lock hits and residual honesty",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-blast-radius: identical checklist; residual honesty",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-residual-honesty: notice + residual match #308/#309 reality",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::read-only contract sensors (source + inventory) UNIT-26-2-residual-honesty-source: lib source bans stale residual phrases"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --config vitest.config.ts --root apps/mcp --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/prepare-agent-suggestion.test.ts"
+    ],
+    "test_ids": [
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::buildPrBody flags overlapping soft-lock counts",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::formatPrepareAgentSuggestionResult formats package + soft-lock + residual for agents",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::normalizeDriver accepts hermes and openclaw case-insensitively",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::normalizeDriver maps unknown / empty to other",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-adversarial-summary: slug never becomes main/master/production",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-defensive-copy: mutating returned arrays does not poison next call",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-identical-blast: hermes/openclaw/other share deep-equal blastRadius",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-package: returns branch/title/body + clear overlap",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-softlock-client: invokes overlap client with planned paths only",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion UNIT-26-2-softlock: embeds overlap hits when paths collide",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion caps very long summaries",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::prepareAgentSuggestion rejects missing owner/repo/summary/paths",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::read-only contract sensors (source + inventory) UNIT-26-2-entitlements: launch/current include; free excludes",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::read-only contract sensors (source + inventory) landing inventory lists prepare_agent_suggestion",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::read-only contract sensors (source + inventory) prepare-agent-suggestion.ts never writes to GitHub",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::read-only contract sensors (source + inventory) route tool description advertises PREVIEW ONLY, Hermes/OpenClaw, Launch gate",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::slugifySummary / branch / title never suggests main/master/production as the branch",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::slugifySummary / branch / title prefixes PR titles with Suggestion:",
+      "apps/mcp/lib/prepare-agent-suggestion.test.ts::slugifySummary / branch / title slugifies and caps branch length"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

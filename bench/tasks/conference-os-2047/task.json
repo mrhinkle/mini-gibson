@@ -1,0 +1,62 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2047",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2047,
+  "base_sha": "af28e4866bf7acbab99e532b8dcefd765445094d",
+  "merge_sha": "7fb3c38755c6492413728b3c8cd3e799bdba4389",
+  "issue_number": 2037,
+  "issue_title": "fix(a11y): correct event landing text contrast and card labels",
+  "problem_statement": "fix(a11y): correct event landing text contrast and card labels\n\nLighthouse13.4.1 on the live All Things AI2027 event page at ATA runtime74f9dd9, before the orange header change, reports accessibility97 on both mobile and desktop. This is a pre-existing page-body issue; the scoped header browser axe checks pass.\n\nReproduced findings:\n- `color-contrast`: \u201cResearch Triangle Park\u201d town label in `src/components/homepage/place-triangle-map.tsx` uses `text-white/45`; the \u201cWHOEVER YOU ARE\u201d outro eyebrow in `src/components/homepage/tracks.tsx` also uses `text-white/45` on its dark tinted surface.\n- `label-content-name-mismatch`: event-directory cards expose an `aria-label` built from primary action plus event name, while the visible linked card contains further text. Lighthouse flags the2027 conference,2026replays, AI Forward and All Things Open AI2025 cards. See `src/components/events-directory.tsx`, where `actionLabel` is assigned to the wrapping Link.\n\nAcceptance: fix the two demonstrated text contrast failures while preserving the intended hierarchy; give the event cards accessible names consistent with their visible labeling and discoverable descriptions without changing destinations, registration eligibility or replay rules. Verify the actual composed event page at mobile/desktop with axe/Lighthouse, keyboard and assistive-technology naming checks, and cover external recap/imported events plus upcoming/past states. Do not hide text or silence audits to pass.\n\nEvidence: originating Codex task `outputs/Orange-Event-Bar/lighthouse-before/event-mobile.report.json` and desktop equivalent, captured2026-09-14. Related#2032 concerns schedule Grid semantics and is a separate surface. This issue records discovery; it does not claim the fixes are shipped.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/events-directory.test.ts tests/unit/homepage-accessibility-contract.test.ts tests/unit/public-link-names.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard accessible names (#2037) deep-links a recap card with replays and keeps Watch replays discoverable",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard accessible names (#2037) keeps a past View Event CTA in the link contents",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard accessible names (#2037) keeps an external pre-platform import on websiteUrl with target=_blank",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard accessible names (#2037) keeps an upcoming Register CTA, event name, and type chip in the link contents",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard pre-platform classifier (#1948) does not externalize a past event that has native sessions even with a websiteUrl",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard pre-platform classifier (#1948) keeps an upcoming event with real sessions native (no mutation of the upcoming conjunct can uniquely turn this red)",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard pre-platform classifier (#1948) keeps an upcoming native event in-app even with zero counts and a websiteUrl",
+      "tests/unit/events-directory.test.ts::EventsDirectory EventCard pre-platform classifier (#1948) still externalizes a published-but-past zero-count event with a websiteUrl",
+      "tests/unit/homepage-accessibility-contract.test.ts::homepage accessibility contract pins PLACE map town labels and sector headings above 4.5 to 1 on their real surfaces (#2037)",
+      "tests/unit/homepage-accessibility-contract.test.ts::homepage accessibility contract pins TRACKS outro eyebrow above 4.5 to 1 on the tinted card, and leaves the icon at /45 (#2037)",
+      "tests/unit/public-link-names.test.ts::public page accessible link names (#270) names event cards in the shared events directory"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/events-directory.test.ts tests/unit/homepage-accessibility-contract.test.ts tests/unit/public-link-names.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/homepage-accessibility-contract.test.ts::homepage accessibility contract pins COMMITMENT stat sources to their real card surface above 4.5 to 1",
+      "tests/unit/homepage-accessibility-contract.test.ts::homepage accessibility contract pins NEWS small copy to a default color pair above 4.5 to 1",
+      "tests/unit/homepage-accessibility-contract.test.ts::homepage accessibility contract preserves the shared SizzleReel name and renders all information without JavaScript or hover",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded attributes the platform in the footer, as a real link",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded falls back to the event name, not a conference logo, on bannerless cards",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded keeps conference-specific branding out of src/app/(public)/events/page.tsx",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded keeps conference-specific branding out of src/app/(public)/page.tsx",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded keeps conference-specific branding out of src/app/(public)/public-layout-client.tsx",
+      "tests/unit/public-link-names.test.ts::All Things AI de-branding stays de-branded keeps conference-specific branding out of src/components/events-directory.tsx",
+      "tests/unit/public-link-names.test.ts::configurable footer link rendering (#832) does not key rows by href alone because duplicate destinations are valid",
+      "tests/unit/public-link-names.test.ts::public event CTA labels (#271 / #720 / #322) uses availability-gated Get Tickets + Subscribe on the hero; Register stays a header CTA",
+      "tests/unit/public-link-names.test.ts::public page accessible link names (#270) keeps the (public) layout header contract for site-level pages",
+      "tests/unit/public-link-names.test.ts::public page accessible link names (#270) names icon-only links on the home page"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

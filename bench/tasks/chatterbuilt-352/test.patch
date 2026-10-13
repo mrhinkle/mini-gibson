@@ -1,0 +1,130 @@
+diff --git a/apps/mcp/lib/prepare-agent-suggestion.test.ts b/apps/mcp/lib/prepare-agent-suggestion.test.ts
+index a4e3dea7..9fbab13a 100644
+--- a/apps/mcp/lib/prepare-agent-suggestion.test.ts
++++ b/apps/mcp/lib/prepare-agent-suggestion.test.ts
+@@ -92,7 +92,8 @@ describe("buildPrBody", () => {
+     expect(body).toMatch(/Owner gate/i);
+     expect(body).toMatch(/content\/site\.ts/);
+     expect(body).toMatch(/prepare_agent_suggestion/);
+-    expect(body).toMatch(/#18/);
++    expect(body).toMatch(/#308/);
++    expect(body).not.toMatch(/#18 residual/);
+   });
+ 
+   it("flags overlapping soft-lock counts", () => {
+@@ -169,8 +170,54 @@ describe("prepareAgentSuggestion", () => {
+     expect(result.blastRadius.join(" ")).toMatch(/rewind_site/i);
+     expect(result.blastRadius.join(" ")).toMatch(/no extra privileges/i);
+     expect(result.residual.join(" ")).toMatch(/GitHub App/i);
+-    expect(result.residual.join(" ")).toMatch(/#18/);
+-    expect(result.residual.join(" ")).toMatch(/Per-agent identity/i);
++    expect(result.residual.join(" ")).toMatch(/#308/);
++    expect(result.residual.join(" ")).toMatch(/person-licensed|agent-as-delegate/i);
++    expect(result.residual.join(" ")).toMatch(/#309/);
++    expect(result.residual.join(" ")).not.toMatch(/#18 residual/i);
++    expect(result.residual.join(" ")).not.toMatch(
++      /Per-agent identity under one license/i,
++    );
++  });
++
++  /**
++   * UNIT-26-2-residual-honesty (#351): agent-facing residual + notice must
++   * match post-#308/#309 reality — Mark-gated App registration; person-licensed
++   * + agent-as-delegate. Stale "#18 residual" / "per-agent identity under one
++   * license" phrases are regression-banned.
++   */
++  it("UNIT-26-2-residual-honesty: notice + residual match #308/#309 reality", async () => {
++    const result = await prepareAgentSuggestion({
++      owner: "o",
++      repo: "r",
++      paths: ["content/site.ts"],
++      summary: "honesty check",
++      driver: "hermes",
++      client: clearClient(),
++    });
++    const residual = result.residual.join(" ");
++    const notice = result.notice;
++    const packageSurfaces = [residual, notice, result.prBody].join("\n");
++
++    // App path: Mark-gated registration; #308 package shipped, not open #18 residual
++    expect(residual).toMatch(/GitHub App/i);
++    expect(residual).toMatch(/#308/);
++    expect(residual).toMatch(/registration|registers/i);
++    expect(notice).toMatch(/#308/);
++    expect(notice).toMatch(/registration pending|registers the/i);
++    expect(packageSurfaces).not.toMatch(/#18 residual/i);
++
++    // Identity: person-licensed + agent-as-delegate; roles not built (#309)
++    expect(residual).toMatch(/person-licensed/i);
++    expect(residual).toMatch(/agent-as-delegate/i);
++    expect(residual).toMatch(/#309/);
++    expect(residual).toMatch(/roles?.*not built|not built yet/i);
++    expect(packageSurfaces).not.toMatch(
++      /Per-agent identity under one license/i,
++    );
++
++    // Still package-only — no claim that App write path is live
++    expect(notice).toMatch(/PREVIEW ONLY/i);
++    expect(notice).toMatch(/never creates/i);
+   });
+ 
+   it("rejects missing owner/repo/summary/paths", async () => {
+@@ -388,29 +435,31 @@ describe("formatPrepareAgentSuggestionResult", () => {
+     expect(text).toMatch(/Soft-lock/i);
+     expect(text).toMatch(/42|Hours already open/);
+     expect(text).toMatch(/GitHub App/i);
+-    expect(text).toMatch(/#18/);
+-    expect(text).toMatch(/Per-agent identity/i);
++    expect(text).toMatch(/#308/);
++    expect(text).toMatch(/person-licensed|agent-as-delegate/i);
+     expect(text).toMatch(/OpenClaw|openclaw/i);
++    expect(text).not.toMatch(/#18 residual/i);
+     expect(text).not.toMatch(/already opens the PR for you/i);
+   });
+ });
+ 
+ /**
+- * Criterion → sensor map for #26 part 2 (prepare_agent_suggestion).
++ * Criterion → sensor map for #26 part 2 (prepare_agent_suggestion) + #351 residual honesty.
+  *
+- * | AC (part-2 slice)                                      | Test ID                          | Type        |
++ * | AC (part-2 / #351 slice)                               | Test ID                          | Type        |
+  * |--------------------------------------------------------|----------------------------------|-------------|
+  * | Package: branch + title/body + PREVIEW ONLY            | UNIT-26-2-package                | unit        |
+  * | Soft-lock reuses check_suggestion_overlap              | UNIT-26-2-softlock, softlock-client | unit     |
+  * | Blast-radius identical across drivers                  | UNIT-26-2-identical-blast, blast-radius | unit |
+- * | Residual honesty (App + per-agent identity deferred)   | UNIT-26-2-blast-radius + format  | unit        |
++ * | Residual honesty (#308 App prep + #309 identity)       | UNIT-26-2-residual-honesty (+ blast/format/source) | unit |
+  * | Hermes/OpenClaw driver labels                          | normalizeDriver + package/body   | unit        |
+  * | Never writes GitHub / no App token                     | source scan below                | static      |
+  * | Launch/Current only; free excluded                     | UNIT-26-2-entitlements           | unit        |
+  * | Route: PREVIEW + requireTier launch + wiring           | route tool description           | static      |
+  * | Landing inventory lists tool                           | landing inventory                | static      |
+  * | Adversarial summary cannot target main/master          | UNIT-26-2-adversarial-summary    | unit        |
+- * | App auto-propose / per-agent identity                  | N/A — deferred #18 residual      | deferred    |
++ * | App auto-propose write path                            | N/A — Mark-gated (#308)          | deferred    |
++ * | Site roles / person-level entitlement                  | N/A — design #309; build later   | deferred    |
+  */
+ describe("read-only contract sensors (source + inventory)", () => {
+   it("prepare-agent-suggestion.ts never writes to GitHub", () => {
+@@ -433,6 +482,20 @@ describe("read-only contract sensors (source + inventory)", () => {
+     expect(src).toMatch(/never creates/i);
+   });
+ 
++  it("UNIT-26-2-residual-honesty-source: lib source bans stale residual phrases", () => {
++    const src = fs.readFileSync(
++      path.join(__dirname, "prepare-agent-suggestion.ts"),
++      "utf8",
++    );
++    // #351: continuous agents must not read open-#18 or pre-#309 identity copy.
++    expect(src).not.toMatch(/#18 residual/i);
++    expect(src).not.toMatch(/Per-agent identity under one license/i);
++    expect(src).toMatch(/#308/);
++    expect(src).toMatch(/#309/);
++    expect(src).toMatch(/person-licensed/i);
++    expect(src).toMatch(/agent-as-delegate/i);
++  });
++
+   it("route tool description advertises PREVIEW ONLY, Hermes/OpenClaw, Launch gate", () => {
+     const route = fs.readFileSync(
+       path.join(__dirname, "../app/api/[transport]/route.ts"),

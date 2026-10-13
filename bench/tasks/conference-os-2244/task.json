@@ -1,0 +1,45 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2244",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2244,
+  "base_sha": "e0db0061fc4db2f4b305a02918b4cc0b091e0fb8",
+  "merge_sha": "e1ccbe4f93710d566f174116cded7f55f16790a9",
+  "issue_number": null,
+  "issue_title": "fix(public): mirror the 2026-10-11 allthingsai.org menus on the ATA parent bar",
+  "problem_statement": "fix(public): mirror the 2026-10-11 allthingsai.org menus on the ATA parent bar\n\nMirrors Mark's 2026-10-11 menu spec (applied to allthingsai.org `staging` in a public repository (pull request 179)) on the ATA parent bar, `src/lib/atai-site-chrome.ts`.\n\n**Events:** Overview \u00b7 Why Attend \u00b7 Save the Date for ATAI 2027 (local `/events/all-things-ai-2027/save-the-date`) \u00b7 Executive AI Summit \u00b7 Meetups \u00b7 Build an Agent Day \u00b7 All Events (local `/`, the upcoming-events index). Dropped: the direct \"All Things AI 2027\" item, \"2026 Talks\", \"Upcoming events\".\n\n**Get Involved:** adds Scholarships for parity with allthingsai.org.\n\n**About:** Our Story \u00b7 News \u00b7 Advisory Board \u00b7 The Industry \u00b7 AI Skills for Work \u00b7 Build the AI Future \u00b7 Why the Triangle?.\n\n**Footer, Conference column:** 2026 Conference and 2025 Conference point at this site's archives (`/events/all-things-ai-2026`, `/events/all-things-open-ai-2025`) instead of `allthingsai.org/2026` and `/2025`.\n\nTests updated in `tests/unit/atai-site-chrome.test.ts`. Verified: `vitest` 7/7 on that file, `tsc --noEmit` clean.\n\nNote for the OSS cleanup lane (#2231 / #2240): on `chore/oss-cleanup` this file is replaced by tenant-configured `parentNav` data. When that lands, the ATA tenant's `parentNav` must carry this same list; tracked as a note on The-AIE/ata-events-site#15.\n\nNot Tier C. Promote to `ata/release` after merge so events.allthingsai.org matches allthingsai.org.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\n<!-- This is an auto-generated comment: release notes by coderabbit.ai -->\n\n## Summary by CodeRabbit\n\n* **Navigation**\n  * Updated the Events menu with links to the 2027 save-the-date, Executive Summit, Agent Day, and All Events pages.\n  * Refreshed the Get Involved and About menu labels and links, including the AI scholarships link.\n  * Updated the mobile menu label to \u201cAll Events.\u201d\n* **Links**\n  * Conference archive links for 2026 and 2025 now lead to this site\u2019s local archive pages.\n\n<!-- end of auto-generated comment: release notes by coderabbit.ai -->",
+  "split": "temporal_gibson_holdout",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome keeps the event bar below, and a phone menu with the site groups then the event",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome points allthingsai.org pages at absolute URLs and events-site pages at local routes",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome opens a menu on click with every link, closing on Escape",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome mirrors allthingsai.org: Events, Get Involved, About"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome swaps the event footer for the site footer only for the All Things AI parent",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome renders the site bar with menus, contact and updates icons, and the search pill",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome renders the allthingsai.org footer on site pages, and the product footer elsewhere"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

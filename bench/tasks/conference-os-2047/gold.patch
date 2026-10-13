@@ -1,0 +1,62 @@
+diff --git a/src/components/events-directory.tsx b/src/components/events-directory.tsx
+index dee50b5ed..a39b18bf7 100644
+--- a/src/components/events-directory.tsx
++++ b/src/components/events-directory.tsx
+@@ -110,14 +110,15 @@ export async function EventsDirectory() {
+       eventType: event.eventType,
+       hasReplays,
+     });
+-    const actionLabel = `${primaryCta}: ${event.name}`;
+     const featureImageUrl = eventCardFeatureImageUrl(event);
+ 
++    // #2037: no aria-label. `${primaryCta}: ${event.name}` hid the chip, date,
++    // location, and CTA from the accessible name (WCAG 2.5.3). Name comes from
++    // the wrapping Link's visible contents; href / target / rel stay as below.
+     return (
+       <Link
+         href={href}
+         {...linkProps}
+-        aria-label={actionLabel}
+         className="group relative flex flex-col rounded-xl border border-white/10 bg-space-800 p-6 shadow-sm transition-all hover:border-nebula-400/60 hover:shadow-lg hover:shadow-nebula-900/40"
+       >
+         <div className="mb-4 aspect-[16/9] w-full overflow-hidden rounded-lg bg-space-700">
+diff --git a/src/components/homepage/place-triangle-map.tsx b/src/components/homepage/place-triangle-map.tsx
+index a03f672db..ac2f63bed 100644
+--- a/src/components/homepage/place-triangle-map.tsx
++++ b/src/components/homepage/place-triangle-map.tsx
+@@ -297,7 +297,8 @@ export function PlaceTriangleMap({ sectors }: { sectors: readonly PlaceMapSector
+         <div>
+           {visibleSectors.map(({ sector, sectorIndex }) => (
+             <div key={`${sectorIndex}:${sector.label}`} className="mb-8 last:mb-0">
+-              <h3 className="text-xs uppercase tracking-[0.18em] text-white/45">{sector.label}</h3>
++              {/* white/50, not /45: on #0B1426 (place section bg-space-900), /45 composites to 4.496:1 — under the 4.5:1 AA floor. */}
++              <h3 className="text-xs uppercase tracking-[0.18em] text-white/50">{sector.label}</h3>
+               <ul className="mt-3">
+                 {sector.organizations.map((organization) => (
+                   <li key={organization.id}>
+@@ -313,8 +314,9 @@ export function PlaceTriangleMap({ sectors }: { sectors: readonly PlaceMapSector
+                     >
+                       <summary className="flex min-h-11 cursor-pointer list-none items-baseline justify-between gap-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#66AAFF] [&::-webkit-details-marker]:hidden">
+                         <span className="text-base font-medium text-white">{organization.name}</span>
++                        {/* white/50, not /45: on open:bg-white/[0.04] over #0B1426, /45 composites to 4.40:1 — under the 4.5:1 AA floor. */}
+                         {organization.townLabel && (
+-                          <span className="shrink-0 text-xs text-white/45">{organization.townLabel}</span>
++                          <span className="shrink-0 text-xs text-white/50">{organization.townLabel}</span>
+                         )}
+                       </summary>
+                       <div className="pb-4">
+diff --git a/src/components/homepage/tracks.tsx b/src/components/homepage/tracks.tsx
+index 0af698bbf..15cf11c5b 100644
+--- a/src/components/homepage/tracks.tsx
++++ b/src/components/homepage/tracks.tsx
+@@ -193,8 +193,9 @@ function TracksSection({
+ 
+         {showOutro && (
+           <div className="mt-16 max-w-4xl rounded-[18px] bg-white/[0.04] p-6 sm:p-8">
++            {/* white/50, not /45: on bg-white/[0.04] over #0B1426, /45 composites to 4.40:1 — under the 4.5:1 AA floor. */}
+             {config.outroEyebrow !== null && (
+-              <p className="text-xs uppercase tracking-[0.18em] text-white/45">
++              <p className="text-xs uppercase tracking-[0.18em] text-white/50">
+                 {config.outroEyebrow}
+               </p>
+             )}

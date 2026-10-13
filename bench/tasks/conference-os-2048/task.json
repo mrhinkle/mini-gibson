@@ -1,0 +1,42 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2048",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2048,
+  "base_sha": "af28e4866bf7acbab99e532b8dcefd765445094d",
+  "merge_sha": "d532c71f018af1f913c0fed3e6b51906f243190f",
+  "issue_number": 2031,
+  "issue_title": "fix(seo): give public schedules event-specific metadata and canonical URLs",
+  "problem_statement": "fix(seo): give public schedules event-specific metadata and canonical URLs\n\nObserved during the owner-requested schedule track-description/AEO verification on 2026-09-14, at ATA release c2a5565444cf48790cb3d5fa9589e5f59b5810ca:\n\n`https://events.allthingsai.org/events/all-things-ai-2026/schedule` returns HTTP 200 with the correct title and server-rendered schedule. Its initial HTML uses the generic site meta description (\u201cThe community for AI practitioners and users \u2014 news, events, and insights delivered to your inbox.\u201d), has no canonical link, and includes no JSON-LD. Lighthouse 13.4.1 nevertheless scores SEO 100; that score does not cover all AEO/metadata requirements.\n\nSource: `src/app/(public)/events/[eventSlug]/schedule/page.tsx` currently returns only `title` from `generateMetadata`. This predates #2030 and is independent of public track-description rendering. Existing issue search found no bounded schedule-metadata issue; #1348 is a launch-control epic, not an implementation lane.\n\nBounded follow-up:\n\n- Give the public schedule event-specific description and canonical metadata using the existing public-origin resolution and event visibility rules.\n- Assess whether the schedule should reuse existing structured-data helpers for event/breadcrumb context; use verified event data only and avoid redundant or contradictory entities.\n- Add assertions on the actual server HTML, including custom-domain versus default-domain behavior and draft/unpublished schedules. Preserve the current no-draft-content boundary.\n- Re-run Lighthouse and a separate metadata/AEO check. Do not claim that structured data guarantees ranking or inclusion in AI answers.\n\nNo schema, event data, provider, secret, or deployment-setting changes are requested by this issue. This is a newly observed product gap, not an additional gate on #2030.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-schedule-metadata.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-schedule-metadata.test.ts::public schedule generateMetadata (#2031) emits an event-specific description, not the generic site line",
+      "tests/unit/public-schedule-metadata.test.ts::public schedule generateMetadata (#2031) never puts session titles or speakers in unpublished-schedule metadata",
+      "tests/unit/public-schedule-metadata.test.ts::public schedule generateMetadata (#2031) returns title only, with no canonical, when the event is missing",
+      "tests/unit/public-schedule-metadata.test.ts::public schedule generateMetadata (#2031) rewrites the canonical to https://conf.example.com/schedule on a custom domain",
+      "tests/unit/public-schedule-metadata.test.ts::public schedule generateMetadata (#2031) uses the public-app origin for canonical and OG url on the default domain"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-schedule-metadata.test.ts"
+    ],
+    "test_ids": []
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

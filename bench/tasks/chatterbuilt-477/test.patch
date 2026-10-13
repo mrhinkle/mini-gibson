@@ -1,0 +1,55 @@
+diff --git a/marketing/lib/issue-197-product-house-contract.test.ts b/marketing/lib/issue-197-product-house-contract.test.ts
+index e0f79909..f0c112aa 100644
+--- a/marketing/lib/issue-197-product-house-contract.test.ts
++++ b/marketing/lib/issue-197-product-house-contract.test.ts
+@@ -236,15 +236,16 @@ describe("#197 product-house vision contract", () => {
+   });
+ 
+   it("UNIT-197-seo: default + home + crew SEO use product-house framing", () => {
+-    // Agent-team-first repositioning (2026-07): the lead framing is the crew, not
+-    // "product house". The contract still pins Website-live + crew-on-deck honesty.
+-    expect(site.description).toMatch(/agent team to run the business/i);
++    // #282 (2026-08-07): categoryLine is AI back office (DECISIONS #39 vision).
++    // Contract still pins Website-live honesty; unshipped products are
++    // explicitly "in development" (CodeRabbit review on #477).
++    expect(site.description).toMatch(/AI back office for your business/i);
+     expect(site.description).toMatch(/live today|live now/i);
+-    expect(site.description).toMatch(/crew on deck/i);
++    expect(site.description).toMatch(/in development/i);
+ 
+     const homeSeo = site.pages.home.seo;
+-    expect(homeSeo.title).toMatch(/Agent Team|Crew on Deck|Website Live/i);
+-    expect(homeSeo.description).toMatch(/agent team to run the business/i);
++    expect(homeSeo.title).toMatch(/AI Back Office/i);
++    expect(homeSeo.description).toMatch(/AI back office for your business/i);
+     expect(homeSeo.description).toMatch(/live now/i);
+ 
+     const crewSeo = site.pages.crew.seo;
+@@ -307,9 +308,9 @@ describe("#197 product-house vision contract", () => {
+   });
+ 
+   it("UNIT-197-theme-category: themeLine short motif; categoryLine not in home productHouse/crew body", () => {
+-    // Direction A motif (#278, 2026-07-31); categoryLine is the agent-team precision line.
++    // Direction A motif (#278, 2026-07-31); categoryLine is the #282 AI back-office precision line.
+     expect(site.themeLine).toMatch(/Run your business\. We'll help you manage your AI\./);
+-    expect(site.categoryLine).toMatch(/agent team to run the business/i);
++    expect(site.categoryLine).toMatch(/AI back office for your business/i);
+ 
+     const ph = site.pages.home.productHouse;
+     expect(ph.body).not.toContain(site.categoryLine);
+diff --git a/marketing/lib/voice-key-pages-contract.test.ts b/marketing/lib/voice-key-pages-contract.test.ts
+index 1afb1dd3..4f9f5155 100644
+--- a/marketing/lib/voice-key-pages-contract.test.ts
++++ b/marketing/lib/voice-key-pages-contract.test.ts
+@@ -165,9 +165,9 @@ describe("#25 slice-2 key-page voice contract", () => {
+   });
+ 
+   it("UNIT-25-key-theme-line: shared description matches VOICE after #1 spirit", () => {
+-    // Direction A motif (#278, 2026-07-31) + v14 agent-team description.
++    // Direction A motif (#278, 2026-07-31) + #282 AI back-office categoryLine.
+     expect(site.themeLine).toMatch(/Run your business\. We'll help you manage your AI\./);
+-    expect(site.description).toMatch(/agent team to run the business/i);
++    expect(site.description).toMatch(/AI back office for your business/i);
+     // The bring-your-own-agent promise lives in the hero explainer ("Talk to
+     // them in the AI you already use"). Keep the sensor pointed there — the
+     // promise still has to be made somewhere.

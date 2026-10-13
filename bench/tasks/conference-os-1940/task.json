@@ -1,0 +1,80 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-1940",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 1940,
+  "base_sha": "d1702cc1a52b93ee2c6b87d94f0df6a7c822e46e",
+  "merge_sha": "1497af2c2cb22031eeb15954273e927b2641c6b4",
+  "issue_number": 1863,
+  "issue_title": "Homepage renderer config-schema registry",
+  "problem_statement": "Homepage renderer config-schema registry\n\n## Problem\n\nThe organizer JSON editor and seed engine cannot safely accept per-renderer\nconfig until one server-safe registry validates each section type.\n\n## Acceptance criteria\n\n- Add one pure/server-safe registry mapping each config-editable\n  `HomepageSectionType` to its parser/validator and documented accepted shape.\n- Renderer parsers are the single source of truth; do not duplicate a looser\n  validation schema in organizer code.\n- Reject dangerous prototype keys, non-JSON values, excessive depth/size, and\n  a type without a registered validator. Return a null-prototype shallow-frozen\n  normalized config.\n- A renderer may remain displayable before it becomes config-editable; missing\n  validator means fail closed, not pass-through.\n- Focused `.test.ts` covers every registered type, registry/type drift,\n  malformed nesting, prototype keys, size/depth limits, and parser equivalence\n  with RED/GREEN mutants.\n\n## Dependencies and boundaries\n\nLand only after the milestone renderer contracts/parsers stabilize; a single\nintegration captain owns the registry hot file. No schema/migration, UI, seed,\nProduction, secrets, spend, pricing, or legal work. Parent: #1851.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/homepage-config-schema.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) enforces 32KiB by serialized UTF-8 bytes, including multibyte content",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) enforces the exact 4,096-node boundary",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) enforces the exact container-depth boundary before ignored data reaches a parser",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) fails closed for unknown and display-only section types",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) keeps the actual runtime dependency closure pure and server-safe",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches AUDIENCE_BAND renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches COMMITMENT renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches HERO renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches MANIFESTO renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches PLACE renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches PROGRAM_DAYS renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches SESSION_LIBRARY renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches SPEAKERS renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches TICKETS renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) matches TRACKS renderer rejection/default behavior for an empty safe object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes AUDIENCE_BAND with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes COMMITMENT with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes HERO with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes MANIFESTO with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes PLACE with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes PROGRAM_DAYS with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes SESSION_LIBRARY with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes SPEAKERS with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes TICKETS with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) normalizes TRACKS with the renderer parser as the single source of truth",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) registers the exact ten config-editable renderer parsers and shapes",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects cycles and every non-dense or extended array shape",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects dangerous prototype key __proto__ at every nesting position",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects dangerous prototype key constructor at every nesting position",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects dangerous prototype key prototype at every nesting position",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects inherited, accessor, non-enumerable, symbol, and proxy inputs without invoking code",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON NaN values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON bigint values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON date values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON function values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON infinity values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON map values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON symbol values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) rejects nested non-JSON undefined values before parsing",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) returns a detached null-prototype shallow-frozen config and drops unknown keys",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) returns null when a registered renderer parser rejects an otherwise safe JSON object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) revalidates hostile parser output before creating the public normalized object",
+      "tests/unit/homepage-config-schema.test.ts::homepage renderer config-schema registry (#1863) uses the HERO object adaptor and preserves portable section-specific contracts"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/homepage-config-schema.test.ts"
+    ],
+    "test_ids": []
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

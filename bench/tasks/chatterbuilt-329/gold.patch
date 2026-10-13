@@ -1,0 +1,154 @@
+diff --git a/apps/mcp/content/presets/auto-detailing.json b/apps/mcp/content/presets/auto-detailing.json
+index b17e6d29..a0c61676 100644
+--- a/apps/mcp/content/presets/auto-detailing.json
++++ b/apps/mcp/content/presets/auto-detailing.json
+@@ -159,6 +159,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Basic Wash",
++    "Full Detail",
++    "Ceramic Coating",
++    "Mobile Maintenance Plan",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From book to before-and-after.",
+diff --git a/apps/mcp/content/presets/cerakote-shop.json b/apps/mcp/content/presets/cerakote-shop.json
+index b67649ee..98d95c46 100644
+--- a/apps/mcp/content/presets/cerakote-shop.json
++++ b/apps/mcp/content/presets/cerakote-shop.json
+@@ -127,6 +127,12 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Pistol Cerakote",
++    "Rifle Cerakote",
++    "Automotive & Gear",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "A clear path from drop-off to pickup.",
+diff --git a/apps/mcp/content/presets/handyman.json b/apps/mcp/content/presets/handyman.json
+index f2503a3c..2a590dc0 100644
+--- a/apps/mcp/content/presets/handyman.json
++++ b/apps/mcp/content/presets/handyman.json
+@@ -152,6 +152,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "General Repairs",
++    "Plumbing Fixtures",
++    "Carpentry & Doors",
++    "Mounting & Assembly",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From punch list to done.",
+diff --git a/apps/mcp/content/presets/house-cleaning.json b/apps/mcp/content/presets/house-cleaning.json
+index 98c2f132..5d2c8408 100644
+--- a/apps/mcp/content/presets/house-cleaning.json
++++ b/apps/mcp/content/presets/house-cleaning.json
+@@ -129,6 +129,12 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Standard Clean",
++    "Deep Clean",
++    "Move-Out Clean",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From estimate to a clean home.",
+diff --git a/apps/mcp/content/presets/hvac.json b/apps/mcp/content/presets/hvac.json
+index 9715e5a6..e628b975 100644
+--- a/apps/mcp/content/presets/hvac.json
++++ b/apps/mcp/content/presets/hvac.json
+@@ -152,6 +152,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "AC Repair",
++    "Heating & Furnace",
++    "Maintenance & Tune-Ups",
++    "Install & Replace",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From first call to cold air (or warm air) again.",
+diff --git a/apps/mcp/content/presets/landscaping.json b/apps/mcp/content/presets/landscaping.json
+index 82b43a5f..4ca0688a 100644
+--- a/apps/mcp/content/presets/landscaping.json
++++ b/apps/mcp/content/presets/landscaping.json
+@@ -152,6 +152,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Mowing & Maintenance",
++    "Mulch & Beds",
++    "Seasonal Cleanup",
++    "Lawn Care Treatments",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From walkthrough to a yard on a plan.",
+diff --git a/apps/mcp/content/presets/painting.json b/apps/mcp/content/presets/painting.json
+index 0ea18f41..21d5eba8 100644
+--- a/apps/mcp/content/presets/painting.json
++++ b/apps/mcp/content/presets/painting.json
+@@ -153,6 +153,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Interior Repaint",
++    "Exterior Paint",
++    "Cabinet Refinish",
++    "Color Consult & Touch-Ups",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From first call to a finished room.",
+diff --git a/apps/mcp/content/presets/plumbing.json b/apps/mcp/content/presets/plumbing.json
+index 5567f0a0..48956e27 100644
+--- a/apps/mcp/content/presets/plumbing.json
++++ b/apps/mcp/content/presets/plumbing.json
+@@ -153,6 +153,13 @@
+       }
+     }
+   ],
++  "itemTypes": [
++    "Drain Clearing",
++    "Water Heater Service",
++    "Fixture Install",
++    "Leak Diagnosis & Repair",
++    "Other"
++  ],
+   "process": {
+     "eyebrow": "How it works",
+     "title": "From call to a working system.",
+diff --git a/docs/active-work.md b/docs/active-work.md
+index 480fe1d3..b79f4a11 100644
+--- a/docs/active-work.md
++++ b/docs/active-work.md
+@@ -30,6 +30,7 @@ Labels: `agent-claimed`, `blocked`, `gibson-halt`.
+ | 2026-08-01T21:05Z | issue-214-imagery-manifest | docs/demo-fleet-imagery-manifest.md (new), docs/active-work.md | cb-finish driver iter 40 |
+ | 2026-08-01T23:05Z | issue-324-validate-absence-warns | apps/mcp/lib/site-schema.ts, apps/mcp/lib/site-schema.test.ts, apps/mcp/app/api/[transport]/route.ts, docs/active-work.md | cb-finish driver iter 42 |
+ | 2026-08-02T00:15Z | issue-323-day-zero-orphan-cleanup | apps/mcp/app/api/[transport]/route.ts, apps/mcp/lib/issue-323-day-zero-cleanup-contract.test.ts (new), docs/active-work.md | cb-finish driver iter 43 |
++| 2026-08-02T01:20Z | issue-325-preset-itemtypes | apps/mcp/content/presets/*.json (8 files), apps/mcp/lib/issue-325-preset-itemtypes.test.ts (new), docs/active-work.md | cb-finish driver iter 44 |
+ 
+ Releasing stale rows (two-phase, enforced by `scripts/check-active-work.mjs`):
+ once a claim's work has merged and its issue, if any, is closed, append a

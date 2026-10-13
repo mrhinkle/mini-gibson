@@ -1,0 +1,42 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2054",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2054,
+  "base_sha": "fca52778fd8ec7082d189c5e2f93b0bffcd88e0c",
+  "merge_sha": "6b150ed8568ab6c922f655bf5484764c92f16127",
+  "issue_number": 2051,
+  "issue_title": "fix(a11y): event footer column headings fail color contrast on the ATA 2027 event page",
+  "problem_statement": "fix(a11y): event footer column headings fail color contrast on the ATA 2027 event page\n\n## Why\n\nAfter the 2026-09-14 release (ata/release `b128f876`), a headless axe-core 4.10.2 run (WCAG 2A/2AA/2.1AA tags) on the live `https://events.allthingsai.org/events/all-things-ai-2027` reports one `color-contrast` violation (impact: serious) on 4 nodes, at both 1440px and 390px:\n\n```\n.min-w-\\[8rem\\]:nth-child(1) > .text-gray-500.mb-3.tracking-wide\n.min-w-\\[8rem\\]:nth-child(2) > .text-gray-500.mb-3.tracking-wide\n```\n\n`min-w-[8rem]` is the footer column wrapper in `src/components/event-public-footer.tsx` (~line 209), so these are the event footer's column headings (Conference, Community, Connect, All Things AI), rendered in `text-gray-500` on the footer's background.\n\nThis is separate from #2037, whose two labels (PLACE town label, TRACKS outro eyebrow) no longer appear in the results. The same run found no violations on the schedule Grid (#2032) and no `label-content-name-mismatch` on the home directory (#2037).\n\n## Acceptance\n- Compute the real composited contrast of the footer column headings on the footer's actual background, for each theme or brand the footer renders on. Include the ATA event theme; don't assume the default tenant.\n- Raise the heading colour to the lowest token that clears 4.5:1 while keeping the heading hierarchy. If the footer is themeable, make the fix theme-safe.\n- Add a contract test with the composited ratio, in the style of `tests/unit/homepage-accessibility-contract.test.ts`, that fails with the old class.\n- Re-run axe on the live 2027 event page at 1440px and 390px after release. Expect 0 `color-contrast` violations from the footer.\n- Don't hide the headings or suppress the rule.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/event-footer-contrast.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/event-footer-contrast.test.ts::event footer column heading contrast (#2051) pins orbit headings to the same secondary token as footer body/links",
+      "tests/unit/event-footer-contrast.test.ts::event footer column heading contrast (#2051) renders orbit column headings in text-gray-400, not the failing text-gray-500"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/event-footer-contrast.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/event-footer-contrast.test.ts::event footer column heading contrast (#2051) keeps gray-500 under 4.5:1 on the ATA/Launchpad footer background",
+      "tests/unit/event-footer-contrast.test.ts::event footer column heading contrast (#2051) pins gray-400 above 4.5:1 on ATA/Launchpad and the other dark orbit surfaces"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

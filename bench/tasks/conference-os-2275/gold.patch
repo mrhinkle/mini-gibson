@@ -1,0 +1,22 @@
+diff --git a/src/lib/atai-site-chrome.ts b/src/lib/atai-site-chrome.ts
+index b21cb824e..362a0bcbb 100644
+--- a/src/lib/atai-site-chrome.ts
++++ b/src/lib/atai-site-chrome.ts
+@@ -44,7 +44,8 @@ const site = (path: string) => `${ATAI_SITE_URL}${path}`;
+  * Menus per Mark's 2026-10-11 spec (applied to allthingsai.org `staging` the
+  * same day): Events = Overview, Why Attend, Save the Date, Executive AI Summit,
+  * Meetups, Build an Agent Day, All Events; Get Involved drops The Arcade;
+- * About drops How We Dogfood AI. Re-check allthingsai.org before trusting this.
++ * How We Dogfood AI came back under About on 2026-10-12 (Mark;
++ * a public repository (pull request 185)). Re-check allthingsai.org before trusting this.
+  */
+ export const ATAI_HEADER_GROUPS: readonly AtaiChromeGroup[] = [
+   {
+@@ -75,6 +76,7 @@ export const ATAI_HEADER_GROUPS: readonly AtaiChromeGroup[] = [
+     label: 'About',
+     children: [
+       { label: 'Our Story', href: site('/about') },
++      { label: 'How We Dogfood AI', href: site('/about/dogfooding-ai') },
+       { label: 'News', href: ATAI_NEWS_HREF },
+       { label: 'Advisory Board', href: site('/advisory-board') },
+       { label: 'The Industry', href: site('/ai-industry') },

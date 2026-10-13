@@ -1,0 +1,145 @@
+diff --git a/tests/unit/atai-site-chrome.test.ts b/tests/unit/atai-site-chrome.test.ts
+index f23663631..2737b7e32 100644
+--- a/tests/unit/atai-site-chrome.test.ts
++++ b/tests/unit/atai-site-chrome.test.ts
+@@ -163,8 +163,10 @@ describe('All Things AI site chrome', () => {
+     expect(bar).not.toBeNull();
+     expect(bar.querySelector('a[aria-label="All Things AI — Home"]')?.getAttribute('href')).toBe('https://allthingsai.org');
+     const menus = [...bar.querySelectorAll('nav[aria-label="All Things AI"] button[aria-expanded]')];
+-    expect(menus.map((b) => b.getAttribute('aria-label') || b.textContent)).toEqual(['Browse events', 'Get Involved', 'About']);
++    expect(menus.map((b) => b.getAttribute('aria-label') || b.textContent)).toEqual(['Get Involved', 'About']);
+     expect(bar.querySelector('nav a[href="/"]')?.textContent).toBe('Events');
++    expect(bar.querySelector('nav a[href="/"]')?.className).not.toMatch(/rounded|border|bg-/);
++    expect(bar.querySelector('button[aria-label="Browse events"]')).toBeNull();
+     expect(container.querySelector('[data-testid="events-bar"]')).toBeNull();
+     expect(bar.querySelector('a[aria-label="Contact us"]')?.getAttribute('href')).toBe('https://allthingsai.org/contact');
+     expect(bar.querySelector('a[title="Get updates"]')?.getAttribute('href')).toBe('https://news.allthingsai.org');
+@@ -211,11 +213,10 @@ describe('All Things AI site chrome', () => {
+     expect(menu.hidden).toBe(false);
+     const headings = [...menu.querySelectorAll('h2')].map((h) => h.textContent);
+     expect(headings).toEqual(['Events', 'Get Involved', 'About', EVENT.name]);
+-    expect(menu.querySelector('a[href="/events/all-things-ai-2027/save-the-date"]')).not.toBeNull();
++    expect(menu.querySelector('[data-testid="atai-mobile-site-menu"] a[href="/"]')?.textContent).toBe('Events');
+     expect(menu.querySelector('a[href="https://allthingsai.org/why-the-triangle"]')).not.toBeNull();
+     const agentDay = menu.querySelector('a[href="https://allthingsai.org/build-an-agent-day"]');
+-    expect(agentDay?.textContent).toBe('Build an Agent Day');
+-    expect(agentDay?.getAttribute('target')).toBeNull();
++    expect(agentDay).toBeNull();
+     expect(menu.querySelector('a[aria-label="Buy tickets for this event"]')?.textContent).toBe('Buy Tickets');
+   });
+ 
+diff --git a/tests/unit/event-directory-page.test.ts b/tests/unit/event-directory-page.test.ts
+index 3c9931e00..57a1e223b 100644
+--- a/tests/unit/event-directory-page.test.ts
++++ b/tests/unit/event-directory-page.test.ts
+@@ -11,11 +11,16 @@ vi.mock('@/lib/demo-mode-server', () => ({ getDemoEnabledEvents: mocks.getDemoEn
+ vi.mock('@/lib/homepage-campaign-server', () => ({ loadHomepageCampaignState: mocks.loadHomepageCampaignState }));
+ vi.mock('@/components/events-directory', () => ({ EventsDirectory: ({ mode }: { mode: string }) => createElement('div', { 'data-directory-mode': mode }) }));
+ vi.mock('@/lib/public-app-url', () => ({ resolvePublicAppOrigin: () => 'https://events.example.org' }));
++import UpcomingEvents from '@/app/(public)/upcoming-events/page';
+ import PastEvents from '@/app/(public)/past-events/page';
+ import { EventDirectoryPage } from '@/components/event-directory-page';
+ 
+ describe('standalone event listings (#2167)', () => {
+   beforeEach(() => { vi.clearAllMocks(); mocks.getOrganization.mockResolvedValue({ name: 'Example community', logoUrl: null, blurb: null }); });
++  it('upcoming listing has its own route without replacing the homepage', () => {
++    expect(UpcomingEvents().type).toBe(EventDirectoryPage);
++    expect(UpcomingEvents().props.mode).toBe('upcoming');
++  });
+   it('archive selects past without occupying the event-slug namespace', () => {
+     expect(PastEvents().type).toBe(EventDirectoryPage);
+     expect(PastEvents().props.mode).toBe('past');
+@@ -24,7 +29,7 @@ describe('standalone event listings (#2167)', () => {
+     const html = renderToStaticMarkup(await EventDirectoryPage({ mode }));
+     expect(html).toContain('Example community');
+     expect(html).toContain(`data-directory-mode="${mode}"`);
+-    expect(html).toContain('href="/"');
++    expect(html).toContain('href="/upcoming-events"');
+     expect(html).toContain('href="/past-events"');
+     expect(html).not.toContain('All Things AI');
+     expect(html).not.toContain('<main');
+diff --git a/tests/unit/public-header-mobile-reflow.test.ts b/tests/unit/public-header-mobile-reflow.test.ts
+index 8bceccf83..cbac87dd4 100644
+--- a/tests/unit/public-header-mobile-reflow.test.ts
++++ b/tests/unit/public-header-mobile-reflow.test.ts
+@@ -21,12 +21,9 @@ const source = readFileSync(
+ 
+ describe('public header mobile reflow', () => {
+   it('caps the brand logo to the viewport below sm and keeps the desktop cap', () => {
+-    const logo = source.match(/<img\s+src=\{brandLogoUrl\}[\s\S]*?className="([^"]+)"/);
+-    expect(logo).not.toBeNull();
+-    const classes = logo![1].split(/\s+/);
+-    expect(classes).toContain('max-w-[35vw]');
+-    expect(classes).toContain('sm:max-w-[15rem]');
+-    expect(classes).not.toContain('max-w-[15rem]');
+-    expect(classes).toContain('object-contain');
++    expect(source).toContain('max-w-[35vw] shrink-0 items-center gap-2 sm:max-w-[22rem]');
++    expect(source).toContain("'h-8 w-auto max-w-[40%] shrink-0 object-contain'");
++    expect(source).toContain("'h-14 w-auto max-w-[35vw] object-contain sm:max-w-[15rem]'");
++
+   });
+ });
+diff --git a/tests/unit/public-two-bar-header.test.ts b/tests/unit/public-two-bar-header.test.ts
+index 4acefa17a..6d3e7ef64 100644
+--- a/tests/unit/public-two-bar-header.test.ts
++++ b/tests/unit/public-two-bar-header.test.ts
+@@ -271,6 +271,29 @@ describe('public shell: two bars, one family (#1983)', () => {
+     expect(container.querySelector('#home-mobile-navigation nav[aria-label="Primary mobile"]')).not.toBeNull();
+   });
+ 
++  it('preserves the destination logo when the shared layout still has the home seed', async () => {
++    const seed = siteBrand();
++    const featured = featuredBar();
++    featured.event = { ...featured.event, logoUrl: '/events/brand-2027/custom.svg' };
++    await render({ ...seed, family: family({ featured }) }, '/events/brand-2027', 'brand-2027');
++    expect(container.querySelector('[data-testid="events-bar-identity"] img')?.getAttribute('src')).toBe('/events/brand-2027/custom.svg');
++  });
++
++  it('shows an optional event logo beside the name in both header variants', async () => {
++    for (const familyEnabled of [false, true]) {
++      for (const logoUrl of ['/events/custom/logo.svg', null]) {
++        const brand = { ...eventBrand(), logoUrl, ...(familyEnabled ? { family: family() } : {}) };
++        await render(brand, '/events/brand-2027', 'brand-2027');
++        const identity = familyEnabled
++          ? container.querySelector('[data-testid="events-bar-identity"]')!
++          : container.querySelector('a[aria-label="Brand 2027 — home"]')!;
++        expect(identity.textContent).toContain('Brand 2027');
++        expect(identity.getAttribute('href')).toBe('/events/brand-2027');
++        expect(identity.querySelector('img')?.getAttribute('src') ?? null).toBe(logoUrl);
++      }
++    }
++  });
++
+   it('renders the parent bar items with a disclosure dropdown, parent-site links in the same tab', async () => {
+     await render(featuredEventSeed(), '/events/brand-2027', 'brand-2027');
+     const parentNav = container.querySelector('nav[aria-label="Brand"]') as HTMLElement;
+diff --git a/tests/unit/public-two-bar-nav.test.ts b/tests/unit/public-two-bar-nav.test.ts
+index 004dfb887..1dfdb96d9 100644
+--- a/tests/unit/public-two-bar-nav.test.ts
++++ b/tests/unit/public-two-bar-nav.test.ts
+@@ -71,7 +71,7 @@ const SITE_NAV = [
+ ];
+ /** The featured event's bar for eventRow(): Eventbrite tickets, so an external Register CTA. */
+ const FEATURED_2027_BAR = {
+-  event: { slug: 'brand-2027', name: 'Brand 2027', dates: 'Apr 18–21', city: 'Raleigh' },
++  event: { slug: 'brand-2027', name: 'Brand 2027', logoUrl: '/events/brand-2027/logo.svg', dates: 'Apr 18–21', city: 'Raleigh' },
+   eventNav: publicEventNav('brand-2027', {
+     externalTicketUrl: 'https://www.eventbrite.com/brand-2027',
+     showRegister: true,
+@@ -180,6 +180,7 @@ describe('brand payload: parent site and events bar (#1983)', () => {
+     expect(brand?.family?.routeEvent).toEqual({
+       slug: 'brand-2026',
+       name: 'Brand 2026',
++      logoUrl: '/events/brand-2027/logo.svg',
+       dates: 'Apr 27–28',
+       city: 'Raleigh',
+     });
+@@ -260,7 +261,7 @@ describe('Past events menu query (#1983)', () => {
+     expect(PAST_EVENTS_NAV_LIMIT).toBe(6);
+     expect(mocks.eventFindMany).toHaveBeenCalledWith({
+       where: pastEventsNavWhere(now, 'evt_2027'),
+-      select: { slug: true, name: true },
++      select: { slug: true, name: true, logoUrl: true },
+       orderBy: [{ endDate: 'desc' }, { id: 'desc' }],
+       take: PAST_EVENTS_NAV_LIMIT,
+     });

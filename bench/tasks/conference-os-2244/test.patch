@@ -1,0 +1,64 @@
+diff --git a/tests/unit/atai-site-chrome.test.ts b/tests/unit/atai-site-chrome.test.ts
+index 70843fcd5..8c36f0995 100644
+--- a/tests/unit/atai-site-chrome.test.ts
++++ b/tests/unit/atai-site-chrome.test.ts
+@@ -114,14 +114,25 @@ describe('All Things AI site chrome', () => {
+   it('mirrors allthingsai.org: Events, Get Involved, About', () => {
+     expect(ATAI_HEADER_GROUPS.map((g) => g.label)).toEqual(['Events', 'Get Involved', 'About']);
+     expect(ATAI_HEADER_GROUPS[0].children.map((c) => c.label)).toEqual([
+-      'All Things AI 2027',
+       'Overview',
++      'Why Attend',
++      'Save the Date for ATAI 2027',
++      'Executive AI Summit',
+       'Meetups',
+-      '2026 Talks',
+-      'Upcoming events',
++      'Build an Agent Day',
++      'All Events',
++    ]);
++    expect(ATAI_HEADER_GROUPS[1].children.map((c) => c.label)).toEqual([
++      'Speak',
++      'Sponsor',
++      'Scholarships',
++      'Partner With Us',
+     ]);
+     expect(ATAI_HEADER_GROUPS[2].children.map((c) => c.label)).toEqual([
+       'Our Story',
++      'News',
++      'Advisory Board',
++      'The Industry',
+       'AI Skills for Work',
+       'Build the AI Future',
+       'Why the Triangle?',
+@@ -136,9 +147,11 @@ describe('All Things AI site chrome', () => {
+     expect(local.sort()).toEqual(
+       [
+         '2027 event page /events/all-things-ai-2027',
+-        'All Things AI 2027 /events/all-things-ai-2027',
+-        'Upcoming events /',
++        'Save the Date for ATAI 2027 /events/all-things-ai-2027/save-the-date',
++        'All Events /',
+         'Events /',
++        '2026 Conference /events/all-things-ai-2026',
++        '2025 Conference /events/all-things-open-ai-2025',
+       ].sort()
+     );
+     for (const link of links) {
+@@ -209,6 +222,7 @@ describe('All Things AI site chrome', () => {
+     expect([...panel.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
+       'https://allthingsai.org/speak',
+       'https://allthingsai.org/sponsors',
++      'https://allthingsai.org/ai-scholarships',
+       'https://allthingsai.org/partners',
+     ]);
+     await act(async () => {
+@@ -230,7 +244,7 @@ describe('All Things AI site chrome', () => {
+     expect(menu.hidden).toBe(false);
+     const headings = [...menu.querySelectorAll('h2')].map((h) => h.textContent);
+     expect(headings).toEqual(['Events', 'Get Involved', 'About', EVENT.name]);
+-    expect(menu.querySelector('[data-testid="atai-mobile-site-menu"] a[href="/"]')?.textContent).toBe('Upcoming events');
++    expect(menu.querySelector('[data-testid="atai-mobile-site-menu"] a[href="/"]')?.textContent).toBe('All Events');
+     expect(menu.querySelector('a[href="https://allthingsai.org/why-the-triangle"]')).not.toBeNull();
+     expect(menu.querySelector('a[href="https://allthingsai.org/build-the-ai-future"]')).not.toBeNull();
+     expect(menu.querySelector('a[aria-label="Buy tickets for this event"]')?.textContent).toBe('Buy Tickets');

@@ -1,0 +1,208 @@
+diff --git a/apps/mcp/lib/issue-331-reviews-url-contract.test.ts b/apps/mcp/lib/issue-331-reviews-url-contract.test.ts
+new file mode 100644
+index 00000000..ee29f76d
+--- /dev/null
++++ b/apps/mcp/lib/issue-331-reviews-url-contract.test.ts
+@@ -0,0 +1,202 @@
++import fs from "node:fs";
++import path from "node:path";
++import { describe, it, expect } from "vitest";
++import { INDUSTRIES } from "./presets";
++import { renderSiteTs } from "./render-site-ts";
++import { validateSiteConfig } from "./site-schema";
++import { detectIntegrations } from "./business-brain";
++
++/**
++ * Issue #331 — interview REVIEWS_URL reaches the rendered site config
++ * (smallest #326 slice).
++ *
++ * Chain under contract: interview question 22 collects {REVIEWS_URL}
++ * (route.ts) → every preset carries meta.reviewsUrl = "{REVIEWS_URL}" →
++ * a filled, usable answer is hoisted into the rendered site object by
++ * render-site-ts. Empty / skipped / leftover-token answers emit NO field
++ * (fail closed — never an empty or unresolved review link on a customer
++ * site), and the #324 reviews-absence WARN is untouched.
++ *
++ * | Contract point (issue #331)                 | Sensor(s)                        |
++ * | ------------------------------------------- | -------------------------------- |
++ * | 1. non-empty answer → meta.reviewsUrl path  | UNIT-331-preset-token,           |
++ * |    consumed by existing readers             | UNIT-331-render-usable,          |
++ * |                                             | UNIT-331-consumer-parity         |
++ * | 2. empty answer → NO field; #324 WARN       | UNIT-331-empty-omitted,          |
++ * |    behavior unchanged                       | UNIT-331-token-omitted,          |
++ * |                                             | UNIT-331-absence-warn-unchanged  |
++ * | 3. config-parity: token → preset → render   | UNIT-331-interview-parity,       |
++ * |                                             | UNIT-331-pipeline-end-to-end     |
++ * | 4. out of scope: no reviews section built   | UNIT-331-no-reviews-block        |
++ */
++
++const PRESETS_DIR = path.join(__dirname, "..", "content", "presets");
++const ROUTE_PATH = path.join(
++  __dirname,
++  "..",
++  "app",
++  "api",
++  "[transport]",
++  "route.ts",
++);
++
++const SAMPLE_REVIEWS_URL =
++  "https://www.google.com/maps/search/?api=1&query=Acme+HVAC+Austin+TX";
++
++function loadPresetRaw(industry: string): string {
++  return fs.readFileSync(path.join(PRESETS_DIR, `${industry}.json`), "utf8");
++}
++
++/** Minimal valid config (mirrors issue-325 test fixture). */
++function baseConfig(): Record<string, unknown> {
++  return {
++    meta: {
++      name: "Acme HVAC",
++      tagline: "Cold air fast.",
++      description:
++        "Owner-operated heating and cooling repair, maintenance, and installs for homes in Austin with clear diagnostics and honest ETAs from a licensed local crew.",
++      url: "https://acme-hvac.example",
++      schedulingUrl: "",
++    },
++    hero: { headline: "AC down? Call.", subheadline: "Repair and installs." },
++    services: [
++      {
++        slug: "ac-repair",
++        name: "AC Repair",
++        seo: {
++          title: "AC Repair Austin",
++          description: "Same-day AC repair in Austin when available.",
++        },
++      },
++    ],
++    process: {
++      steps: [
++        { step: 1, title: "Call", description: "Tell us what broke." },
++        { step: 2, title: "Fix", description: "We repair it." },
++      ],
++    },
++    faq: [
++      { question: "Q1?", answer: "A1" },
++      { question: "Q2?", answer: "A2" },
++      { question: "Q3?", answer: "A3" },
++      { question: "Q4?", answer: "A4" },
++      { question: "Q5?", answer: "A5" },
++    ],
++    contactSection: { title: "Contact" },
++    scheduleSection: { title: "Schedule" },
++    contact: { phone: "+1 (512) 555-0100" },
++  };
++}
++
++function withReviewsUrl(value: string): Record<string, unknown> {
++  const config = baseConfig();
++  (config.meta as Record<string, unknown>).reviewsUrl = value;
++  return config;
++}
++
++describe("issue #331 — contract point 1: non-empty answer lands on a consumed path", () => {
++  it("UNIT-331-preset-token: all 8 presets carry meta.reviewsUrl = '{REVIEWS_URL}'", () => {
++    expect(INDUSTRIES).toHaveLength(8);
++    for (const industry of INDUSTRIES) {
++      const preset = JSON.parse(loadPresetRaw(industry)) as {
++        meta?: { reviewsUrl?: string };
++      };
++      expect(preset.meta?.reviewsUrl, industry).toBe("{REVIEWS_URL}");
++    }
++  });
++
++  it("UNIT-331-render-usable: a usable meta.reviewsUrl is emitted into rendered site.ts", () => {
++    const result = renderSiteTs(JSON.stringify(withReviewsUrl(SAMPLE_REVIEWS_URL)));
++    expect(result.ok).toBe(true);
++    if (!result.ok) return;
++    expect(result.source).toContain(
++      `reviewsUrl: ${JSON.stringify(SAMPLE_REVIEWS_URL)}`,
++    );
++  });
++
++  it("UNIT-331-consumer-parity: meta.reviewsUrl is read by the existing review_collection signal", () => {
++    // business-brain's review_collection paths include meta.reviewsUrl —
++    // the exact path this slice writes. No new consumer was invented.
++    expect(detectIntegrations(withReviewsUrl(SAMPLE_REVIEWS_URL))).toContain(
++      "review_collection",
++    );
++    expect(detectIntegrations(baseConfig())).not.toContain("review_collection");
++  });
++});
++
++describe("issue #331 — contract point 2: empty answer emits NO field, WARN unchanged", () => {
++  it("UNIT-331-empty-omitted: empty-string meta.reviewsUrl emits no reviewsUrl field", () => {
++    const result = renderSiteTs(JSON.stringify(withReviewsUrl("")));
++    expect(result.ok).toBe(true);
++    if (!result.ok) return;
++    expect(result.source).not.toContain("reviewsUrl");
++  });
++
++  it("UNIT-331-token-omitted: leftover {REVIEWS_URL} token emits no reviewsUrl field", () => {
++    const result = renderSiteTs(JSON.stringify(withReviewsUrl("{REVIEWS_URL}")));
++    expect(result.ok).toBe(true);
++    if (!result.ok) return;
++    expect(result.source).not.toContain("reviewsUrl");
++    // whitespace-only is equally unusable
++    const blank = renderSiteTs(JSON.stringify(withReviewsUrl("   ")));
++    expect(blank.ok).toBe(true);
++    if (!blank.ok) return;
++    expect(blank.source).not.toContain("reviewsUrl");
++  });
++
++  it("UNIT-331-absence-warn-unchanged: the #324 reviews-absence WARN fires regardless of meta.reviewsUrl", () => {
++    // The reviews BLOCK (testimonial items) is still not collected by the
++    // interview; storing the review URL must not silence the honest warning.
++    for (const config of [
++      baseConfig(),
++      withReviewsUrl(""),
++      withReviewsUrl(SAMPLE_REVIEWS_URL),
++    ]) {
++      const result = validateSiteConfig(JSON.stringify(config));
++      expect(result.valid).toBe(true);
++      expect(
++        result.warnings.some((w) => w.startsWith("reviews is not configured")),
++      ).toBe(true);
++    }
++  });
++});
++
++describe("issue #331 — contract point 3: config parity, interview → preset → render", () => {
++  it("UNIT-331-interview-parity: route.ts still asks question 22 and initializes the REVIEWS_URL placeholder", () => {
++    const routeSource = fs.readFileSync(ROUTE_PATH, "utf8");
++    expect(routeSource).toContain("{REVIEWS_URL}");
++    expect(routeSource).toContain('"REVIEWS_URL": ""');
++  });
++
++  it("UNIT-331-pipeline-end-to-end: a real preset, filled, renders the customer's review URL", () => {
++    // Fill the hvac preset the way the interview output does: every
++    // {TOKEN} replaced with the customer's answer, REVIEWS_URL included.
++    // (SAMPLE_REVIEWS_URL contains no `$`, so String.replace treats it
++    // literally — no $&/$' replacement-pattern hazard.)
++    const filled = loadPresetRaw("hvac")
++      .replace(/\{REVIEWS_URL\}/g, SAMPLE_REVIEWS_URL)
++      .replace(/\{PHONE_E164\}/g, "+15125550100")
++      .replace(/\{PHONE\}/g, "(512) 555-0100")
++      .replace(/\{[A-Z][A-Z0-9_]*\}/g, "Sample answer");
++    const result = renderSiteTs(filled);
++    expect(result.ok).toBe(true);
++    if (!result.ok) return;
++    expect(result.source).toContain(
++      `reviewsUrl: ${JSON.stringify(SAMPLE_REVIEWS_URL)}`,
++    );
++  });
++});
++
++describe("issue #331 — contract point 4: scope guard", () => {
++  it("UNIT-331-no-reviews-block: no preset gained a reviews section in this slice", () => {
++    // Testimonial items are not collected by the interview; emitting a
++    // reviews block here would silence the #324 absence WARN dishonestly.
++    for (const industry of INDUSTRIES) {
++      const preset = JSON.parse(loadPresetRaw(industry)) as Record<
++        string,
++        unknown
++      >;
++      expect(preset.reviews, industry).toBeUndefined();
++    }
++  });
++});

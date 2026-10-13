@@ -1,0 +1,616 @@
+diff --git a/tests/unit/homepage-config-schema.test.ts b/tests/unit/homepage-config-schema.test.ts
+new file mode 100644
+index 000000000..3a4958774
+--- /dev/null
++++ b/tests/unit/homepage-config-schema.test.ts
+@@ -0,0 +1,610 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { existsSync, readFileSync } from 'node:fs';
++import { dirname, extname, join, resolve } from 'node:path';
++import ts from 'typescript';
++import { describe, expect, it, vi } from 'vitest';
++
++import { parseAudienceBandConfig } from '@/components/homepage/audience-band-config';
++import { parseCommitmentConfig } from '@/components/homepage/commitment-config';
++import { parseManifestoConfig } from '@/components/homepage/manifesto-config';
++import { parsePlaceConfig } from '@/components/homepage/place-config';
++import { parseProgramDaysConfig } from '@/components/homepage/program-days-config';
++import { parseSessionLibraryConfig } from '@/components/homepage/session-library-parser';
++import { parseTicketsConfig } from '@/components/homepage/tickets-config';
++import { parseTracksConfig } from '@/components/homepage/tracks-config';
++import {
++  HOMEPAGE_CONFIG_SCHEMAS,
++  MAX_HOMEPAGE_CONFIG_BYTES,
++  MAX_HOMEPAGE_CONFIG_DEPTH,
++  MAX_HOMEPAGE_CONFIG_NODES,
++  REGISTERED_HOMEPAGE_CONFIG_TYPES,
++  getHomepageSectionConfigSchema,
++  parseHomepageSectionConfig,
++  type ConfigEditableHomepageSectionType,
++} from '@/lib/homepage-config-schema';
++import { parseHeroPhotoSlides } from '@/lib/homepage-hero-slides';
++import { parseSpeakersConfig } from '@/lib/homepage-speakers';
++
++const EXPECTED_TYPES = [
++  'HERO',
++  'AUDIENCE_BAND',
++  'SPEAKERS',
++  'MANIFESTO',
++  'PLACE',
++  'COMMITMENT',
++  'TRACKS',
++  'PROGRAM_DAYS',
++  'TICKETS',
++  'SESSION_LIBRARY',
++] as const satisfies readonly ConfigEditableHomepageSectionType[];
++
++const EXPECTED_SHAPES = {
++  HERO: '{ slides?: Array<{ imageUrl: string; alt: string }> (max 8) }',
++  AUDIENCE_BAND:
++    '{ anchor: string; tiles: Array<{ value: string; label: string; source: string } | { metric: "FEATURED_EVENT_TRACK_COUNT"; label: string; source: string }> (max 12 usable) }',
++  SPEAKERS:
++    '{ style?: "grid" | "flip" (unknown or malformed defaults to "grid") }',
++  MANIFESTO:
++    '{ eyebrow?: string; title?: string; question?: string; body?: string[1..4]; figure?: { imageUrl: string; alt: string } }',
++  PLACE:
++    '{ eyebrow?: string; title: string; intro?: string; graphic?: { src: safe-url-or-site-path; alt: string; caption?: string }; facts?: Array<{ value: string; label: string; sourceLabel: string; sourceHref: public-https-url }> (max 8); sectors?: Array<{ label: string; organizations: Array<{ name: string; sourceLabel: string; sourceHref: public-https-url }> (max 12) }> (max 8) }',
++  COMMITMENT:
++    '{ eyebrow?: string; title?: string; intro?: string; columns?: Array<{ eyebrow: string; title: string; body: string }> (1..6); stats?: Array<{ value: string; label: string; source?: visible string (required for numeric claims) }> (0..6); cta?: { label: string; href: safe-same-site-relative-path } }',
++  TRACKS:
++    '{ eyebrow?: string; title?: string; intro?: string|null; outroEyebrow?: string|null; outroTitle?: string|null; outroBody?: string|null }',
++  PROGRAM_DAYS: '{ eyebrow?: string; title?: string }',
++  TICKETS:
++    '{ publishFloorPrice?: true; publishOnSaleDate?: true } (at least one exact own true)',
++  SESSION_LIBRARY:
++    '{ eventSlug: /^[a-z0-9_-]{1,200}$/ (trimmed and lowercased); limit: integer 1..100 }',
++} as const satisfies Record<ConfigEditableHomepageSectionType, string>;
++
++const SAMPLES = {
++  HERO: {
++    slides: [{ imageUrl: '/hero.webp', alt: 'Attendees learning together' }],
++  },
++  AUDIENCE_BAND: {
++    anchor: 'Who joins us',
++    tiles: [
++      { value: '12', label: 'Communities', source: 'Published report' },
++      {
++        metric: 'FEATURED_EVENT_TRACK_COUNT',
++        label: 'Program tracks',
++        source: 'Current featured-event program',
++      },
++    ],
++  },
++  SPEAKERS: { style: 'flip' },
++  MANIFESTO: {
++    eyebrow: 'Our principle',
++    title: 'Make the useful thing',
++    question: 'What changes on Monday?',
++    body: ['Learn it.', 'Use it.'],
++    figure: { imageUrl: '/manifesto.webp', alt: 'A working session' },
++  },
++  PLACE: {
++    eyebrow: 'The place',
++    title: 'Built here',
++    intro: 'A regional ecosystem.',
++    facts: [
++      {
++        value: '10',
++        label: 'Organizations',
++        sourceLabel: 'Public directory',
++        sourceHref: 'https://example.com/directory',
++      },
++    ],
++  },
++  COMMITMENT: {
++    eyebrow: 'Shared work',
++    title: 'Build the room',
++    intro: 'Everyone belongs.',
++    columns: [
++      { eyebrow: 'Learn', title: 'Together', body: 'Share useful context.' },
++    ],
++    stats: [
++      {
++        value: '12',
++        label: 'Public cohorts',
++        source: 'Published program report',
++      },
++    ],
++    cta: { label: 'See the program', href: '/program?view=all#sessions' },
++  },
++  TRACKS: {
++    eyebrow: 'Choose your room',
++    title: 'A track for every role',
++    intro: null,
++    outroEyebrow: 'Together',
++    outroTitle: 'Depth without gatekeeping',
++    outroBody: null,
++  },
++  PROGRAM_DAYS: {
++    eyebrow: 'At a glance',
++    title: 'Four useful days',
++  },
++  TICKETS: {
++    publishFloorPrice: true,
++    publishOnSaleDate: true,
++    publishRemainingCount: true,
++  },
++  SESSION_LIBRARY: { eventSlug: ' PAST-Event ', limit: 12 },
++} as const satisfies Record<
++  ConfigEditableHomepageSectionType,
++  Record<string, unknown>
++>;
++
++function jsonShape(value: unknown): unknown {
++  return JSON.parse(JSON.stringify(value));
++}
++
++function rendererParsed(
++  type: ConfigEditableHomepageSectionType,
++  input: Record<string, unknown>,
++): object | null {
++  switch (type) {
++    case 'HERO':
++      return { slides: parseHeroPhotoSlides(input) };
++    case 'AUDIENCE_BAND':
++      return parseAudienceBandConfig(input);
++    case 'SPEAKERS':
++      return parseSpeakersConfig(input);
++    case 'MANIFESTO':
++      return parseManifestoConfig(input);
++    case 'PLACE':
++      return parsePlaceConfig(input);
++    case 'COMMITMENT':
++      return parseCommitmentConfig(input);
++    case 'TRACKS':
++      return parseTracksConfig(input);
++    case 'PROGRAM_DAYS':
++      return parseProgramDaysConfig(input);
++    case 'TICKETS':
++      return parseTicketsConfig(input);
++    case 'SESSION_LIBRARY':
++      return parseSessionLibraryConfig(input);
++  }
++}
++
++function nestedObject(containerDepth: number): Record<string, unknown> {
++  let value: unknown = 'leaf';
++  for (let index = 0; index < containerDepth; index += 1) {
++    value = { child: value };
++  }
++  return value as Record<string, unknown>;
++}
++
++function utf8Bytes(value: unknown): number {
++  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
++}
++
++function sizedPaddingConfig(targetBytes: number, multibyte = false) {
++  const empty = { padding: '' };
++  const available = targetBytes - utf8Bytes(empty);
++  if (!multibyte) return { padding: 'x'.repeat(available) };
++  return {
++    padding: `${'é'.repeat(Math.floor(available / 2))}${
++      available % 2 === 0 ? '' : 'x'
++    }`,
++  };
++}
++
++function resolveLocalImport(fromFile: string, specifier: string): string | null {
++  let base: string;
++  if (specifier.startsWith('@/')) {
++    base = join(process.cwd(), 'src', specifier.slice(2));
++  } else if (specifier.startsWith('.')) {
++    base = resolve(dirname(fromFile), specifier);
++  } else {
++    return null;
++  }
++
++  const candidates = extname(base)
++    ? [base]
++    : [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')];
++  return candidates.find(existsSync) ?? null;
++}
++
++function runtimeImportClosure(entry: string): readonly string[] {
++  const pending = [entry];
++  const visited = new Set<string>();
++  while (pending.length > 0) {
++    const path = pending.pop();
++    if (!path || visited.has(path)) continue;
++    visited.add(path);
++    const source = readFileSync(path, 'utf8');
++    const parsed = ts.createSourceFile(
++      path,
++      source,
++      ts.ScriptTarget.Latest,
++      true,
++      path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
++    );
++
++    const visit = (node: ts.Node) => {
++      if (ts.isImportDeclaration(node)) {
++        const clause = node.importClause;
++        const bindings = clause?.namedBindings;
++        const namedImportsAreTypeOnly =
++          bindings &&
++          ts.isNamedImports(bindings) &&
++          bindings.elements.length > 0 &&
++          bindings.elements.every((element) => element.isTypeOnly);
++        const isTypeOnly =
++          clause?.isTypeOnly === true ||
++          (!clause?.name && namedImportsAreTypeOnly === true);
++        if (!isTypeOnly && ts.isStringLiteral(node.moduleSpecifier)) {
++          const local = resolveLocalImport(path, node.moduleSpecifier.text);
++          if (local) pending.push(local);
++        }
++      }
++      if (
++        ts.isCallExpression(node) &&
++        node.expression.kind === ts.SyntaxKind.ImportKeyword
++      ) {
++        throw new Error(`dynamic import in config registry closure: ${path}`);
++      }
++      ts.forEachChild(node, visit);
++    };
++    visit(parsed);
++  }
++  return [...visited].sort();
++}
++
++describe('homepage renderer config-schema registry (#1863)', () => {
++  it('registers the exact ten config-editable renderer parsers and shapes', () => {
++    expect(REGISTERED_HOMEPAGE_CONFIG_TYPES).toEqual(EXPECTED_TYPES);
++    expect(Object.keys(HOMEPAGE_CONFIG_SCHEMAS)).toEqual(EXPECTED_TYPES);
++    expect(Object.isFrozen(HOMEPAGE_CONFIG_SCHEMAS)).toBe(true);
++    expect(Object.isFrozen(REGISTERED_HOMEPAGE_CONFIG_TYPES)).toBe(true);
++
++    for (const type of EXPECTED_TYPES) {
++      const schema = getHomepageSectionConfigSchema(type);
++      expect(schema?.acceptedShape).toBe(EXPECTED_SHAPES[type]);
++      expect(Object.isFrozen(schema)).toBe(true);
++      expect(typeof schema?.parser).toBe('function');
++    }
++
++    expect(HOMEPAGE_CONFIG_SCHEMAS.AUDIENCE_BAND.parser).toBe(
++      parseAudienceBandConfig,
++    );
++    expect(HOMEPAGE_CONFIG_SCHEMAS.SPEAKERS.parser).toBe(parseSpeakersConfig);
++    expect(HOMEPAGE_CONFIG_SCHEMAS.MANIFESTO.parser).toBe(parseManifestoConfig);
++    expect(HOMEPAGE_CONFIG_SCHEMAS.PLACE.parser).toBe(parsePlaceConfig);
++    expect(HOMEPAGE_CONFIG_SCHEMAS.COMMITMENT.parser).toBe(
++      parseCommitmentConfig,
++    );
++    expect(HOMEPAGE_CONFIG_SCHEMAS.TRACKS.parser).toBe(parseTracksConfig);
++    expect(HOMEPAGE_CONFIG_SCHEMAS.PROGRAM_DAYS.parser).toBe(
++      parseProgramDaysConfig,
++    );
++    expect(HOMEPAGE_CONFIG_SCHEMAS.TICKETS.parser).toBe(parseTicketsConfig);
++    expect(HOMEPAGE_CONFIG_SCHEMAS.SESSION_LIBRARY.parser).toBe(
++      parseSessionLibraryConfig,
++    );
++  });
++
++  it('keeps the actual runtime dependency closure pure and server-safe', () => {
++    const entry = join(process.cwd(), 'src/lib/homepage-config-schema.ts');
++    const closure = runtimeImportClosure(entry);
++    const relative = closure.map((path) => path.replace(`${process.cwd()}/`, ''));
++
++    expect(relative).toEqual(
++      expect.arrayContaining([
++        'src/components/homepage/audience-band-config.ts',
++        'src/components/homepage/commitment-config.ts',
++        'src/components/homepage/manifesto-config.ts',
++        'src/components/homepage/place-config.ts',
++        'src/components/homepage/program-days-config.ts',
++        'src/components/homepage/session-library-parser.ts',
++        'src/components/homepage/tickets-config.ts',
++        'src/components/homepage/tracks-config.ts',
++        'src/lib/homepage-hero-slides.ts',
++        'src/lib/homepage-speakers.ts',
++      ]),
++    );
++    expect(relative.every((path) => path.endsWith('.ts'))).toBe(true);
++
++    const source = closure.map((path) => readFileSync(path, 'utf8')).join('\n');
++    expect(source).not.toMatch(
++      /(?:from\s+['"]server-only['"]|@\/lib\/db|@\/app\/|homepage-section-data|homepage-renderers|['"]use client['"])/u,
++    );
++    expect(source).not.toMatch(/\brequire\s*\(|\bimport\s*\(/u);
++  });
++
++  it.each(EXPECTED_TYPES)(
++    'normalizes %s with the renderer parser as the single source of truth',
++    (type) => {
++      const input = SAMPLES[type];
++      const normalized = parseHomepageSectionConfig(type, input);
++      expect(normalized).not.toBeNull();
++      expect(jsonShape(normalized)).toEqual(
++        jsonShape(rendererParsed(type, input)),
++      );
++      expect(Object.getPrototypeOf(normalized)).toBeNull();
++      expect(Object.isFrozen(normalized)).toBe(true);
++    },
++  );
++
++  it.each(EXPECTED_TYPES)(
++    'matches %s renderer rejection/default behavior for an empty safe object',
++    (type) => {
++      expect(jsonShape(parseHomepageSectionConfig(type, {}))).toEqual(
++        jsonShape(rendererParsed(type, {})),
++      );
++    },
++  );
++
++  it('uses the HERO object adaptor and preserves portable section-specific contracts', () => {
++    expect(parseHomepageSectionConfig('HERO', SAMPLES.HERO)).toEqual({
++      slides: [{ imageUrl: '/hero.webp', alt: 'Attendees learning together' }],
++    });
++    expect(
++      parseHomepageSectionConfig('SESSION_LIBRARY', {
++        eventSlug: ' PAST-Event ',
++        limit: 1,
++      }),
++    ).toEqual({ eventSlug: 'past-event', limit: 1 });
++    expect(
++      parseHomepageSectionConfig('SESSION_LIBRARY', {
++        eventId: 'past-event',
++        limit: 1,
++      }),
++    ).toBeNull();
++    expect(
++      parseHomepageSectionConfig('TICKETS', {
++        publishRemainingCount: true,
++      }),
++    ).toBeNull();
++    expect(
++      parseHomepageSectionConfig('TICKETS', {
++        publishFloorPrice: true,
++        publishRemainingCount: true,
++      }),
++    ).toEqual({ publishFloorPrice: true, publishOnSaleDate: false });
++    expect(parseHomepageSectionConfig('COMMITMENT', {})).toEqual(
++      parseCommitmentConfig({}),
++    );
++  });
++
++  it('fails closed for unknown and display-only section types', () => {
++    for (const type of [
++      'NOT_A_SECTION',
++      'PHOTO_COLLAGE',
++      'TESTIMONIALS',
++      'SPONSOR_MARQUEE',
++      'SPONSORSHIP',
++      'EVENTS_DIRECTORY',
++      'SIZZLE_REEL',
++      'NEWS',
++      'NEWSLETTER',
++      'CONTACT',
++      'SITE_DIRECTORY',
++      'SCROLL_SET_PIECE',
++    ]) {
++      expect(getHomepageSectionConfigSchema(type)).toBeNull();
++      expect(parseHomepageSectionConfig(type, {})).toBeNull();
++    }
++  });
++
++  it('returns a detached null-prototype shallow-frozen config and drops unknown keys', () => {
++    const slide = { imageUrl: '/before.webp', alt: 'Before' };
++    const input = { slides: [slide], ignored: { retained: false } };
++    const normalized = parseHomepageSectionConfig('HERO', input);
++    expect(normalized).not.toBeNull();
++    expect(Object.getPrototypeOf(normalized)).toBeNull();
++    expect(Object.isFrozen(normalized)).toBe(true);
++    expect(normalized).not.toHaveProperty('ignored');
++
++    slide.imageUrl = '/after.webp';
++    input.slides.push({ imageUrl: '/later.webp', alt: 'Later' });
++    expect(normalized).toEqual({
++      slides: [{ imageUrl: '/before.webp', alt: 'Before' }],
++    });
++    expect(() => {
++      (normalized as Record<string, unknown>).extra = true;
++    }).toThrow();
++  });
++
++  it.each(['__proto__', 'constructor', 'prototype'])
++  ('rejects dangerous prototype key %s at every nesting position', (key) => {
++    const root = JSON.parse(`{"${key}":true}`) as Record<string, unknown>;
++    const nested = JSON.parse(
++      `{"title":"Safe","ignored":{"${key}":{"polluted":true}}}`,
++    ) as Record<string, unknown>;
++    expect(parseHomepageSectionConfig('TRACKS', root)).toBeNull();
++    expect(parseHomepageSectionConfig('TRACKS', nested)).toBeNull();
++    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
++  });
++
++  it('rejects inherited, accessor, non-enumerable, symbol, and proxy inputs without invoking code', () => {
++    const inherited = Object.assign(Object.create({ inherited: true }), {
++      title: 'Configured title',
++    }) as Record<string, unknown>;
++    let invoked = false;
++    const accessor = Object.defineProperty({}, 'title', {
++      enumerable: true,
++      get() {
++        invoked = true;
++        throw new Error('must not run');
++      },
++    });
++    const nonEnumerable = Object.defineProperty({}, 'title', {
++      enumerable: false,
++      value: 'Hidden',
++    });
++    const withSymbol = { title: 'Visible' } as Record<PropertyKey, unknown>;
++    withSymbol[Symbol('hidden')] = true;
++    const transparentProxy = new Proxy({ title: 'Proxy title' }, {});
++    const hostileProxy = new Proxy(
++      {},
++      {
++        getPrototypeOf() {
++          invoked = true;
++          throw new Error('must not run');
++        },
++      },
++    );
++
++    for (const candidate of [
++      inherited,
++      accessor,
++      nonEnumerable,
++      withSymbol,
++      transparentProxy,
++      hostileProxy,
++    ]) {
++      expect(parseHomepageSectionConfig('TRACKS', candidate)).toBeNull();
++    }
++    expect(invoked).toBe(false);
++
++    const nullPrototype = Object.assign(Object.create(null), {
++      title: 'Null prototype is valid JSON data',
++    });
++    expect(parseHomepageSectionConfig('TRACKS', nullPrototype)?.title).toBe(
++      'Null prototype is valid JSON data',
++    );
++  });
++
++  it.each([
++    ['undefined', undefined],
++    ['NaN', Number.NaN],
++    ['infinity', Number.POSITIVE_INFINITY],
++    ['bigint', BigInt(1)],
++    ['symbol', Symbol('not-json')],
++    ['function', () => 'not-json'],
++    ['date', new Date('2027-01-01T00:00:00.000Z')],
++    ['map', new Map([['key', 'value']])],
++  ])('rejects nested non-JSON %s values before parsing', (_label, value) => {
++    expect(
++      parseHomepageSectionConfig('TRACKS', {
++        title: 'Configured title',
++        ignored: value,
++      }),
++    ).toBeNull();
++  });
++
++  it('rejects cycles and every non-dense or extended array shape', () => {
++    const objectCycle: Record<string, unknown> = {};
++    objectCycle.self = objectCycle;
++    const arrayCycle: unknown[] = [];
++    arrayCycle.push(arrayCycle);
++    const sparse = new Array<unknown>(2);
++    sparse[1] = 'present';
++    const extended = ['present'] as unknown[] & { extra?: boolean };
++    extended.extra = true;
++    const accessor = ['safe'];
++    Object.defineProperty(accessor, '0', {
++      enumerable: true,
++      get() {
++        throw new Error('must not run');
++      },
++    });
++    class ArraySubclass<T> extends Array<T> {}
++
++    for (const value of [
++      objectCycle,
++      arrayCycle,
++      sparse,
++      extended,
++      accessor,
++      new ArraySubclass('value'),
++    ]) {
++      expect(
++        parseHomepageSectionConfig('TRACKS', {
++          title: 'Configured title',
++          ignored: value,
++        }),
++      ).toBeNull();
++    }
++  });
++
++  it('enforces the exact container-depth boundary before ignored data reaches a parser', () => {
++    expect(MAX_HOMEPAGE_CONFIG_DEPTH).toBe(8);
++    expect(
++      parseHomepageSectionConfig('TRACKS', {
++        ignored: nestedObject(MAX_HOMEPAGE_CONFIG_DEPTH),
++      }),
++    ).not.toBeNull();
++    expect(
++      parseHomepageSectionConfig('TRACKS', {
++        ignored: nestedObject(MAX_HOMEPAGE_CONFIG_DEPTH + 1),
++      }),
++    ).toBeNull();
++  });
++
++  it('enforces 32KiB by serialized UTF-8 bytes, including multibyte content', () => {
++    const exactAscii = sizedPaddingConfig(MAX_HOMEPAGE_CONFIG_BYTES);
++    const exactMultibyte = sizedPaddingConfig(MAX_HOMEPAGE_CONFIG_BYTES, true);
++    expect(utf8Bytes(exactAscii)).toBe(MAX_HOMEPAGE_CONFIG_BYTES);
++    expect(utf8Bytes(exactMultibyte)).toBe(MAX_HOMEPAGE_CONFIG_BYTES);
++    expect(parseHomepageSectionConfig('TRACKS', exactAscii)).not.toBeNull();
++    expect(
++      parseHomepageSectionConfig('TRACKS', exactMultibyte),
++    ).not.toBeNull();
++
++    const overAscii = {
++      ...exactAscii,
++      padding: `${exactAscii.padding}x`,
++    };
++    const overMultibyte = {
++      ...exactMultibyte,
++      padding: `${exactMultibyte.padding}é`,
++    };
++    expect(utf8Bytes(overAscii)).toBe(MAX_HOMEPAGE_CONFIG_BYTES + 1);
++    expect(utf8Bytes(overMultibyte)).toBe(MAX_HOMEPAGE_CONFIG_BYTES + 2);
++    expect(parseHomepageSectionConfig('TRACKS', overAscii)).toBeNull();
++    expect(parseHomepageSectionConfig('TRACKS', overMultibyte)).toBeNull();
++  });
++
++  it('enforces the exact 4,096-node boundary', () => {
++    expect(MAX_HOMEPAGE_CONFIG_NODES).toBe(4_096);
++    const exact = {
++      ignored: new Array(MAX_HOMEPAGE_CONFIG_NODES - 2).fill(null),
++    };
++    const over = {
++      ignored: new Array(MAX_HOMEPAGE_CONFIG_NODES - 1).fill(null),
++    };
++    expect(parseHomepageSectionConfig('TRACKS', exact)).not.toBeNull();
++    expect(parseHomepageSectionConfig('TRACKS', over)).toBeNull();
++  });
++
++  it('revalidates hostile parser output before creating the public normalized object', async () => {
++    vi.resetModules();
++    vi.doMock('@/components/homepage/tracks-config', () => ({
++      parseTracksConfig: () => ({ unsafe: new Date('2027-01-01T00:00:00Z') }),
++    }));
++    try {
++      const isolatedRegistry = await import('@/lib/homepage-config-schema');
++      expect(isolatedRegistry.parseHomepageSectionConfig('TRACKS', {})).toBeNull();
++    } finally {
++      vi.doUnmock('@/components/homepage/tracks-config');
++      vi.resetModules();
++    }
++  });
++
++  it('returns null when a registered renderer parser rejects an otherwise safe JSON object', () => {
++    expect(
++      parseHomepageSectionConfig('AUDIENCE_BAND', {
++        anchor: 'Audience',
++        tiles: [],
++      }),
++    ).toBeNull();
++    expect(
++      parseHomepageSectionConfig('PLACE', {
++        title: 'A place with no sourced content',
++      }),
++    ).toBeNull();
++    expect(
++      parseHomepageSectionConfig('SESSION_LIBRARY', {
++        eventSlug: 'contains spaces',
++        limit: 1,
++      }),
++    ).toBeNull();
++  });
++});

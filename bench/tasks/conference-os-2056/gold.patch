@@ -1,0 +1,16 @@
+diff --git a/src/components/event-public-footer.tsx b/src/components/event-public-footer.tsx
+index 189f92c6b..99b138788 100644
+--- a/src/components/event-public-footer.tsx
++++ b/src/components/event-public-footer.tsx
+@@ -104,8 +104,10 @@ export function EventPublicFooter({
+   // gray-400, not gray-500: on bg-space-900 (#0b1426, ATA/Launchpad), gray-500
+   // is 3.80:1 — under the 4.5:1 AA floor. gray-400 is 7.07:1 and matches this
+   // footer's secondary/link text.
++  // Broadside: stone-600, not stone-500: on bg-[#f5f2eb], stone-500 is 4.28:1
++  // and stone-600 is 6.83:1, the footer's existing link and body text token.
+   const headingClass = isBroadside
+-    ? 'mb-3 text-xs font-semibold uppercase tracking-wide text-stone-500'
++    ? 'mb-3 text-xs font-semibold uppercase tracking-wide text-stone-600'
+     : 'mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400';
+ 
+   // null → hardcoded fallback; array → DB override (empty array = intentional empty).

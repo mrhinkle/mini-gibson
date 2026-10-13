@@ -1,0 +1,46 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-1931",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 1931,
+  "base_sha": "b8390233389503941930cf8da4ec38fd0d7ace71",
+  "merge_sha": "d9d80ffb19cf7a3ec4b3dc138de88da8c7dc06cb",
+  "issue_number": 1929,
+  "issue_title": "SpaceHeroBg NightSky \u2014 persistent pause control",
+  "problem_statement": "SpaceHeroBg NightSky \u2014 persistent pause control\n\n## Problem\n\nThe exact-main #1838 closure audit found that NightSkyCanvas now has correct manual pause, offscreen, cleanup, and live reduced-motion mechanics, but SpaceHeroBg still invokes it without the visible motion control. The public homepage and event hero/footer paths therefore run motion for longer than five seconds without a user control.\n\n## Acceptance criteria\n\n- Every animated NightSkyCanvas reached through SpaceHeroBg exposes a visible, persistent Pause animation / Resume animation control, or the instance is explicitly static.\n- Reuse the existing NightSkyCanvas control semantics: keyboard operable, stable accessible name, aria-pressed, and aria-controls targeting the canvas.\n- Manual pause composes with offscreen state and live prefers-reduced-motion changes; returning onscreen or changing preference must not override a manual pause.\n- Preserve server-rendered page content and decorative aria-hidden canvas behavior without JavaScript.\n- Cover public homepage hero/footer and event hero call paths with focused static-markup/interaction/source-contract tests and meaningful RED/GREEN mutation probes.\n\n## Scope and boundaries\n\nParent: #1838. Reuse the merged #1836 NightSky controller; do not duplicate animation state. No schema/migration, tenant content, asset, Production action, secret, spend, pricing, billing, or legal change.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/night-sky-canvas.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/night-sky-canvas.test.ts::AmbientNightSky per-section opt-in (#1836) keeps bare canvases control-free while the shared SpaceHeroBg is controlled",
+      "tests/unit/night-sky-canvas.test.ts::SpaceHeroBg motion control (#1929) keeps page content and the accessible control in static markup at every public call path",
+      "tests/unit/night-sky-canvas.test.ts::SpaceHeroBg motion control (#1929) persists manual pause through offscreen and live reduced-motion changes"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/night-sky-canvas.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/night-sky-canvas.test.ts::AmbientNightSky per-section opt-in (#1836) is off by default and mounts the controlled decorative canvas only when enabled",
+      "tests/unit/night-sky-canvas.test.ts::NightSkyCanvas motion controller (#1836) cleans up observers, listeners, timers, and stale callbacks across adversarial remounts",
+      "tests/unit/night-sky-canvas.test.ts::NightSkyCanvas motion controller (#1836) keeps one RAF, persists a manual pause across offscreen transitions, and resumes on demand",
+      "tests/unit/night-sky-canvas.test.ts::NightSkyCanvas motion controller (#1836) starts still when reduced motion is already set and begins only after it clears",
+      "tests/unit/night-sky-canvas.test.ts::NightSkyCanvas motion controller (#1836) stops immediately for live reduced motion and restarts only when visible and not manually paused"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

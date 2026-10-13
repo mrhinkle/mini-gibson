@@ -1,0 +1,49 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "the-gibson-131",
+  "repo": "the-gibson",
+  "repo_url": "https://github.com/The-AIE/the-gibson",
+  "pr": 131,
+  "base_sha": "97a26853db9bd544bac9f048573320e1bcbd1f48",
+  "merge_sha": "136dd02e53675718ae80e25016af22366b376899",
+  "issue_number": 67,
+  "issue_title": "Dedicated reviewer GitHub identity: formal reviews without admin merges (L-015/L-021)",
+  "problem_statement": "Dedicated reviewer GitHub identity: formal reviews without admin merges (L-015/L-021)\n\n## Problem\nThe solo loop's builder and reviewer hats share one GitHub account, so GitHub rejects `gh pr review --approve` (L-015) and branch protection's required-review rule can never be satisfied without a human: chatterbuilt PR #98 had CI green + cross-vendor Claude APPROVE + security CLEAR and still needed an **admin squash merge** (L-021). The `VERDICT: APPROVE` comment convention unblocks process signaling but not mergeability. Every admin merge is a human-privilege touch that breaks the \"no interaction except product opinions\" contract.\n\n## Proposed fix\nStand up a dedicated reviewer identity so formal reviews come from a genuinely different account:\n1. A machine/bot GitHub account (or GitHub App) with repo access, used by `REVIEWER_CMD` / `second-opinion.sh` / the Devin supervisor path to post real `gh pr review --approve` / `--request-changes` under its own token (`GH_TOKEN` env in the reviewer shell-out).\n2. Branch protection then works as designed: required review satisfied by the reviewer identity, no admin override needed for Tier A/B.\n3. Playbook updates: reviewer hat prefers the formal review path when the reviewer token is configured; `VERDICT:` comment remains the fallback and the release playbook's admin-merge checklist becomes the exception, not the routine.\n4. Document the token setup in docs/13 adoption (one-time human step, G14 \u2014 that's fine; it's setup, not per-PR interaction).\n\n## Acceptance criteria\n- On a branch-protected repo, a solo-loop PR reaches merge with zero admin overrides: CI green + formal APPROVED review from the reviewer identity.\n- Tier C still queues for Mark (G12) \u2014 unchanged.\n- second-opinion.sh accepts an optional reviewer token/identity and posts a formal review instead of (or in addition to) writing second-opinion.md.\n\nRefs: L-015, L-021 in memory/LESSONS.md; docs/20 rule 1 (cross-vendor review), docs/14 G12/G14.",
+  "split": "external_holdout_unseen",
+  "runner": "shell",
+  "f2p": {
+    "commands": [
+      "bash scripts/tests/formal-review.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/formal-review.test.sh::adoption docs mention GH_REVIEWER_TOKEN",
+      "scripts/tests/formal-review.test.sh::approve exit 0",
+      "scripts/tests/formal-review.test.sh::approve flag",
+      "scripts/tests/formal-review.test.sh::dry-run",
+      "scripts/tests/formal-review.test.sh::gh pr review invoked",
+      "scripts/tests/formal-review.test.sh::help",
+      "scripts/tests/formal-review.test.sh::identity in log",
+      "scripts/tests/formal-review.test.sh::missing token exits 2",
+      "scripts/tests/formal-review.test.sh::request-changes",
+      "scripts/tests/formal-review.test.sh::second-opinion formal hook present"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "bash scripts/tests/formal-review.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/formal-review.test.sh::dry-run no API post"
+    ]
+  },
+  "setup": [
+    "test -d scripts/tests"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": false,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "the-gibson-398",
+  "repo": "the-gibson",
+  "repo_url": "https://github.com/The-AIE/the-gibson",
+  "pr": 398,
+  "base_sha": "a83e297c72af772426195b2f0c3bdd6a84e87580",
+  "merge_sha": "a769d1276227ce1687c73461ed3deb6fc651d944",
+  "issue_number": 390,
+  "issue_title": "pr-size: decode both sides of C-quoted renames in parseNumstatText",
+  "problem_statement": "pr-size: decode both sides of C-quoted renames in parseNumstatText\n\nFollow-up from CodeRabbit's review of #383 (merged as 11a6e0c).\n\n`parseNumstatText` in `scripts/pr-size.mjs` (the newline-delimited parser, used only for offline `--numstat FILE` fixtures; CI uses `-z`) treats a C-quoted rename such as `\"old\\tname\" => \"new\\tname\"` as a single quoted path. It then fails to pick the destination path, so the file can be misclassified and the offline budget metrics come out wrong.\n\n**Fix:** when a rename has C-quoted paths, decode both sides and classify on the destination.\n**Test:** add a regression fixture for a C-quoted rename in `scripts/tests/pr-size.test.sh`.\n\nSeverity: minor. It does not affect the CI path.",
+  "split": "external_holdout_unseen",
+  "runner": "shell",
+  "f2p": {
+    "commands": [
+      "bash scripts/tests/pr-size.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/pr-size.test.sh::C-quoted rename decodes destination (tab, class change, escaped quote)",
+      "scripts/tests/pr-size.test.sh::one-sided quoted renames classify the destination; a quoted name containing ' => ' stays a single path"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "bash scripts/tests/pr-size.test.sh"
+    ],
+    "test_ids": [
+      "explicit exception emits a ::warning:: annotation",
+      "scripts/tests/pr-size.test.sh::--exception exits 0 on breach for local operator runs",
+      "scripts/tests/pr-size.test.sh::-z fixture exits 0",
+      "scripts/tests/pr-size.test.sh::-z stream missing final NUL exits 2",
+      "scripts/tests/pr-size.test.sh::-z truncated rename record exits 2",
+      "scripts/tests/pr-size.test.sh::-z: rename, UTF-8 docs path classified as docs, literal ' => ' kept verbatim, binary flagged",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml executes the trusted copy",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml materialises sensor+config from the trusted base",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml measures the pinned event pair",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml neutralizes local exception override in CI",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml pins the event base SHA",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml pins the event head SHA",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml runs pr-size",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml takes the budget config from the trusted base too",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: CI leaves labels informational",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: base does not follow mutable branch tip",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: bootstrap reports explicit not-enforced only when both base files are absent",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: never copies the PR-controlled sensor",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: never executes the PR-controlled sensor",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: partial trusted-base install fails closed",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: pr-size result not swallowed",
+      "scripts/tests/pr-size.test.sh::.github/workflows/gibson-self-gate.yml: proves base-file absence before skipping",
+      "scripts/tests/pr-size.test.sh::C-quoted text path decodes to docs/caf\u00e9.md and counts as docs",
+      "scripts/tests/pr-size.test.sh::GIBSON_PR_SIZE_EXCEPTION=0 is not an exception",
+      "scripts/tests/pr-size.test.sh::GIBSON_PR_SIZE_EXCEPTION=1 honoured for local operator runs",
+      "scripts/tests/pr-size.test.sh::GitHub annotation stays off JSON stdout",
+      "scripts/tests/pr-size.test.sh::binary and rename numstat rows parse with binary flag",
+      "scripts/tests/pr-size.test.sh::breach message states label is informational",
+      "scripts/tests/pr-size.test.sh::breach names the budget and value",
+      "scripts/tests/pr-size.test.sh::bulk in tests trips totalLines",
+      "scripts/tests/pr-size.test.sh::config is valid JSON",
+      "scripts/tests/pr-size.test.sh::config present",
+      "scripts/tests/pr-size.test.sh::empty diff exits 0",
+      "scripts/tests/pr-size.test.sh::exception still reports the breach",
+      "scripts/tests/pr-size.test.sh::exception written to GITHUB_STEP_SUMMARY with the numbers",
+      "scripts/tests/pr-size.test.sh::explicit exception emits a ::warning:: annotation",
+      "scripts/tests/pr-size.test.sh::invalid config exits 2",
+      "scripts/tests/pr-size.test.sh::live JSON reports exact base/head/merge-base",
+      "scripts/tests/pr-size.test.sh::live git call uses --numstat -z",
+      "scripts/tests/pr-size.test.sh::lockfile classified as generated; json output parseable",
+      "scripts/tests/pr-size.test.sh::malformed numstat exits 2",
+      "scripts/tests/pr-size.test.sh::no annotations outside GitHub Actions",
+      "scripts/tests/pr-size.test.sh::productFiles breach exits 1",
+      "scripts/tests/pr-size.test.sh::productLines breach exits 1",
+      "scripts/tests/pr-size.test.sh::production parser rejects non-NUL live numstat",
+      "scripts/tests/pr-size.test.sh::sensor present",
+      "scripts/tests/pr-size.test.sh::shipped config evaluates a real diff (rc=0)",
+      "scripts/tests/pr-size.test.sh::small PR exits 0",
+      "scripts/tests/pr-size.test.sh::tests and docs are not counted as product",
+      "scripts/tests/pr-size.test.sh::text output reports binary line-count limit",
+      "scripts/tests/pr-size.test.sh::unexcepted breach emits ::error::",
+      "scripts/tests/pr-size.test.sh::unknown base ref exits 2 (fails closed, not green)",
+      "scripts/tests/pr-size.test.sh::unsafe integer numstat exits 2",
+      "scripts/tests/pr-size.test.sh::unsafe line-total overflow exits 2",
+      "scripts/tests/pr-size.test.sh::within budget emits ::notice::",
+      "unexcepted breach emits ::error::",
+      "within budget emits ::notice::"
+    ]
+  },
+  "setup": [
+    "test -f scripts/tests/pr-size.test.sh"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": false,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

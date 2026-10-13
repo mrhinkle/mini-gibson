@@ -1,0 +1,279 @@
+diff --git a/DESIGN.md b/DESIGN.md
+index 2c2c2302..8fb73e59 100644
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -105,26 +105,27 @@ omitted:
+ 
+ Chatterbuilt is "websites you update by talking to them" — AI-maintained sites
+ for small business. The UI should feel like a sharp, friendly tradesperson's
+-tool: dark, engineered, confident, with one loud lime accent that carries every
++tool: dark, engineered, confident, with one loud cyan accent that carries every
+ call to action. Personality: plain, trade-friendly, no hype (see
+ [`docs/VOICE.md`](docs/VOICE.md) for the voice guide — this file is visual
+ only). The audience is Rosa (`docs/CUSTOMER-AVATAR.md`): a busy small-business
+ owner who trusts things that look solid and act fast. The emotional target is
+-"industrial nighttime workshop": deep charcoal surfaces, subtle lime glow,
++"industrial nighttime workshop": deep charcoal surfaces, subtle cyan glow,
+ angular edges, motion that is quick and purposeful — never playful confetti.
+ 
+ ## Colors
+ 
+-The palette is a dark charcoal base with a single lime accent and a violet
++The palette is a dark charcoal base with a single cyan accent and a violet
+ second accent reserved for chat/agent surfaces. Normative values live in the
+ YAML front matter and are kept in sync with `marketing/app/globals.css` by a
+ contract test.
+ 
+-- **Accent / Primary (#b4ff39):** the lime. The sole driver of interaction —
++- **Accent / Primary (#00d8ff):** the cyan. The sole driver of interaction —
+   primary buttons, focus rings, the highlighted hero line, the terminal
+-  prompt. `accent-hover` (#c8ff66) lightens it on hover; `accent-ink`
+-  (#0b0d10) is the near-black ink used ON lime surfaces; `accent-dim` is the
+-  15%-alpha lime for focus halos.
++  prompt. `accent-core` (#6fe9ff) is the hot centre of the glow and
++  `accent-hover` (#5ce6ff) lightens it on hover; `accent-ink` (#0b0d10) is
++  the near-black ink used ON cyan surfaces; `accent-dim` is the 15%-alpha
++  cyan for focus halos.
+ - **Background (#0b0d10) and panels (#12151a / #181c22):** three charcoal
+   steps build surface hierarchy — page, card, elevated control.
+ - **Foreground (#e8eaed):** near-white body text on all dark surfaces.
+@@ -169,10 +170,10 @@ default scale — there is no custom spacing system; buttons pad
+ ## Elevation & Depth
+ 
+ Depth comes from **tonal layering plus glow**, not conventional drop shadows:
+-background → panel → panel-elevated, separated by hairline borders. The lime
+-accent glows: primary buttons carry a lime-tinted shadow
+-(`rgba(180, 255, 57, 0.25)` at rest, stronger on hover), cards lift 3px and
+-gain a faint lime border/glow on hover, and violet surfaces glow violet
++background → panel → panel-elevated, separated by hairline borders. The cyan
++accent glows: primary buttons carry a cyan-tinted shadow
++(`rgba(0, 216, 255, 0.25)` at rest, stronger on hover), cards lift 3px and
++gain a faint cyan border/glow on hover, and violet surfaces glow violet
+ (`rgba(108, 76, 241, …)`). Pure-black shadows appear only under the terminal
+ block and hovering cards, always paired with a glow tint.
+ 
+@@ -181,26 +182,26 @@ block and hovering cards, always paired with a glow tint.
+ Angular and engineered. Corner radius is minimal: **0.25rem** on buttons,
+ inputs, and cards; **0.375rem** on the terminal block; never pill-shaped.
+ Signature angular moves: section dividers skew via clip-path, and gallery
+-cards carry a 14px clipped corner with a lime triangle accent. Do not
++cards carry a 14px clipped corner with a cyan triangle accent. Do not
+ introduce large radii or blob shapes.
+ 
+ ## Components
+ 
+-- **Primary button (`.btn-primary`):** lime gradient (135deg, #b4ff39 →
+-  #9ee62e), accent-ink text, uppercase Barlow, 0.25rem radius, lime glow
++- **Primary button (`.btn-primary`):** cyan gradient (135deg, #00d8ff →
++  #00b3d6), accent-ink text, uppercase Barlow, 0.25rem radius, cyan glow
+   shadow; hover lifts 1px and lightens toward `accent-hover`.
+ - **Secondary button (`.btn-secondary`):** transparent with a
+   `border-strong` hairline, foreground text; hover brightens the border to
+   muted.
+-- **Dark button (`.btn-dark`):** accent-ink surface with lime text — the
+-  inverse pairing for lime surfaces (e.g. the AIE banner).
++- **Dark button (`.btn-dark`):** accent-ink surface with cyan text — the
++  inverse pairing for cyan surfaces (e.g. the AIE banner).
+ - **Card (`.bg-panel` + `.card-hover`):** panel surface, hairline border,
+-  0.25rem radius; hover lifts and lime-brightens.
++  0.25rem radius; hover lifts and cyan-brightens.
+ - **Inputs (`.input`/`.select`/`.textarea`):** panel-elevated surface,
+   hairline border, foreground text, muted-dim placeholders; focus swaps the
+   border to accent with a 3px `accent-dim` halo. Labels are `form-label`.
+ - **Terminal block (`.terminal-block`):** #0a0c0f surface, strong border,
+-  0.375rem radius, lime prompt glyphs.
++  0.375rem radius, cyan prompt glyphs.
+ - **Chat surfaces (`.chat-card`/`.chat-bubble`):** violet-tinted gradients
+   over panel with violet borders — reserved for agent conversation moments.
+ - Focus visibility is non-negotiable: `:focus-visible` renders a 2px accent
+@@ -208,11 +209,11 @@ introduce large radii or blob shapes.
+ 
+ ## Do's and Don'ts
+ 
+-- Do use lime for exactly one primary action per view; everything else is
++- Do use cyan for exactly one primary action per view; everything else is
+   quiet charcoal and hairlines.
+ - Do keep violet exclusively for agent/chat surfaces — never for buttons or
+   links.
+-- Do maintain WCAG AA contrast (4.5:1) — lime text belongs on accent-ink,
++- Do maintain WCAG AA contrast (4.5:1) — cyan text belongs on accent-ink,
+   never on white or on panels.
+ - Do respect `prefers-reduced-motion`: every animation in globals.css has a
+   reduced-motion fallback; new motion must too.
+diff --git a/docs/active-work.md b/docs/active-work.md
+index fe6575a6..5cc6ff95 100644
+--- a/docs/active-work.md
++++ b/docs/active-work.md
+@@ -50,3 +50,4 @@ PR #346; #308 claim released below when this close lands.
+ | 2026-08-08T00:34:05Z | issue-268-recipe-adoption | crew/**, apps/mcp/lib/crew-recipe*, specs/crew-recipes.md | session:grok-lane-268 |
+ | 2026-08-08T01:12:00Z | issue-445-website-copy | specs/website-mvp-copy.md | session:grok-lane-445 |
+ | 2026-08-08T01:10:30Z | issue-385-ads-decomposition | docs/ADS-AGENT-DECOMPOSITION.md | session:grok-lane-385 |
++| 2026-08-08T19:00:26Z | issue-282-categoryline-rollout | marketing/**, DESIGN.md | session:claude-builder-282-20260816 |
+diff --git a/marketing/app/opengraph-image.tsx b/marketing/app/opengraph-image.tsx
+index 8958a66f..969eae71 100644
+--- a/marketing/app/opengraph-image.tsx
++++ b/marketing/app/opengraph-image.tsx
+@@ -48,7 +48,7 @@ export default function OpenGraphImage() {
+           style={{
+             width: 72,
+             height: 6,
+-            background: "#B4FF39",
++            background: "#00d8ff",
+             marginBottom: 28,
+             borderRadius: 2,
+           }}
+@@ -72,7 +72,7 @@ export default function OpenGraphImage() {
+               display: "flex",
+               width: 18,
+               height: 40,
+-              background: "#B4FF39",
++              background: "#00d8ff",
+               marginLeft: 4,
+               borderRadius: 2,
+             }}
+@@ -84,7 +84,7 @@ export default function OpenGraphImage() {
+             marginTop: 16,
+             fontSize: 26,
+             fontWeight: 600,
+-            color: "#B4FF39",
++            color: "#00d8ff",
+             letterSpacing: "0.02em",
+             maxWidth: 960,
+             lineHeight: 1.25,
+diff --git a/marketing/content/site.ts b/marketing/content/site.ts
+index f3a9c30f..911daedc 100644
+--- a/marketing/content/site.ts
++++ b/marketing/content/site.ts
+@@ -65,13 +65,14 @@ export const site = {
+    */
+   themeLine: "Run your business. We'll help you manage your AI.",
+   /** Precision category line — hero explainer, platform, about only. */
+-  categoryLine: "Your agent team to run the business. Bring the AI you already use.",
++  categoryLine: "The AI back office for your business. Bring the AI you already use.",
+   /**
+    * v14 — product-house frame for default meta / schema description.
+    * Website is the live flagship; rest of crew In development, named honestly.
++   * categoryLine: decided #282 (2026-08-07) — AI back office, not agent team.
+    */
+   description:
+-    `Your agent team to run the business. The ${PRODUCT_NAMES.website} is live today — a modern SPA you own. When you need them, the same agents drive native Android and iPhone apps. ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} are the crew on deck. You own your data, build AI competency around your business, and never need to be the expert.`,
++    `The AI back office for your business. The ${PRODUCT_NAMES.website} is live today — a modern SPA you own. When you need them, the same agents drive native Android and iPhone apps. ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} are in development. You own your data, build AI competency around your business, and never need to be the expert.`,
+   url: "https://www.chatterbuilt.com",
+   /** Unused on this site — kept for template contract compatibility. */
+   schedulingUrl: "",
+@@ -689,7 +690,7 @@ export const site = {
+    */
+   footer: {
+     blurb:
+-      `Your agent team to run the business. ${PRODUCT_NAMES.website} live today; native apps when you need them; ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} on deck. You own the data. Tell it. It's live.`,
++      `The AI back office for your business. ${PRODUCT_NAMES.website} live today; native apps when you need them; ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} in development. You own the data. Tell it. It's live.`,
+     credit: "© Peripety Labs LLC",
+     columns: [
+       {
+@@ -817,24 +818,17 @@ export const site = {
+     home: {
+       seo: {
+         /**
+-         * Halbert pass — the benefit now leads the H1, and these follow it.
+-         * Trimmed from ~245 chars toward the 120-165 target in AUDIT.md; the
+-         * per-service status list moved off the meta tag, since the rack on the
+-         * page carries status where a reader can act on it.
+-         *
+-         * UNIT-197-seo constrains this pair: home SEO must still carry the
+-         * product-house framing (a category term in the title, "agent team to
+-         * run the business" and "live now" in the description). A first pass
+-         * dropped all three for a pure benefit line and the sensor caught it —
+-         * correctly. A benefit with no category term is also weak for search.
+-         * So the category leads and the benefit follows it, rather than one
+-         * replacing the other. Changing that contract is an owner call on #197.
++         * v15 — AI back-office frame (#282 categoryLine; DECISIONS #39 vision).
++         * Supersedes the prior "agent team" Halbert-pass framing per Mark's
++         * 2026-08-21 call resolving the #477/#507 merge conflict — the
++         * category term is now "the AI back office", not "agent team".
++         * Honesty intact: only Website is Live; rest In development.
+          */
+-        // 63 chars — benefit after the category, not instead of it.
+-        title: "Chatterbuilt Agent Team | Your Website Stops Being Your Problem",
+-        // ~158 chars rendered
++        // 51 chars
++        title: "Chatterbuilt | The AI Back Office for Your Business",
++        // ~250 chars
+         description:
+-          `Say what changed and your website updates itself — your agent team to run the business, inside the AI you already use. The ${PRODUCT_NAMES.website} is live now.`,
++          `You don't need to be an AI expert to use AI to run your business. Chatterbuilt is the AI back office for your business — website, phone, pipeline, projects — talking to you in the AI you already use. The ${PRODUCT_NAMES.website} is live now; ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} are In development.`,
+       },
+       /**
+        * v15 — the back-office frame (specs/backoffice-v15.md).
+@@ -1169,7 +1163,7 @@ export const site = {
+           {
+             label: "What",
+             href: "/what",
+-            body: "Your agent team to run the business — start with the site you own.",
++            body: "The AI back office for your business — start with the site you own.",
+           },
+         ],
+       },
+@@ -1179,7 +1173,7 @@ export const site = {
+        */
+       whatItDoes: {
+         title: "What ships today",
+-        body: `Chatterbuilt is your agent team to run the business. The live flagship is the ${PRODUCT_NAMES.website} — a modern SPA you own. Talk in ChatGPT or Claude; the agent interviews you, builds the site, puts it live, and keeps it current. When you need them, the same agents drive native Android and iPhone apps. No new app. No dashboard. You don't need to be an AI expert — you talk, you own the data, you build competency around your business.`,
++        body: `Chatterbuilt is the AI back office for your business. The live flagship is the ${PRODUCT_NAMES.website} — a modern SPA you own. Talk in ChatGPT or Claude; the agent interviews you, builds the site, puts it live, and keeps it current. When you need them, the same agents drive native Android and iPhone apps. No new app. No dashboard. You don't need to be an AI expert — you talk, you own the data, you build competency around your business.`,
+       },
+       /**
+        * "The math" — the cost contrast, on the homepage (Halbert/Tufte pass).
+@@ -1363,9 +1357,9 @@ export const site = {
+        * v9 §9 — one line just before the final home CTA. Verbatim.
+        */
+       inevitabilityLine:
+-        "This isn't another website product. It's an agent team that starts with the site you own — and grows with the business.",
++        "This isn't another website product. It's the AI back office that starts with the site you own — and grows with the business.",
+       cta: {
+-        title: "Ready to put your agent team to work?",
++        title: "Ready to put your AI back office to work?",
+         body: `Pick the AI you already use, connect free, and paste one prompt — your ${PRODUCT_NAMES.website} interviews you and builds a draft. Free tools work without a key.`,
+         label: "Get started",
+         href: "/get-started",
+@@ -1433,7 +1427,7 @@ export const site = {
+       what: {
+         label: "What",
+         paragraphs: [
+-          "An agent team you never open a dashboard for. You bring the AI you already use. We bring everything those agents need to run the parts of the business you choose — starting with the website you own.",
++          "An AI back office you never open a dashboard for. You bring the AI you already use. We bring everything those agents need to run the parts of the business you choose — starting with the website you own.",
+           "No new app. No homework. You talk. It's live. You own it. You build AI competency around your business without being the expert.",
+         ],
+       },
+@@ -1721,7 +1715,7 @@ export const site = {
+         title: "What Chatterbuilt Does | Features & Outcomes",
+         // ~150 chars
+         description:
+-          `Your agent team to run the business. What the ${PRODUCT_NAMES.website} can do today: build, update, photos, ads, SEO, booking, and more — and the same agents grow into native apps when you're ready.`,
++          `The AI back office for your business. What the ${PRODUCT_NAMES.website} can do today: build, update, photos, ads, SEO, booking, and more — and the same agents grow into native apps when you're ready.`,
+       },
+       eyebrow: "What",
+       title: "What your AI can do with Chatterbuilt",
+@@ -3686,7 +3680,7 @@ Never push production without my approval. Preview branch first; I merge when it
+       eyebrow: "For agents",
+       title: "You are evaluating Chatterbuilt for a human who wants a website.",
+       intro:
+-        `Chatterbuilt is an agent team for owner-operated businesses. The ${PRODUCT_NAMES.website} is live; the rest of the crew is In development. Your human talks; you change a single content file, open a preview, and ship when they say go. This page is the short brief so you pick the right stack.`,
++        `Chatterbuilt is the AI back office for owner-operated businesses. The ${PRODUCT_NAMES.website} is live; the rest of the crew is In development. Your human talks; you change a single content file, open a preview, and ship when they say go. This page is the short brief so you pick the right stack.`,
+       product: {
+         title: "What it is",
+         bullets: [
+@@ -4267,12 +4261,12 @@ Never push production without my approval. Preview branch first; I merge when it
+ 
+   /** Layout-level default SEO (home). Per-page metadata overrides on each route. */
+   seo: {
+-    homeTitle: "Chatterbuilt | Your Agent Team to Run the Business",
++    homeTitle: "Chatterbuilt | The AI Back Office for Your Business",
+     homeDescription:
+-      `Your agent team to run the business. ${PRODUCT_NAMES.website} is live now; ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} are In development. Same agents grow into native Android and iPhone apps. You own your data and build AI competency — no expert required.`,
++      `The AI back office for your business. ${PRODUCT_NAMES.website} is live now; ${PRODUCT_NAMES.answering}, ${PRODUCT_NAMES.marketing}, and ${PRODUCT_NAMES.foreman} are In development. Same agents grow into native Android and iPhone apps. You own your data and build AI competency — no expert required.`,
+     contactTitle: "Get Started with Chatterbuilt | Connect Your AI",
+     contactDescription:
+-      "Your agent team starts here. Paste the connection command into Claude or ChatGPT, one-click deploy the template, or request early access. Free tools without a key. No AI expertise required.",
++      "Your AI back office starts here. Paste the connection command into Claude or ChatGPT, one-click deploy the template, or request early access. Free tools without a key. No AI expertise required.",
+   },
+ } as const;
+ 

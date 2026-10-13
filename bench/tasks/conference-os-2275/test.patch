@@ -1,0 +1,12 @@
+diff --git a/tests/unit/atai-site-chrome.test.ts b/tests/unit/atai-site-chrome.test.ts
+index 0aa03bdd1..87ebc9641 100644
+--- a/tests/unit/atai-site-chrome.test.ts
++++ b/tests/unit/atai-site-chrome.test.ts
+@@ -130,6 +130,7 @@ describe('All Things AI site chrome', () => {
+     ]);
+     expect(ATAI_HEADER_GROUPS[2].children.map((c) => c.label)).toEqual([
+       'Our Story',
++      'How We Dogfood AI',
+       'News',
+       'Advisory Board',
+       'The Industry',

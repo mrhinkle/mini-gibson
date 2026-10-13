@@ -1,0 +1,17 @@
+diff --git a/src/lib/public-sponsor-booth.ts b/src/lib/public-sponsor-booth.ts
+index 045e39c86..dfe42572d 100644
+--- a/src/lib/public-sponsor-booth.ts
++++ b/src/lib/public-sponsor-booth.ts
+@@ -207,10 +207,10 @@ export function toVideoEmbedUrl(url: string): string | null {
+   try {
+     const u = new URL(url);
+     if (u.hostname.includes("youtube.com") && u.searchParams.get("v")) {
+-      return `https://www.youtube.com/embed/${u.searchParams.get("v")}`;
++      return `https://www.youtube-nocookie.com/embed/${u.searchParams.get("v")}`;
+     }
+     if (u.hostname === "youtu.be") {
+-      return `https://www.youtube.com/embed${u.pathname}`;
++      return `https://www.youtube-nocookie.com/embed${u.pathname}`;
+     }
+     if (u.hostname.includes("vimeo.com")) {
+       return `https://player.vimeo.com/video${u.pathname}`;

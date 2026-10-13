@@ -1,0 +1,100 @@
+diff --git a/src/app/(public)/events/[eventSlug]/schedule/page.tsx b/src/app/(public)/events/[eventSlug]/schedule/page.tsx
+index 60d62bdb8..3994225af 100644
+--- a/src/app/(public)/events/[eventSlug]/schedule/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/schedule/page.tsx
+@@ -40,6 +40,7 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
+     where: { slug: eventSlug },
+     include: {
+       tracks: {
++        select: { id: true, name: true, color: true, marketingDescription: true },
+         where: {
+           sessions: {
+             some: { isPublished: true },
+@@ -115,6 +116,7 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
+         id: track.id,
+         name: track.name,
+         color: track.color,
++        marketingDescription: track.marketingDescription?.trim() || null,
+       }))}
+       sessions={publicSessions.map((session) => ({
+         id: session.id,
+diff --git a/src/app/(public)/events/[eventSlug]/schedule/schedule-client.tsx b/src/app/(public)/events/[eventSlug]/schedule/schedule-client.tsx
+index 16eda59e9..f79ea88f0 100644
+--- a/src/app/(public)/events/[eventSlug]/schedule/schedule-client.tsx
++++ b/src/app/(public)/events/[eventSlug]/schedule/schedule-client.tsx
+@@ -20,6 +20,7 @@ import {
+   type ScheduleSessionDetail,
+ } from './session-detail';
+ import { ScheduleBoardView } from './schedule-board-view';
++import { ScheduleTrackGuide } from './schedule-track-guide';
+ 
+ /** Stable deep-link targets for #session-* / #day-* (speaker cards, breadcrumbs).
+  *  Grid view only mounts the active day, so ids must live outside the day filter. */
+@@ -54,6 +55,7 @@ interface Track {
+   id: string;
+   name: string;
+   color: string | null;
++  marketingDescription?: string | null;
+ }
+ 
+ interface SessionItem extends ScheduleSessionDetail {
+@@ -647,6 +649,8 @@ export default function ScheduleClient({
+           </div>
+         )}
+ 
++        <ScheduleTrackGuide tracks={tracks} selectedTrackId={selectedTrackId} />
++
+         {isBroadside ? (
+           <TimelineScheduleView
+             eventSlug={eventSlug}
+diff --git a/src/app/(public)/events/[eventSlug]/schedule/schedule-track-guide.tsx b/src/app/(public)/events/[eventSlug]/schedule/schedule-track-guide.tsx
+new file mode 100644
+index 000000000..1065076b6
+--- /dev/null
++++ b/src/app/(public)/events/[eventSlug]/schedule/schedule-track-guide.tsx
+@@ -0,0 +1,45 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++interface ScheduleTrackGuideProps {
++  tracks: Array<{
++    id: string;
++    name: string;
++    /** Public presentation copy; organizer descriptions must not be passed here. */
++    marketingDescription?: string | null;
++  }>;
++  selectedTrackId: string | null;
++}
++
++export function ScheduleTrackGuide({ tracks, selectedTrackId }: ScheduleTrackGuideProps) {
++  const describedTracks = tracks.flatMap((track) => {
++    const description = track.marketingDescription?.trim();
++    if (!description || (selectedTrackId !== null && track.id !== selectedTrackId)) {
++      return [];
++    }
++    return [{ id: track.id, name: track.name, description }];
++  });
++
++  if (describedTracks.length === 0) return null;
++
++  return (
++    <details open className="mb-8 rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
++      <summary className="cursor-pointer rounded-sm text-base font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nebula-500 focus-visible:ring-offset-4">
++        About the tracks
++      </summary>
++      <dl className="mt-5 grid gap-x-8 gap-y-6 md:grid-cols-2">
++        {describedTracks.map((track) => (
++          <div key={track.id} className="min-w-0">
++            <dt className="break-words font-semibold text-gray-900">{track.name}</dt>
++            <dd className="mt-1.5 whitespace-pre-line break-words text-sm leading-relaxed text-gray-600">
++              {track.description}
++            </dd>
++          </div>
++        ))}
++      </dl>
++    </details>
++  );
++}

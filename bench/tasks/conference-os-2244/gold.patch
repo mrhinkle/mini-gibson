@@ -1,0 +1,75 @@
+diff --git a/src/lib/atai-site-chrome.ts b/src/lib/atai-site-chrome.ts
+index c12f3980f..71f016f40 100644
+--- a/src/lib/atai-site-chrome.ts
++++ b/src/lib/atai-site-chrome.ts
+@@ -25,6 +25,8 @@ export const ATAI_CONTACT_URL = `${ATAI_SITE_URL}/contact`;
+ export const ATAI_NEWS_HREF = `${ATAI_SITE_URL}/newsletter`;
+ /** shared/site-facts.json conference2027.eventPageUrl, as a local route. */
+ export const ATAI_2027_EVENT_HREF = '/events/all-things-ai-2027';
++/** The 2027 save-the-date page this site owns (allthingsai.org links /#save-the-date). */
++export const ATAI_2027_SAVE_THE_DATE_HREF = `${ATAI_2027_EVENT_HREF}/save-the-date`;
+ 
+ export type AtaiChromeLink = {
+   label: string;
+@@ -39,19 +41,25 @@ const site = (path: string) => `${ATAI_SITE_URL}${path}`;
+ 
+ /**
+  * Header menus, in allthingsai.org order: Events, Get Involved, About.
+- * #2217: verified against the live site 2026-10-10 — re-check there, not
+- * here, before trusting this list again.
++ * Menus per Mark's 2026-10-11 spec (applied to allthingsai.org `staging` the
++ * same day): Events = Overview, Why Attend, Save the Date, Executive AI Summit,
++ * Meetups, Build an Agent Day, All Events; Get Involved drops The Arcade;
++ * About drops How We Dogfood AI. Re-check allthingsai.org before trusting this.
+  */
+ export const ATAI_HEADER_GROUPS: readonly AtaiChromeGroup[] = [
+   {
+     label: 'Events',
+     children: [
+-      { label: 'All Things AI 2027', href: ATAI_2027_EVENT_HREF },
+       { label: 'Overview', href: site('/events') },
++      { label: 'Why Attend', href: site('/why-attend') },
++      // allthingsai.org links its homepage save-the-date band; this site owns
++      // the 2027 save-the-date page, so the local route is used here.
++      { label: 'Save the Date for ATAI 2027', href: ATAI_2027_SAVE_THE_DATE_HREF },
++      { label: 'Executive AI Summit', href: site('/executive-summit') },
+       { label: 'Meetups', href: site('/meetups') },
+-      { label: '2026 Talks', href: site('/sessions') },
+-      // allthingsai.org's "Events website" link: this site's calendar.
+-      { label: 'Upcoming events', href: '/' },
++      { label: 'Build an Agent Day', href: site('/build-an-agent-day') },
++      // allthingsai.org's "All Events" link: this site's upcoming-events index.
++      { label: 'All Events', href: '/' },
+     ],
+   },
+   {
+@@ -59,6 +67,7 @@ export const ATAI_HEADER_GROUPS: readonly AtaiChromeGroup[] = [
+     children: [
+       { label: 'Speak', href: site('/speak') },
+       { label: 'Sponsor', href: site('/sponsors') },
++      { label: 'Scholarships', href: site('/ai-scholarships') },
+       { label: 'Partner With Us', href: site('/partners') },
+     ],
+   },
+@@ -66,6 +75,9 @@ export const ATAI_HEADER_GROUPS: readonly AtaiChromeGroup[] = [
+     label: 'About',
+     children: [
+       { label: 'Our Story', href: site('/about') },
++      { label: 'News', href: ATAI_NEWS_HREF },
++      { label: 'Advisory Board', href: site('/advisory-board') },
++      { label: 'The Industry', href: site('/ai-industry') },
+       { label: 'AI Skills for Work', href: site('/ai-fluency') },
+       { label: 'Build the AI Future', href: site('/build-the-ai-future') },
+       { label: 'Why the Triangle?', href: site('/why-the-triangle') },
+@@ -80,8 +92,9 @@ export const ATAI_FOOTER_COLUMNS: readonly AtaiChromeGroup[] = [
+     children: [
+       { label: 'All Things AI 2027', href: site('/conference') },
+       { label: '2027 event page', href: ATAI_2027_EVENT_HREF },
+-      { label: '2026 Conference', href: site('/2026') },
+-      { label: '2025 Conference', href: site('/2025') },
++      // Mark, 2026-10-11: the year archives live on this site now.
++      { label: '2026 Conference', href: '/events/all-things-ai-2026' },
++      { label: '2025 Conference', href: '/events/all-things-open-ai-2025' },
+     ],
+   },
+   {

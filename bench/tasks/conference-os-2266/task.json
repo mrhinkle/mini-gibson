@@ -1,0 +1,54 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2266",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2266,
+  "base_sha": "bb62f8f7e9f39b0d05fb1e1a00822e3e73348401",
+  "merge_sha": "22a8fe3e0bc9ae4988626dc74dfb3921512d44ea",
+  "issue_number": 2258,
+  "issue_title": "Public speaker pages and directory: derive speakers from SessionSpeaker rows, not only Session.speakerName",
+  "problem_statement": "Public speaker pages and directory: derive speakers from SessionSpeaker rows, not only Session.speakerName\n\n## Context\n`src/lib/public-speaker-session.ts` (`findPublicEventSpeaker`) and the event speakers directory (`src/app/(public)/events/[eventSlug]/speakers/page.tsx`) resolve and list speakers only from the legacy flat field `Session.speakerName` (key = `slugify(speakerName)`). The per-person `SessionSpeaker` rows that the importers and the organizer UI write are ignored on the public side.\n\nConsequence, verified on events.allthingsai.org 2026-10-12: a two-speaker session whose `speakerName` is \"Achin Gupta & Divya Mahajan\" produces ONE speaker page at `/speakers/achin-gupta-divya-mahajan` and neither person has a page; the directory shows the pair as one card. Across the 2026 archive this is why 31 of 83 speakers return 404 even though their sessions exist. Same shape for any multi-speaker session on any tenant.\n\nMark's ask (2026-10-12): migrate the 2025 and 2026 speakers to the events site. The ATA data lane (The-AIE/ata-events-site#15) can rewrite the sessions with one `SessionSpeaker` row per person, but it cannot make the public pages show them until this lands.\n\n## Acceptance criteria\n\n## Affected area & files\n\n## Out of scope\n\nNot Tier C: public read path, no money, consent, auth or schema.",
+  "split": "external_holdout",
+  "runner": "vitest",
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-speaker-rows.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-speaker-rows.test.ts::event speaker directory (#2258) drops an out-of-window session and a draft schedule",
+      "tests/unit/public-speaker-rows.test.ts::event speaker directory (#2258) shows one card for a flat-name session and keeps the CFP title",
+      "tests/unit/public-speaker-rows.test.ts::event speaker directory (#2258) shows the linked profile for a row account and snapshots when the name has two accounts",
+      "tests/unit/public-speaker-rows.test.ts::event speaker directory (#2258) splits a two-row session into two cards and keeps one card for a repeated person",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) by session id, a later unlinked appearance shows its own fields, not the earliest appearance",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) by session id, an unlinked row does not borrow a same-name peer's account",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) lists both talks for one person, earliest start first",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) omits unpublished sessions, a draft schedule, break sessions, and out-of-window sessions",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) prefers row fields and falls back to flat speaker fields when the row field is null",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) resolves a flat-name session with no rows from the session fields",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) resolves a two-row session id to the first row by displayOrder",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) resolves each row and does not resolve the joined speakerName slug",
+      "tests/unit/public-speaker-rows.test.ts::public speaker resolution (#2258) uses a row's linked account, and shows snapshots when one name has two accounts",
+      "tests/unit/public-speaker-rows.test.ts::speaker people (#2258) keeps CFP title and organization on a flat directory card",
+      "tests/unit/public-speaker-rows.test.ts::speaker people (#2258) keeps one person when the row and the flat name are the same",
+      "tests/unit/public-speaker-rows.test.ts::speaker people (#2258) orders rows by displayOrder and drops a repeated name and the joined flat name",
+      "tests/unit/public-speaker-rows.test.ts::speaker people (#2258) uses the flat name only when the session has no named rows"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-speaker-rows.test.ts"
+    ],
+    "test_ids": []
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}
