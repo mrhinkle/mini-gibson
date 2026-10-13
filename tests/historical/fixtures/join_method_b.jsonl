@@ -1,0 +1,11 @@
+{"type": "user", "content": [{"type": "text", "text": "<user_query>\nFix issue #55 in the lane. Do not treat this hash as the join.\n</user_query>"}]}
+{"type": "assistant", "tool_calls": [{"id": "c1", "name": "run_terminal_command", "arguments": "{\"command\": \"git commit -m 'Fix the gate'\"}"}]}
+{"type": "tool_result", "tool_call_id": "c1", "content": "exit: 0\n[feat/gate deadbeef1] Fix the gate\n 1 file changed, 4 insertions(+)\n"}
+{"type": "assistant", "tool_calls": [{"id": "c2", "name": "run_terminal_command", "arguments": "{\"command\": \"git rev-parse HEAD\"}"}]}
+{"type": "tool_result", "tool_call_id": "c2", "content": "aaaabbbbccccddddeeeeffff0000111122223333\n"}
+{"type": "assistant", "tool_calls": [{"id": "c3", "name": "run_terminal_command", "arguments": "{\"command\": \"git rev-parse origin/main\"}"}]}
+{"type": "tool_result", "tool_call_id": "c3", "content": "ffffffffffffffffffffffffffffffffffffffff\n"}
+{"type": "assistant", "tool_calls": [{"id": "c4", "name": "run_terminal_command", "arguments": "{\"command\": \"git show --stat ffffffffffffffffffffffffffffffffffffffff\"}"}]}
+{"type": "tool_result", "tool_call_id": "c4", "content": "commit eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\n"}
+{"type": "assistant", "tool_calls": [{"id": "c5", "name": "run_terminal_command", "arguments": "{\"command\": \"git log -1 --format=%H\"}"}]}
+{"type": "tool_result", "tool_call_id": "c5", "content": "1111111111111111111111111111111111111111\n"}
