@@ -300,8 +300,41 @@ class ParseTests(unittest.TestCase):
                 "type": "function",
                 "function": {"name": "edit_file", "arguments": "{\"path\":\"a.ts\"}"},
             }],
+        }, {
+            "role": "tool",
+            "tool_call_id": "1",
+            "content": "The file a.ts has been updated successfully.",
         }]
-        self.assertEqual(classify_session_role(write, "read-only"), "builder")
+        # A read-only reviewer who attempted an edit is not a builder.
+        self.assertEqual(classify_session_role(write, "read-only"), "reviewer")
+        writable = [{
+            "role": "user",
+            "content": "<user_query>\nImplement the gate.\n</user_query>",
+        }, write[1], write[2]]
+        self.assertEqual(classify_session_role(writable, "workspace-write"), "builder")
+        failed = [{
+            "role": "user",
+            "content": "<user_query>\nImplement the gate.\n</user_query>",
+        }, write[1], {
+            "role": "tool",
+            "tool_call_id": "1",
+            "content": "<tool_use_error>String to replace not found in file.</tool_use_error>",
+        }]
+        self.assertEqual(classify_session_role(failed, None), "other")
+        unchanged = [{
+            "role": "user",
+            "content": "<user_query>\nImplement the gate.\n</user_query>",
+        }, write[1], {
+            "role": "tool",
+            "tool_call_id": "1",
+            "content": "Old string and new string are the same",
+        }]
+        self.assertEqual(classify_session_role(unchanged, "workspace-write"), "other")
+        flagged = [{
+            "role": "user",
+            "content": "<user_query>\ncodex exec -s read-only\nReview the diff.\n</user_query>",
+        }, write[1], write[2]]
+        self.assertEqual(classify_session_role(flagged, None), "reviewer")
 
         commit = [{
             "role": "assistant",
@@ -316,6 +349,7 @@ class ParseTests(unittest.TestCase):
             }],
         }]
         self.assertEqual(classify_session_role(commit, None), "builder")
+        self.assertEqual(classify_session_role(commit, "read-only"), "reviewer")
 
         mention = [{
             "role": "assistant",
@@ -344,8 +378,18 @@ class ParseTests(unittest.TestCase):
                     }),
                 },
             }],
+        }, {
+            "role": "tool",
+            "tool_call_id": "1",
+            "content": "Success. Updated the following files:\nM a.ts\n[exit_code=0]",
         }]
         self.assertEqual(classify_session_role(patch, "workspace-write"), "builder")
+        patch_failed = [patch[0], {
+            "role": "tool",
+            "tool_call_id": "1",
+            "content": "apply_patch verification failed: context mismatch\n[exit_code=1]",
+        }]
+        self.assertEqual(classify_session_role(patch_failed, "workspace-write"), "other")
 
         readonly = [{
             "role": "assistant",

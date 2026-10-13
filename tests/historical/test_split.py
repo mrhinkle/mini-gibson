@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 from training.historical.extract import (  # noqa: E402
     apply_splits,
     assert_holdout_disjoint,
+    expand_holdout_by_issue,
     sample_training_episodes,
 )
 
@@ -80,6 +81,52 @@ class SplitTests(unittest.TestCase):
         record = {"episode_id": "same-w00", "repo": "the-gibson", "pr": 7}
         with self.assertRaises(AssertionError):
             assert_holdout_disjoint([shared], [shared], [record], [record])
+
+    def test_overlap_assertion_fires_on_shared_issue(self):
+        held = _episode("late", "conference-os", 100, 20, 10)
+        trained = _episode("early", "conference-os", 101, 1, 10)
+        held["issues"] = [55]
+        trained["issues"] = [55]
+        hold_rec = {"episode_id": "late-w00", "repo": "conference-os", "pr": 100, "issue": 55}
+        train_rec = {"episode_id": "early-w00", "repo": "conference-os", "pr": 101, "issue": 55}
+        with self.assertRaises(AssertionError):
+            assert_holdout_disjoint([trained], [held], [train_rec], [hold_rec])
+
+    def test_shared_issue_with_a_held_out_pr_is_not_in_train(self):
+        """PR 100 closes issue 55 and is the latest PR. PR 101 closes the same issue and must not train."""
+        metas = [
+            _episode("late", "conference-os", 100, 20, 10),
+            _episode("early", "conference-os", 101, 1, 10),
+            _episode("other", "the-gibson", 7, 10, 10),
+        ]
+        metas[0]["issues"] = [55]
+        metas[1]["issues"] = [55]
+        metas[2]["issues"] = [7]
+        records = [
+            {
+                "episode_id": meta["episode_id"],
+                "repo": meta["repo"],
+                "pr": meta["pr"],
+                "issue": meta["issues"][0],
+            }
+            for meta in metas
+        ]
+        dated = {("conference-os", 100)}
+        full, extra = expand_holdout_by_issue(dated, metas)
+        self.assertIn(("conference-os", 101), full)
+        self.assertEqual(extra, {("conference-os", 101)})
+        stats: dict = {}
+        train, hold = apply_splits(records, metas, stats, seed=414, cap=10_000, fraction=0.15)
+        train_prs = {row["pr"] for row in train}
+        hold_prs = {row["pr"] for row in hold}
+        self.assertIn(100, hold_prs)
+        self.assertIn(101, hold_prs)
+        self.assertNotIn(101, train_prs)
+        self.assertNotIn(100, train_prs)
+        self.assertIn(7, train_prs)
+        self.assertEqual(stats["overlap_issues"], 0)
+        self.assertGreaterEqual(stats["holdout_lineage_prs"], 1)
+        self.assertEqual(stats["holdout_cutoff"], "2026-01-20T00:00:00Z")
 
 
 if __name__ == "__main__":

@@ -111,15 +111,68 @@ class RedactTests(unittest.TestCase):
             self.assertNotIn("s3cret-value", json.dumps(cleaned))
             self.assertIn("<redacted>", json.dumps(cleaned))
 
-    def test_truncated_placeholder_is_not_a_residual(self):
-        clipped = {"messages": [{"role": "tool", "content": "OPENAI_API_KEY=<redac"}]}
-        kept, hits = drop_if_residual(clipped)
-        self.assertIsNotNone(kept)
-        self.assertEqual(hits, [])
+    def test_truncated_secret_prefix_is_dropped(self):
+        """Eight or more characters of a known secret shape is residual, even when the token was cut."""
+        samples = (
+            "ghp_FAKEFA",
+            "github_pat_short",
+            "AKIA1234ABCD",
+            "Bearer abcdefgh",
+            "sk-ant-abcdef",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertGreaterEqual(len(sample.replace("Bearer ", "")), 8)
+                self.assertTrue(residual_names(sample), sample)
+                kept, hits = drop_if_residual({"messages": [{"role": "tool", "content": sample}]})
+                self.assertIsNone(kept)
+                self.assertTrue(hits)
+                cleaned, redacted_hits = redact_record({"messages": [{"role": "tool", "content": sample}]})
+                self.assertEqual(redacted_hits, [])
+                blob = json.dumps(cleaned)
+                self.assertNotIn("ghp_", blob)
+                self.assertNotIn("github_pat_", blob)
+                self.assertNotIn("AKIA", blob)
+                self.assertNotIn("sk-ant-", blob)
+                self.assertNotRegex(blob, r"Bearer\s+[A-Za-z0-9]{8,}")
         real = {"messages": [{"role": "tool", "content": "OPENAI_API_KEY=supersecretvalue"}]}
         cleaned, real_hits = redact_record(real)
         self.assertEqual(real_hits, [])
         self.assertNotIn("supersecretvalue", json.dumps(cleaned))
+
+    def test_secret_split_across_messages_is_redacted(self):
+        """A secret, email, or bearer token broken across two strings is one match on the join."""
+        ghp_body = "FAKEFAKEFAKEFAKEFAKEFAKE"
+        cases = (
+            ("ghp_", ghp_body, "ghp_"),
+            ("see alice@", "example.com later", "example.com"),
+            ("use Bearer ", "abcdefghijklmnopqrstuvwxyz now", "abcdefghijklmnopqrstuvwxyz"),
+        )
+        for left, right, leaked in cases:
+            with self.subTest(leaked=leaked[:12]):
+                record = {
+                    "messages": [
+                        {"role": "assistant", "content": left},
+                        {"role": "tool", "tool_call_id": "t", "content": right},
+                    ]
+                }
+                raw_join = left + right
+                self.assertTrue(residual_names(raw_join))
+                poisoned, poison_hits = drop_if_residual(record)
+                self.assertIsNone(poisoned)
+                self.assertTrue(poison_hits)
+                cleaned, hits = redact_record(record)
+                self.assertEqual(hits, [])
+                joined = "".join(message["content"] for message in cleaned["messages"])
+                self.assertNotIn(leaked, joined)
+                self.assertEqual(residual_names(joined), [])
+                self.assertEqual(residual_json_text(json.dumps(cleaned)), [])
+                if leaked == "example.com":
+                    self.assertIn("<email>", joined)
+                    self.assertIn("later", cleaned["messages"][1]["content"])
+                if leaked == ghp_body:
+                    self.assertIn("<redacted-key>", joined)
+                    self.assertNotIn(ghp_body, joined)
 
     def test_redact_text_is_idempotent(self):
         sample = "mail ada@example.com host MacBook-Pro-4 path /Users/mrhinkle/Code Bearer fakefakefakefake12"
@@ -157,8 +210,8 @@ class RedactTests(unittest.TestCase):
     def test_username_is_a_substring_and_session_paths_collapse(self):
         """Shapes the word-boundary scan kept: tokens, encoded paths, bare /Users/."""
         samples = {
-            "/tmp/claude-501/-Users-mrhinkle-Claude-Cowork/cbed6935-e2c1-4eb9-822f-657ac9a42641": "<tmp>",
-            "/private/tmp/claude-501/-Users-markhinkle-Claude-Cowork/abc/scratchpad/hero.png": "<tmp>",
+            "/tmp/claude-501/-Users-mrhinkle-Claude-Cowork/cbed6935-e2c1-4eb9-822f-657ac9a42641": "<abs>/\u2026",
+            "/private/tmp/claude-501/-Users-markhinkle-Claude-Cowork/abc/scratchpad/hero.png": "<abs>/\u2026",
             "unsigned, and mrhinkle-authored agent commits": "<user>-authored",
             "neuro-mancer-broker-mrhinkle": "neuro-mancer-broker-<user>",
             "mrhinkle_cnsvs-network/\nmrhinkle_cortex/": "<user>_cnsvs-network/",
@@ -226,6 +279,51 @@ class RedactTests(unittest.TestCase):
                     self.assertIn("<user>_cnsvs-network/", body)
                 self.assertNotIn("mrhinkle", json.dumps(cleaned).lower())
                 self.assertNotIn("markhinkle", json.dumps(cleaned).lower())
+
+    def test_host_absolute_paths_keep_repo_relative(self):
+        samples = (
+            "cwd=/var/folders/zz/secret-user/project",
+            "disk=/Volumes/Secret/proj",
+            "bin=/opt/homebrew/bin/python",
+            "cellar=/usr/local/lib/x",
+            "tmp=/tmp/abc/def",
+            "pt=/private/tmp/abc",
+            "pv=/private/var/folders/xx/yy",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample[:24]):
+                cleaned = redact_text(sample)
+                self.assertNotIn("/var/folders", cleaned)
+                self.assertNotIn("/Volumes", cleaned)
+                self.assertNotIn("/opt/homebrew", cleaned)
+                self.assertNotIn("/usr/local", cleaned)
+                self.assertNotIn("/private/tmp", cleaned)
+                self.assertNotIn("/private/var", cleaned)
+                self.assertNotIn("/tmp/", cleaned)
+                self.assertIn("<abs>/\u2026", cleaned)
+                self.assertEqual(residual_names(cleaned), [])
+                self.assertEqual(redact_text(cleaned), cleaned)
+        relative = redact_text("src/tmp/file.py and ./notes/var/folders/readme and ./tmp/out.bin")
+        self.assertIn("src/tmp/file.py", relative)
+        self.assertIn("./notes/var/folders/readme", relative)
+        self.assertIn("./tmp/out.bin", relative)
+        self.assertNotIn("<abs>", relative)
+        glued = (
+            "at ../../../../var/folders/tw/abc/T/tmp.x:1 "
+            "file:///private/tmp/gibson-review/eval "
+            "ls -la /Volumes 2>/dev/null "
+            "diskutil info /System/Volumes/Data "
+            "n/Volumes/Mac "
+            "true\\n/opt/homebrew/bin/git "
+            "/usr/local/bin/git "
+            "/private/var/db "
+        )
+        cleaned = redact_text(glued)
+        for needle in ("/var/folders", "/Volumes", "/opt/homebrew", "/usr/local", "/private/tmp", "/private/var"):
+            self.assertNotIn(needle, cleaned)
+        self.assertIn("<abs>/\u2026", cleaned)
+        self.assertEqual(residual_names(cleaned), [])
+        self.assertEqual(redact_text(cleaned), cleaned)
 
 
 if __name__ == "__main__":

@@ -497,17 +497,34 @@ def tally_join(csv_path: Path) -> dict:
     return {"methods": methods, "reasons": reasons}
 
 
-def issue_number(row: dict, pr: dict | None) -> int | None:
+def linked_issue_numbers(row: dict, pr: dict | None) -> list[int]:
+    """Closing issues plus the worktree or prompt issue. Order preserved, duplicates dropped."""
+    found: list[int] = []
+    repo = row.get("repo") or ""
     for ref in (pr or {}).get("closingIssuesReferences") or []:
-        if not isinstance(ref, dict):
+        if not isinstance(ref, dict) or not isinstance(ref.get("number"), int):
             continue
-        repo_name = ((ref.get("repository") or {}).get("name"))
-        number = ref.get("number")
-        if isinstance(number, int) and (not repo_name or repo_name == row.get("repo")):
-            return number
-    raw = (row.get("issue") or "").strip()
+        repo_name = ((ref.get("repository") or {}).get("name")) or ""
+        if repo_name and repo_name != repo:
+            continue
+        found.append(ref["number"])
+    raw = str(row.get("issue") or "").strip()
     if raw.isdigit():
-        return int(raw)
+        found.append(int(raw))
+    seen: set[int] = set()
+    unique: list[int] = []
+    for number in found:
+        if number in seen:
+            continue
+        seen.add(number)
+        unique.append(number)
+    return unique
+
+
+def issue_number(row: dict, pr: dict | None) -> int | None:
+    numbers = linked_issue_numbers(row, pr)
+    if numbers:
+        return numbers[0]
     return None
 
 
@@ -669,6 +686,37 @@ _REVIEW_TIE = re.compile(
     r"|you are reviewing a spec|perform a bounded read-only|read-only release-readiness",
     re.IGNORECASE,
 )
+# Launch flags and reviewer prompts that mean the session cannot write.
+# `-s read-only` is the Codex flag. The sandbox_policy line is checked separately.
+_READ_ONLY_LAUNCH = re.compile(
+    r"(?i)(?:^|[\s\"'`])-s[ \t]+read-only\b"
+    r"|\bsandbox(?:_mode|_policy)?\b[^\n]{0,48}\bread-only\b"
+    r"|\bperform a bounded read-only\b"
+    r"|\bread-only release-readiness\b"
+    r"|\bthis is a read-only\b"
+    r"|\bread-only review\b"
+)
+_EDIT_OK = re.compile(
+    r"(?i)(?:has been (?:updated|created|written)(?: successfully)?"
+    r"|wrote file successfully"
+    r"|updated the following files"
+    r"|applied patch successfully"
+    r"|success(?:fully)?\.\s+updated)"
+)
+_EDIT_BAD = re.compile(
+    r"(?i)(?:tool_use_error"
+    r"|string to replace (?:was )?not found"
+    r"|old string and new string are the same"
+    r"|found multiple times"
+    r"|no changes?(?: were)? made"
+    r"|did not change"
+    r"|file has not been read"
+    r"|permission denied"
+    r"|operation not permitted"
+    r"|read-only file system"
+    r"|apply_patch verification failed"
+    r"|rejected)"
+)
 _VERDICT = re.compile(
     r"(?im)^[ \t]*(?:#{1,3}[ \t]*)?VERDICT[ \t]*:[ \t]*([A-Z][A-Z0-9_ -]{1,40})"
 )
@@ -709,7 +757,11 @@ def invokes_git_commit(arguments: str) -> bool:
 
 
 def call_writes_repo(name: str, arguments: str) -> bool:
-    """True when this tool call edits the repo. Reads and searches do not."""
+    """True when this tool call is an edit or a write. Reads and searches do not.
+
+    The call is builder evidence only when edit_result_succeeded says the
+    tool result shows the file changed. A bare call is not enough.
+    """
     if name in {"edit_file", "write_file"}:
         return True
     text = arguments or ""
@@ -718,6 +770,60 @@ def call_writes_repo(name: str, arguments: str) -> bool:
     if "tools.apply_patch" in text:
         return True
     return False
+
+
+def _tool_result_text(messages: list[dict], call_id: str) -> str | None:
+    if not call_id:
+        return None
+    for message in messages:
+        if message.get("role") == "tool" and message.get("tool_call_id") == call_id:
+            return str(message.get("content") or "")
+    return None
+
+
+def edit_result_succeeded(result: str | None) -> bool:
+    """True when the tool result shows the edit landed and the file changed."""
+    if result is None:
+        return False
+    text = result.strip()
+    if not text:
+        return False
+    if re.search(r"(?im)^exit:\s*[1-9]\d*\b", text):
+        return False
+    if re.search(r"\[exit_code=([1-9]\d*)\]", text):
+        return False
+    failed = _EDIT_BAD.search(text) is not None
+    succeeded = _EDIT_OK.search(text) is not None
+    if failed and not succeeded:
+        return False
+    if failed and succeeded:
+        return False
+    if succeeded:
+        return True
+    stripped = text.lstrip()
+    if stripped[:1] in "{[":
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, list) and any(
+            isinstance(item, dict) and (item.get("path") or item.get("file")) for item in obj
+        ):
+            return True
+        if isinstance(obj, dict):
+            changes = obj.get("changes")
+            if isinstance(changes, list) and changes:
+                return True
+    if "*** Update File" in text or "*** Add File" in text:
+        return True
+    return False
+
+
+def session_requests_read_only(messages: list[dict], sandbox: str | None) -> bool:
+    """True for a read-only sandbox, `-s read-only`, or a read-only reviewer prompt."""
+    if sandbox == "read-only":
+        return True
+    return _READ_ONLY_LAUNCH.search(_review_query_text(messages)) is not None
 
 
 def _review_query_text(messages: list[dict]) -> str:
@@ -756,21 +862,31 @@ def recorded_verdict(messages: list[dict]) -> str:
 
 
 def classify_session_role(messages: list[dict], sandbox: str | None) -> str:
-    """builder, reviewer, or other. Tool calls decide. Keywords only break a tie."""
+    """builder, reviewer, or other.
+
+    An edit or write counts only when its tool result shows the file changed.
+    A session launched read-only (`-s read-only`, a read-only sandbox, or a
+    reviewer prompt that says read-only) is never a builder. git commit still
+    counts when the session was allowed to write.
+    """
+    read_only = session_requests_read_only(messages, sandbox)
     wrote = False
     committed = False
-    for message in messages:
-        for call in message.get("tool_calls") or []:
-            fn = call.get("function") or {}
-            name = str(fn.get("name") or "")
-            args = str(fn.get("arguments") or "")
-            if call_writes_repo(name, args):
-                wrote = True
-            if invokes_git_commit(args):
-                committed = True
+    if not read_only:
+        for message in messages:
+            for call in message.get("tool_calls") or []:
+                fn = call.get("function") or {}
+                name = str(fn.get("name") or "")
+                args = str(fn.get("arguments") or "")
+                if call_writes_repo(name, args) and edit_result_succeeded(
+                    _tool_result_text(messages, str(call.get("id") or ""))
+                ):
+                    wrote = True
+                if invokes_git_commit(args):
+                    committed = True
     if wrote or committed:
         return "builder"
-    if sandbox == "read-only":
+    if read_only:
         return "reviewer"
     if _REVIEW_TIE.search(_review_query_text(messages)):
         return "reviewer"
@@ -1091,6 +1207,7 @@ def _empty_stats() -> dict:
         "no_chat_history": 0,
         "empty": 0,
         "residual_secret": 0,
+        "windows_residual_dropped": 0,
         "schema_invalid": 0,
         "over_context": 0,
         "pr_metadata_missing": 0,
@@ -1120,6 +1237,8 @@ def _empty_stats() -> dict:
         "holdout_cutoff": "",
         "builder_prs": 0,
         "holdout_prs": 0,
+        "holdout_lineage_prs": 0,
+        "overlap_issues": 0,
         "holdout_episodes": 0,
         "holdout_windows": 0,
         "holdout_tokens": 0,
@@ -1293,6 +1412,7 @@ def convert_row(row: dict, pr: dict | None, stats: dict, schema: dict, max_tool:
         final, residual = drop_if_residual(record)
         if final is None:
             secret_drop = True
+            stats["windows_residual_dropped"] = stats.get("windows_residual_dropped", 0) + 1
             for name in residual:
                 stats["residual_patterns"][name] = stats["residual_patterns"].get(name, 0) + 1
             continue
@@ -1341,6 +1461,7 @@ def convert_row(row: dict, pr: dict | None, stats: dict, schema: dict, max_tool:
         "episode_id": batch[0]["episode_id"],
         "join_method": (row.get("join_method") or "").strip(),
         "verdict": verdict,
+        "issues": linked_issue_numbers(row, pr),
     }
     return batch, meta
 
@@ -1377,29 +1498,109 @@ def _id_set(metas: list[dict]) -> set[str]:
     return {str(meta.get("key") or "") for meta in metas}
 
 
+def _issue_numbers(item: dict) -> list[int]:
+    numbers: list[int] = []
+    raw = item.get("issues")
+    if isinstance(raw, (list, tuple)):
+        numbers.extend(raw)
+    single = item.get("issue")
+    if single not in (None, ""):
+        numbers.append(single)
+    found: list[int] = []
+    for number in numbers:
+        try:
+            found.append(int(number))
+        except (TypeError, ValueError):
+            continue
+    return found
+
+
+def _issue_set(items: list[dict]) -> set[tuple[str, int]]:
+    found: set[tuple[str, int]] = set()
+    for item in items:
+        repo = item.get("repo") or ""
+        for number in _issue_numbers(item):
+            found.add((repo, number))
+    return found
+
+
+def _pr_issue_index(builders: list[dict]) -> tuple[dict[tuple[str, int], set[tuple[str, int]]], dict[tuple[str, int], set[tuple[str, int]]]]:
+    """PR key -> issue keys, and issue key -> PR keys. Same issue number in two repos stays two issues."""
+    pr_issues: dict[tuple[str, int], set[tuple[str, int]]] = {}
+    issue_prs: dict[tuple[str, int], set[tuple[str, int]]] = {}
+    for meta in builders:
+        try:
+            key = (meta.get("repo") or "", int(meta.get("pr")))
+        except (TypeError, ValueError):
+            continue
+        issues = {(key[0], number) for number in _issue_numbers(meta)}
+        pr_issues.setdefault(key, set()).update(issues)
+    for key, issues in pr_issues.items():
+        for issue in issues:
+            issue_prs.setdefault(issue, set()).add(key)
+    return pr_issues, issue_prs
+
+
+def expand_holdout_by_issue(
+    held_keys: set[tuple[str, int]], builders: list[dict],
+) -> tuple[set[tuple[str, int]], set[tuple[str, int]]]:
+    """Add every builder PR that shares an issue with a held-out PR.
+
+    The closure is transitive: a PR pulled in for issue 55 also pulls PRs
+    that share its other issues. Returns the full holdout and the PRs that
+    were added only by lineage.
+    """
+    pr_issues, issue_prs = _pr_issue_index(builders)
+    full = set(held_keys)
+    extra: set[tuple[str, int]] = set()
+    stack = list(held_keys)
+    while stack:
+        key = stack.pop()
+        for issue in pr_issues.get(key, ()):
+            for other in issue_prs.get(issue, ()):
+                if other in full:
+                    continue
+                full.add(other)
+                extra.add(other)
+                stack.append(other)
+    return full, extra
+
+
 def assert_holdout_disjoint(
     trained: list[dict], held: list[dict], train_records: list[dict], hold_records: list[dict],
 ) -> None:
-    """Holdout and train share no pull request and no episode id."""
+    """Holdout and train share no pull request, no episode id, and no issue."""
     overlap_pr = _pr_set(trained) & _pr_set(held)
     overlap_ep = _id_set(trained) & _id_set(held)
+    overlap_issue = _issue_set(trained) & _issue_set(held)
     train_rec_pr = {(record.get("repo") or "", record.get("pr")) for record in train_records}
     hold_rec_pr = {(record.get("repo") or "", record.get("pr")) for record in hold_records}
     train_rec_ep = {_episode_key(record["episode_id"]) for record in train_records}
     hold_rec_ep = {_episode_key(record["episode_id"]) for record in hold_records}
-    if overlap_pr or overlap_ep or (train_rec_pr & hold_rec_pr) or (train_rec_ep & hold_rec_ep):
+    overlap_rec_issue = _issue_set(train_records) & _issue_set(hold_records)
+    if (
+        overlap_pr or overlap_ep or overlap_issue or overlap_rec_issue
+        or (train_rec_pr & hold_rec_pr) or (train_rec_ep & hold_rec_ep)
+    ):
         raise AssertionError(
             "holdout overlaps train "
             f"prs={len(overlap_pr)} episodes={len(overlap_ep)} "
+            f"issues={len(overlap_issue)} record_issues={len(overlap_rec_issue)} "
             f"record_prs={len(train_rec_pr & hold_rec_pr)} "
             f"record_episodes={len(train_rec_ep & hold_rec_ep)}"
         )
 
 
 def apply_splits(records: list[dict], metas: list[dict], stats: dict, seed: int, cap: int, fraction: float) -> tuple[list[dict], list[dict]]:
-    """Builder holdout by merge date, then a seeded conference-os sample under the token cap."""
+    """Builder holdout by merge date, then issue lineage, then the token cap.
+
+    A PR that shares an issue with a date-held PR is moved into the holdout,
+    not dropped. The sibling is the same task lineage, so it belongs in the
+    eval set. Dropping it would hide the leak and throw away the episode.
+    """
     builders = [meta for meta in metas if meta.get("role") == "builder"]
-    held_keys = holdout_pr_keys(builders, fraction)
+    dated = holdout_pr_keys(builders, fraction)
+    held_keys, lineage_extra = expand_holdout_by_issue(dated, builders)
     held = [meta for meta in builders if (meta.get("repo") or "", int(meta.get("pr"))) in held_keys]
     pool = [meta for meta in builders if (meta.get("repo") or "", int(meta.get("pr"))) not in held_keys]
     trained = sample_training_episodes(pool, cap, seed)
@@ -1409,13 +1610,18 @@ def apply_splits(records: list[dict], metas: list[dict], stats: dict, seed: int,
     hold_records = [record for record in records if _episode_key(record["episode_id"]) in held_episode_keys]
     assert_holdout_disjoint(trained, held, train_records, hold_records)
     unsampled = [meta for meta in pool if meta["key"] not in trained_keys]
-    dates = sorted(meta.get("merged_at") or "" for meta in held if meta.get("merged_at"))
+    dated_held = [
+        meta for meta in held
+        if (meta.get("repo") or "", int(meta.get("pr"))) in dated and meta.get("merged_at")
+    ]
+    dates = sorted(meta.get("merged_at") or "" for meta in dated_held)
     stats["seed"] = seed
     stats["train_token_cap"] = cap
     stats["holdout_fraction"] = fraction
     stats["holdout_cutoff"] = dates[0] if dates else ""
     stats["builder_prs"] = len({(meta.get("repo"), meta.get("pr")) for meta in builders})
     stats["holdout_prs"] = len(held_keys)
+    stats["holdout_lineage_prs"] = len(lineage_extra)
     stats["holdout_episodes"], stats["holdout_windows"], stats["holdout_tokens"] = _split_counts(held)
     stats["pool_episodes"], stats["pool_windows"], stats["pool_tokens"] = _split_counts(pool)
     stats["train_episodes"], stats["train_windows"], stats["train_tokens"] = _split_counts(trained)
@@ -1424,6 +1630,7 @@ def apply_splits(records: list[dict], metas: list[dict], stats: dict, seed: int,
     stats["holdout_per_repo"] = _per_repo(held)
     stats["overlap_prs"] = 0
     stats["overlap_episodes"] = 0
+    stats["overlap_issues"] = 0
     return train_records, hold_records
 
 
