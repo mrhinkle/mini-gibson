@@ -317,6 +317,7 @@ fails `__suite__`. A failed `__suite__` fails the side that ran the command.
 ## Known limits
 
 - Statements may name files as the original issue did.
+- Test-tamper protection is file-glob based: candidate edits to files touched by test.patch or matching the task's test_globs are reverted before scoring. A candidate could still change a helper or fixture outside those globs that the hidden tests import; the verifier does not compute an import closure. Scoring runs should diff candidate patches against test_globs and review any edit to imported helpers.
 - verify.py runs task commands via bash with env filtering but no OS sandbox. Tasks are authored in this repository and are trusted. Candidate code must be scored inside a container or VM on Brev.
 - the-gibson-270's product change is `scripts/tests/run-all.sh`. Its `test_globs` are `**/*.test.*`, so the verifier does not restore that runner as a test edit.
 - Chatterbuilt yielded 5 tasks from 40 examined candidates, short of 7. Most drops were public-scan hits. The search stopped at the cap.
