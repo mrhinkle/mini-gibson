@@ -7,10 +7,18 @@
   "base_sha": "12d8b4debf29ae8d478bccdf56b8f5364036d2db",
   "merge_sha": "87e0dce6121c44eb2ca78e9755c435e281027e2a",
   "issue_number": 1912,
+  "issues": [
+    1912
+  ],
   "issue_title": "Public sponsor-booth YouTube embeds are blocked by CSP",
   "problem_statement": "Public sponsor-booth YouTube embeds are blocked by CSP\n\n## Problem\n\nIndependent exact-head review of #1903 found a pre-existing CSP mismatch outside that PR: `src/lib/public-sponsor-booth.ts` emits `https://www.youtube.com/embed/...`, but generated `frame-src` does not allow `https://www.youtube.com`. Browsers therefore block those sponsor-booth embeds.\n\n## Safe direction\n\nPrefer normalizing this helper to the already allowlisted privacy-enhanced `https://www.youtube-nocookie.com` origin rather than widening CSP to another YouTube host. Add a source-to-generated-policy contract test and a removal/widening mutant.\n\n## Boundaries\n\nDo not change tenant content, upload media, widen CSP with wildcards, deploy/promote, seed/import, alter schema/secrets, or make pricing/legal decisions. Not part of milestone 1.1 unless explicitly triaged there.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-sponsor-booth.test.ts"

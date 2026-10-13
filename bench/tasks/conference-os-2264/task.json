@@ -7,10 +7,18 @@
   "base_sha": "a058caf485e41c87bc9653913718e0d06c292e17",
   "merge_sha": "bb62f8f7e9f39b0d05fb1e1a00822e3e73348401",
   "issue_number": 2231,
+  "issues": [
+    2231
+  ],
   "issue_title": "Epic: open-source ConferenceOS with no ATA residue",
-  "problem_statement": "Epic: open-source ConferenceOS with no ATA residue\n\n**Context.** `events.allthingsai.org` (All Things AI, \"ATA\") now has its own repo, [The-AIE/ata-events-site](https://github.com/The-AIE/ata-events-site) (private, created from `conference-os` `ata/release` at dc6a041e, then synced to main e0db0061). Old-host redirects for 2025/2026.allthingsai.org live in [The-AIE/ata-legacy-redirects](https://github.com/The-AIE/ata-legacy-redirects). We want ConferenceOS to be open source with **no ATA-specific code, data or docs** in its tree. History is allowed to stay (gitleaks over all 3,378 commits found no secrets: 4 matches, all test placeholders).\n\n## Goal\nA public `conference-os` repo whose **tree** contains no All Things AI code, data, docs or infra IDs, published with full git history. ATA keeps its own code only in `ata-events-site`.\n\n## Decisions already made\n\n## Scan results (2026-10-11)\n\n## Size of the job\n342 files mention ATA: 161 tests, 67 `src`, 50 docs, 39 scripts, 10 prisma data, a handful of root docs/config. ~27 non-test files are ATA-specific; ~70 more are incidental mentions in comments/examples.\n\n## Work (sub-issues)\nPhase 1 is started on branch `chore/oss-cleanup` (WIP, **not mergeable**: 126 ATA-only files deleted, runtime references not yet fixed).\n\n## Acceptance",
+  "problem_statement": "Epic: open-source ConferenceOS with no ATA residue\n\n**Context.** `events.allthingsai.org` (All Things AI, \"ATA\") now has its own repo, [The-AIE/ata-events-site](https://github.com/The-AIE/ata-events-site) (private, created from `conference-os` `ata/release`, then synced to main). Old-host redirects for 2025/2026.allthingsai.org live in [The-AIE/ata-legacy-redirects](https://github.com/The-AIE/ata-legacy-redirects). We want ConferenceOS to be open source with **no ATA-specific code, data or docs** in its tree. History is allowed to stay (gitleaks over all 3,378 commits found no secrets: 4 matches, all test placeholders).\n\n## Goal\nA public `conference-os` repo whose **tree** contains no All Things AI code, data, docs or infra IDs, published with full git history. ATA keeps its own code only in `ata-events-site`.\n\n## Decisions already made\n\n## Scan results (2026-10-11)\n\n## Size of the job\n342 files mention ATA: 161 tests, 67 `src`, 50 docs, 39 scripts, 10 prisma data, a handful of root docs/config. ~27 non-test files are ATA-specific; ~70 more are incidental mentions in comments/examples.\n\n## Work (sub-issues)\nPhase 1 is started on branch `chore/oss-cleanup` (WIP, **not mergeable**: 126 ATA-only files deleted, runtime references not yet fixed).\n\n## Acceptance",
   "split": "temporal_gibson_holdout",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/apply-production-migrations.test.ts tests/unit/event-hero-ctas.test.ts tests/unit/protected-database-hosts.test.ts tests/unit/space-jam-logo.test.ts"

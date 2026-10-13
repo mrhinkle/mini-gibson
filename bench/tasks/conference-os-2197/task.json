@@ -7,10 +7,18 @@
   "base_sha": "8fa7e521dee72ff919e0e6bb856363d607cb4662",
   "merge_sha": "554a36c2352cb48601d306595801f4d5c9728a89",
   "issue_number": 2196,
+  "issues": [
+    2196
+  ],
   "issue_title": "Simplify event navigation and use horizontal upcoming-event cards",
   "problem_statement": "Simplify event navigation and use horizontal upcoming-event cards\n\nOwner requests: remove awkward Events dropdown, plain text navigation without pills, optional event-specific navigation logo linking to overview, upcoming events one per row with feature image left and text right (stack on mobile). Preserve the restored marketing homepage. Reuse existing event branding; no schema changes.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts tests/unit/event-directory-page.test.ts tests/unit/public-header-mobile-reflow.test.ts tests/unit/public-two-bar-header.test.ts tests/unit/public-two-bar-nav.test.ts"

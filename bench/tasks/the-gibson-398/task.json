@@ -7,10 +7,18 @@
   "base_sha": "a83e297c72af772426195b2f0c3bdd6a84e87580",
   "merge_sha": "a769d1276227ce1687c73461ed3deb6fc651d944",
   "issue_number": 390,
+  "issues": [
+    390
+  ],
   "issue_title": "pr-size: decode both sides of C-quoted renames in parseNumstatText",
-  "problem_statement": "pr-size: decode both sides of C-quoted renames in parseNumstatText\n\nFollow-up from CodeRabbit's review of #383 (merged as 11a6e0c).\n\n`parseNumstatText` in `scripts/pr-size.mjs` (the newline-delimited parser, used only for offline `--numstat FILE` fixtures; CI uses `-z`) treats a C-quoted rename such as `\"old\\tname\" => \"new\\tname\"` as a single quoted path. It then fails to pick the destination path, so the file can be misclassified and the offline budget metrics come out wrong.\n\n**Fix:** when a rename has C-quoted paths, decode both sides and classify on the destination.\n**Test:** add a regression fixture for a C-quoted rename in `scripts/tests/pr-size.test.sh`.\n\nSeverity: minor. It does not affect the CI path.",
+  "problem_statement": "pr-size: decode both sides of C-quoted renames in parseNumstatText\n\nFollow-up from CodeRabbit's review of #383 (merged).\n\n`parseNumstatText` in `scripts/pr-size.mjs` (the newline-delimited parser, used only for offline `--numstat FILE` fixtures; CI uses `-z`) treats a C-quoted rename such as `\"old\\tname\" => \"new\\tname\"` as a single quoted path. It then fails to pick the destination path, so the file can be misclassified and the offline budget metrics come out wrong.\n\n**Fix:** when a rename has C-quoted paths, decode both sides and classify on the destination.\n**Test:** add a regression fixture for a C-quoted rename in `scripts/tests/pr-size.test.sh`.\n\nSeverity: minor. It does not affect the CI path.",
   "split": "external_holdout_unseen",
   "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "bash scripts/tests/pr-size.test.sh"

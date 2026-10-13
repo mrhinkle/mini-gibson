@@ -7,10 +7,18 @@
   "base_sha": "3e05014cc40086484a8c816c1dd1de27ce622deb",
   "merge_sha": "84d6a73b712e1c871d7c1bee14377252e0bcc871",
   "issue_number": 2029,
+  "issues": [
+    2029
+  ],
   "issue_title": "fix(schedule): render public track descriptions in the conference schedule",
   "problem_statement": "fix(schedule): render public track descriptions in the conference schedule\n\nThe public Conference Schedule currently sends only track id, name, and color to its client renderer. Track descriptions cannot appear in either Table or Grid view. Reported on https://events.allthingsai.org/events/all-things-ai-2026/schedule.\n\nRender a readable track guide on the schedule using the existing public-facing marketingDescription field. Preserve the explicit boundary that operational Track.description is not a public fallback. The guide should show the available descriptions on initial render, support reading a selected track, work in Grid/Table/Broadside, and remain usable on mobile and with keyboard/screen readers. Missing or whitespace-only public copy must not produce empty cards. Track filters, dates, session ordering, publication gates, and other-event branding must remain unchanged.\n\nUse existing schema and organization/event data. Verify actual public data availability separately; do not invent descriptions or expose operational notes. Cover server serialization and rendering, run the repository green gate and independent exact-head review, then verify the requested ATA deployment.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-schedule-page.test.ts tests/unit/schedule-track-guide.test.ts"

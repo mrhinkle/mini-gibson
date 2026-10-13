@@ -7,10 +7,18 @@
   "base_sha": "d1702cc1a52b93ee2c6b87d94f0df6a7c822e46e",
   "merge_sha": "1497af2c2cb22031eeb15954273e927b2641c6b4",
   "issue_number": 1863,
+  "issues": [
+    1863
+  ],
   "issue_title": "Homepage renderer config-schema registry",
   "problem_statement": "Homepage renderer config-schema registry\n\n## Problem\n\nThe organizer JSON editor and seed engine cannot safely accept per-renderer\nconfig until one server-safe registry validates each section type.\n\n## Acceptance criteria\n\n- Add one pure/server-safe registry mapping each config-editable\n  `HomepageSectionType` to its parser/validator and documented accepted shape.\n- Renderer parsers are the single source of truth; do not duplicate a looser\n  validation schema in organizer code.\n- Reject dangerous prototype keys, non-JSON values, excessive depth/size, and\n  a type without a registered validator. Return a null-prototype shallow-frozen\n  normalized config.\n- A renderer may remain displayable before it becomes config-editable; missing\n  validator means fail closed, not pass-through.\n- Focused `.test.ts` covers every registered type, registry/type drift,\n  malformed nesting, prototype keys, size/depth limits, and parser equivalence\n  with RED/GREEN mutants.\n\n## Dependencies and boundaries\n\nLand only after the milestone renderer contracts/parsers stabilize; a single\nintegration captain owns the registry hot file. No schema/migration, UI, seed,\nProduction, secrets, spend, pricing, or legal work. Parent: #1851.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/homepage-config-schema.test.ts"

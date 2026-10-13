@@ -7,10 +7,18 @@
   "base_sha": "6b150ed8568ab6c922f655bf5484764c92f16127",
   "merge_sha": "adc732fc7ccd49e22a669e62e42e2ecac73d0432",
   "issue_number": 2055,
+  "issues": [
+    2055
+  ],
   "issue_title": "fix(a11y): Broadside event footer column headings are 4.28:1 (under 4.5:1)",
   "problem_statement": "fix(a11y): Broadside event footer column headings are 4.28:1 (under 4.5:1)\n\n## Why\n\nWhile fixing #2051 (the orbit/ATA event footer column headings), the implementer measured the other footer variant in `src/components/event-public-footer.tsx`:\n\n- The **Broadside** (light) footer's column headings use `text-stone-500` on `#f5f2eb`, about **4.28:1**. That's under the WCAG 2.1 AA 4.5:1 floor for normal-size text; the headings are `text-xs` uppercase, so no large-text exemption applies.\n\n#2051 deliberately changed only the orbit variant, because the ATA event page renders the orbit footer, which is where the live axe violation was found. Any event on the Broadside theme still has this failure.\n\n## Acceptance\n- Confirm the composited ratio of the Broadside heading colour on the Broadside footer's real background, derived from code and theme tokens, not assumed.\n- Move the heading to the lowest-contrast token that clears 4.5:1 while keeping it visually secondary to the footer links. Prefer a token this footer variant already uses.\n- Extend `tests/unit/event-footer-contrast.test.ts` (added in #2051) with a Broadside case that fails with `text-stone-500`.\n- If a Broadside-themed event is live, re-run axe on it at 1440px and 390px after release.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/event-footer-broadside-contrast.test.ts"

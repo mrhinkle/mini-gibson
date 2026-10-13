@@ -1,6 +1,6 @@
 # Gibson Bench v0.1
 
-Frozen at `2026-10-13T14:50:29Z`. Status stays `FROZEN_v0.1` in
+Frozen at `2026-10-13T15:30:05Z`. Status stays `FROZEN_v0.1` in
 `manifest.v0.1.json`. `freeze_required_before_lora` stays true: these
 tasks are a holdout, and a LoRA train set must not include them.
 
@@ -10,9 +10,12 @@ resolved only when the task's fail-to-pass tests go from red to green and
 the pass-to-pass tests stay green.
 
 Round 1 froze nine conference-os tasks. Round 2, the same day, adds 26
-tasks under `external_holdout_unseen`. The original nine directories,
-their labels, and their manifest hashes are unchanged. `bench/verify.py`
-is unchanged.
+tasks under `external_holdout_unseen`. Round 3 keeps those 35 tasks and
+their split labels. It recomputes every task hash: each `task.json` now
+records linked issues and `test_globs`, and statements no longer carry
+commit SHAs, the fixing pull request, exact fail-to-pass ids, or lines
+copied from `gold.patch`. `bench/verify.py` requires a zero exit from each
+scored command and restores test files a candidate edited.
 
 ## What is frozen
 
@@ -109,8 +112,10 @@ LoRA's training data, not by the merge date. A pull request can enter
   hint.
 - A fail-to-pass check runs offline, twice on each side, in under five
   minutes, with `gold.patch` and `test.patch`. A public-scan hit in the
-  problem statement, either patch, or a test id drops the candidate. The
-  text is left as it was.
+  problem statement, either patch, or a test id drops the candidate.
+  Round 3 keeps that issue text and strips commit SHAs, the fixing pull
+  request, exact fail-to-pass ids and names, and lines copied from
+  `gold.patch`. Statements may name files as the original issue did.
 
 The base commit (`baseRefOid`) is checked out in a temporary worktree. The
 diff is `gh pr diff` applied onto that base. Test-file changes are applied
@@ -127,8 +132,8 @@ prints a one-line tally, so it hides the assertion names the verifier
 needs. Suites that cannot finish inside the verifier's 300 second cap were
 left out of the scored pool. Qualification allowed up to 600 seconds a
 side while searching. Every kept task finished in under 20 seconds, so
-`time_budget_s` is 90. `verify.py` was not edited, and it still rejects a
-budget above 300.
+`time_budget_s` is 90. Round 2 did not raise the cap. `verify.py` still
+rejects a budget above 300.
 
 chatterbuilt and conference-os are scored with vitest on the unit files the
 pull request touches. End-to-end, Playwright, Prisma, and network tests are
@@ -238,6 +243,34 @@ the frozen nine, or with another kept task. Zero of the chatterbuilt
 candidates shared train issue 676 after that issue was added to the train
 set.
 
+## Round 3 gates
+
+Coordinator decision, 2026-10-13: the statement stays the real issue text
+and is identical for every arm, so a rewritten prompt does not bias the
+comparison. `bench/check_statements.py` fails if `problem_statement` or
+`issue_title` contains a commit SHA (7–40 hex characters, at least one
+letter, not a UUID fragment), the fixing pull request number, an exact
+fail-to-pass id or name, or a line of 40 or more characters that also
+appears in `gold.patch`. Statements may name files as the original issue
+did.
+
+`bench/contamination/train-v7.keys.json` is the sorted list of every
+builder pull request in `~/gibson-traces/sft/train-v7.jsonl`, each
+`{repo, pr, issues[]}`. Issues are the episode's issue field plus that
+pull request's same-repository closing issues. The file stores numbers
+only. `bench/check_contamination.py` exits 1 when a task's repository and
+pull request are in that list, or when the task shares any of those issue
+numbers in the same repository. Each `task.json` records `issues`.
+
+After the candidate applies, `verify.py` restores the base copy of every
+file the candidate changed that `test.patch` also touches or that matches
+the task's `test_globs`. Those paths are `reverted_test_edits`. `test.patch`
+is applied after the restore, so a candidate that only edits tests resolves
+nothing. the-gibson-270's product change is `scripts/tests/run-all.sh`, so
+its `test_globs` are `**/*.test.*` and do not treat that runner as a test
+edit. Every other task uses `**/*.test.*`, `**/tests/**`, and
+`scripts/tests/**`.
+
 ## Verifier
 
 ```bash
@@ -247,14 +280,19 @@ python3 bench/verify.py TASK_ID CANDIDATE_PATCH
 The process prints one JSON object:
 
 ```json
-{"resolved": false, "f2p_pass": false, "p2p_pass": false, "logs_path": "..."}
+{"resolved": false, "f2p_pass": false, "p2p_pass": false, "reverted_test_edits": [], "logs_path": "..."}
 ```
 
-Exit 0 only when `resolved` is true. `resolved` is true only when every
-fail-to-pass id passed and every pass-to-pass id passed. Any setup failure
-(missing mirror, unknown commit, patch that will not apply, setup command
-failure, missing runner output, time-budget expiry, cleanup failure) sets
-`error` and `resolved` to false. A setup failure is never resolved.
+Exit 0 only when `resolved` is true. A side passes when every named id for
+that side passed, every command for that side exited 0, a vitest task wrote
+its JSON report, and every `::__suite__` status from those commands is
+`passed`. `resolved` is true only when fail-to-pass and pass-to-pass both
+passed. A non-zero exit, a timeout, or a missing report means that side did
+not pass. Any setup failure (missing mirror, unknown commit, patch that
+will not apply, setup command failure, unreadable runner output,
+time-budget expiry, cleanup failure) sets `error` and `resolved` to false.
+A setup failure is never resolved. A missing vitest report is a failed
+command, not a setup error.
 
 `time_budget_s` must be from 1 through 300. That cap is why the slow
 the-gibson suites above are excluded.
@@ -274,10 +312,13 @@ does not open a database. The schema is unchanged by the pull request.
 
 Shell tasks parse `ok   — name` and `FAIL — name` lines. The id prefix is
 the first `scripts/tests/*.test.sh` in the command. A non-zero suite exit
-fails `__suite__`.
+fails `__suite__`. A failed `__suite__` fails the side that ran the command.
 
 ## Known limits
 
+- Statements may name files as the original issue did.
+- verify.py runs task commands via bash with env filtering but no OS sandbox. Tasks are authored in this repository and are trusted. Candidate code must be scored inside a container or VM on Brev.
+- the-gibson-270's product change is `scripts/tests/run-all.sh`. Its `test_globs` are `**/*.test.*`, so the verifier does not restore that runner as a test edit.
 - Chatterbuilt yielded 5 tasks from 40 examined candidates, short of 7. Most drops were public-scan hits. The search stopped at the cap.
 - Conference-os merges from 2026-08-01 through 2026-08-23 are outside the 400-row page.
 - `node_modules` is not in this repository. A checkout without `GIBSON_BENCH_NODE_MODULES` cannot run the vitest tasks. the-gibson shell tasks do not need it.

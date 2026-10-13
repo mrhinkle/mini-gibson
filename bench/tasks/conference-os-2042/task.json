@@ -7,10 +7,18 @@
   "base_sha": "efb2c571815945276b3278dc4d5cff40f737781f",
   "merge_sha": "ac6ff283e4abf076d90d98b680945aa9d359d366",
   "issue_number": 2040,
+  "issues": [
+    2040
+  ],
   "issue_title": "Public header: icon-only search and help, plus a Get Involved page (flat events menu)",
   "problem_statement": "Public header: icon-only search and help, plus a Get Involved page (flat events menu)\n\n## Problem\nMark wants the events.allthingsai.org top menu flattened, after the Dribbble \"JoyToys\" pattern: centered text links, small round icon buttons on the right, **no dropdowns**, a **\"?\" icon with no \"Help\" text**, and a **magnifying glass for search** instead of the text field.\nOwner decision 2026-09-14: **option A, flat two bars**.\nWireframe (low-fi, attached per doctrine): https://claude.ai/code/artifact/62d69b20-c93d-42e8-bb80-25b9e89517f5\n\n## Core changes (ConferenceOS `main`, all tenants)\n1. **Icon-only search in the parent-site bar.** The utilities show a round magnifying-glass button, not the text field. Activating it opens the existing `SearchForm`; \u2318K / Ctrl+K opens and focuses it; Escape closes it. The accessible name stays \"Search\" and the form keeps `role=\"search\"`. The phone menu panel keeps its full search field.\n2. **Icon-only help trigger.** `ContextualHelpPanel` shows only the CircleHelp \"?\" icon, with no visible \"Help\" text. The accessible name, `title`, panel, and route-help gating are unchanged.\n3. **Get Involved page** at `/events/[eventSlug]/get-involved`. It lists the same participation options as today's default \"Participate\" menu, from one shared function so the two cannot drift:\n   - Submit a Talk, only while `cfpOpen`;\n   - Register, only while registration shows;\n   - Apply for a Scholarship;\n   - Volunteer;\n   - Sponsor the event.\n\n   Each option is a card with a one-line description and a link. The default grouped event nav is unchanged.\n\n## Not code (ATA data, after release)\n- The flat header uses the existing per-event header override (`NavItem` `scope=EVENT`, `placement=HEADER`, \"Event header\" editor): Schedule \u00b7 Speakers \u00b7 Sponsors \u00b7 Venue & Travel \u00b7 FAQ \u00b7 Get Involved.\n- Parent-bar rows flattened to Events \u00b7 Webinars \u00b7 Speak \u00b7 Sponsor \u00b7 About \u00b7 News.\n- Moved links go to footer rows.\n- Other sites keep their dropdowns.\n\n## Acceptance\n- Header tests updated for icon-only search and help, with keyboard behaviour (open, \u2318K, Escape, focus) and accessible names asserted.\n- A Get Involved page test covers the option set under `cfpOpen` true/false and register shown/hidden, via the shared function; the nav test still passes against the same function.\n- The page returns `notFound` for an unknown event and handles CANCELLED like the sibling pages do.\n- a11y/link-name suites stay green.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/contextual-help-panel.test.ts tests/unit/get-involved-page.test.ts tests/unit/public-event-nav.test.ts tests/unit/public-two-bar-header.test.ts tests/unit/search-toggle-contract.test.ts tests/unit/search-toggle.test.ts"

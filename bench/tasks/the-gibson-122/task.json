@@ -7,10 +7,18 @@
   "base_sha": "4524e9a20e95776990186eacbdde6cec1c56bf27",
   "merge_sha": "71a4f330e3952ab79d60e991c0f43b13598b4502",
   "issue_number": 64,
+  "issues": [
+    64
+  ],
   "issue_title": "Release preflight sensor: hard-fail closing-keyword titles on partial ships (L-013/L-025)",
   "problem_statement": "Release preflight sensor: hard-fail closing-keyword titles on partial ships (L-013/L-025)\n\n## Problem\nMulti-slice issues keep auto-closing on partial PR merges. The guide (release playbook prose) forbids close/fix/resolve keywords near #N for partials, but agents still default to `fix(#N):` titles (L-025, chatterbuilt #115) and GitHub's linker ignores negations (L-013, chatterbuilt #28 closed four separate times). Issue #4 tracked this and was closed, but no sensor landed: `playbooks/release.md` contains no `closingIssuesReferences` check and no script enforces it.\n\n## Proposed sensor\nA release-preflight step (script `scripts/release-preflight.sh` or a block in the release playbook that shells out) that hard-fails the merge when BOTH:\n1. The PR is marked partial / Related-only (body contains `Related: #N` without Closes/Fixes/Resolves, or an explicit `partial` marker), AND\n2. `gh pr view N --json closingIssuesReferences` is non-empty, OR the squash/PR title matches `(?i)\\b(fix|close|resolve|closes|fixes|resolves)\\s*\\(?#\\d+`.\n\nOn failure: instruct retitle (`feat(scope): ... (related #N)`) and/or unlink via the Development sidebar before merge. Keep the existing recovery path (reopen + residual comment) for anything that slips through.\n\n## Acceptance criteria\n- Running preflight on a Related-only PR with a `fix(#N):` title exits non-zero with the exact remediation.\n- Release playbook references the sensor as a required pre-merge step.\n- Full-close PRs (genuine `Closes #N`) pass untouched.\n\nRefs: L-013, L-025 in memory/LESSONS.md; supersedes closed #4. Guides only work if every fresh context reads and obeys them \u2014 this one has enough recurrences to earn a sensor.",
   "split": "external_holdout_unseen",
   "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "bash scripts/tests/release-preflight.test.sh"

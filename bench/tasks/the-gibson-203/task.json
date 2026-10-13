@@ -7,10 +7,18 @@
   "base_sha": "4397f9b93f2d6d02bbde335ace6e0461d74eb584",
   "merge_sha": "90aedc36bf5664cc8cb15cfe7c315c47f48626ee",
   "issue_number": 202,
+  "issues": [
+    202
+  ],
   "issue_title": "route-inventory: reject unexpected positional arguments",
   "problem_statement": "route-inventory: reject unexpected positional arguments\n\n## Context\n\nFollow-up to #192 and #201. The single-file vendoring repair is correct and independently approved, but it exposed one narrow command-line regression: `scripts/route-inventory.mjs` silently ignores positional arguments and scans the current directory.\n\n## Problem\n\nBefore #201, the shared parser rejected unexpected positional arguments. The inlined single-file parser now validates unknown flags but does not reject a bare argument such as `/tmp/project`. That can make an operator believe a requested path was scanned when the tool actually scanned the current working directory.\n\n## Scope\n\n- Update only `scripts/route-inventory.mjs` and its focused test unless a directly necessary fixture requires another test-only change.\n- Reject every unexpected positional argument, including arguments after `--`, because this CLI has no positional-argument contract.\n- Preserve all documented flags, output formats, exit codes, and the tool's single-file vendoring contract.\n- Do not change CI workflows, deployment behavior, secrets, environment configuration, billing, data schemas, legal content, or fleet activation.\n\n## Acceptance criteria\n\n- `node scripts/route-inventory.mjs /tmp/example` exits `2`, writes an `unexpected argument` diagnostic to stderr, and produces no normal report or output file.\n- A positional argument after `--` is rejected the same way.\n- Existing documented flag forms continue to work.\n- The isolated single-file adopter test still passes without `scripts/lib/`.\n- Focused route-inventory tests and `bash scripts/tests/run-all.sh` are green.\n- The implementation is DCO-signed and receives independent cross-vendor exact-head review before merge.\n\n## Delivery\n\nThis is a narrow Tier A implementation item with no owner decision or external dependency. A PR may be opened autonomously; merge remains gated on exact-head checks and independent review.",
   "split": "external_holdout_unseen",
   "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "bash scripts/tests/route-inventory.test.sh"

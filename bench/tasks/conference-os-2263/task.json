@@ -7,10 +7,18 @@
   "base_sha": "21fb799705a9a0283414aec12386fd1cce27479c",
   "merge_sha": "3e48cb5c509df7bfbf2bd401aa92a609febf8e1a",
   "issue_number": 2235,
+  "issues": [
+    2235
+  ],
   "issue_title": "OSS cleanup 2d: config, CI guards, fixture sensors and infra IDs",
   "problem_statement": "OSS cleanup 2d: config, CI guards, fixture sensors and infra IDs\n\nPart of #2231.\n\n## Infra IDs\n`config/install-database-map.json`, `config/protected-database-hosts.json`, runbooks (`break-glass`, `demo-refresh`, `neon-pitr-restore`, `pinned-install-promotion`, `docs/LAUNCH-CHECKLIST.md`) and `scripts/database-env-guard.test.mjs` contain real Neon project/endpoint names and Vercel project ids (not credentials, but they identify live infra). Builds read the map, so **don't just delete it**: ship a template (`*.example.json`) plus an env-supplied path, and keep real values only in each install's repo/config.\n\n## References to removed ATA artifacts\n`scripts/neon-rehearsal-cow-guard.mjs`, `neon-rehearsal-trust.test.mjs`, `pr-review-workflows.test.mjs`, `pr-risk-classifier.mjs`, `.github/workflows/{ci,preview-deploy-smoke,production-migrate,pr-review-evidence}.yml`, `.snyk`, `.gitleaksignore` (entries for deleted files), `lighthouserc.json`, `.env.example`, and the real-content sensors (`seed-real-content-manifest.json`, `scripts/lib/seed-fixture-guards.mjs`, `real-content-fixture-branding-sensor*.mjs`, `update-real-content-manifest-digests.mjs`, `agent-archive-data.test.mjs`). Update or remove them so CI is green without the deleted ATA files.\n\n## Also",
   "split": "temporal_gibson_holdout",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/protected-database-hosts.test.ts"

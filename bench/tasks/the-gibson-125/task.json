@@ -7,10 +7,18 @@
   "base_sha": "93aca58cb2dae40491f2565d634852b8f78e5550",
   "merge_sha": "f3cbc6d3f59fb65cc3206aa6ebf47aa8d18e06c8",
   "issue_number": 69,
+  "issues": [
+    69
+  ],
   "issue_title": "First-class single-platform mode: run the full loop with one AI vendor, no deadlock",
   "problem_statement": "First-class single-platform mode: run the full loop with one AI vendor, no deadlock\n\n## Requirement\nThe loop must run end-to-end \u2014 build, test, review, ux-eval, security, release, historian \u2014 with exactly ONE platform CLI installed (only Claude, only Grok, only Codex, or only Hermes). Cross-vendor review and the Devin supervisor are the preferred shape (docs/20/22), but their absence must be a documented degraded mode, not a deadlock or a silent skip.\n\n## Current gaps\n1. `loop.sh --reviewers` defaults to `codex,claude` and `second-opinion.sh` assumes other vendors exist; with one platform installed, `--escalate-after` either fails or skips.\n2. L-005's fail-closed rule (\"missing reviewer blocks merge\") is correct fleet doctrine but undefined for single-platform: Tier B/C could never merge, or worse, agents improvise.\n3. Nothing exploits the fact that one PLATFORM still offers multiple MODELS: the reviewer hat can run a different model of the same vendor (e.g. builder on the default model, reviewer via `claude -p --model opus` / grok's alternate model) in a fresh context \u2014 real generator/evaluator separation without a second subscription.\n\n## Proposal: first-class single-platform mode\n1. **Same-vendor, different-model review.** `loop.sh --solo-platform` (or auto-detect: only one runner CLI present) sets `REVIEWER_CMD` to the same platform with an alternate model + read-only invocation. second-opinion.sh accepts same-vendor reviewers instead of erroring; verdicts still land in `gibson/second-opinion.md`.\n2. **Degraded-mode contract in docs/11.** Explicit table: what substitutes for cross-vendor review (fresh-context adversarial self-pass + different-model pass), and what tightens to compensate \u2014 proposal: in single-platform mode, Tier B review requires TWO independent fresh-context APPROVE verdicts (different model where available), and Tier C remains human-gated exactly as today (docs/14 G12, unchanged).\n3. **No-deadlock rule.** Resolve the L-005 tension explicitly: single-platform review per (1)-(2) COUNTS as the reviewer being present; fail-closed applies only when the configured review path itself breaks mid-run.\n4. **GitHub identity note.** The same-author approve problem (L-015/L-021) is platform-independent \u2014 the bot/service-account token (see reviewer-identity issue) works identically in single-platform mode and is the recommended pairing so branch protection stays satisfiable.\n\n## Acceptance criteria\n- On a machine with exactly one runner CLI installed and no DEVIN_API_KEY, `loop.sh --runner <x> --solo-platform` takes a Tier A issue from claim to merged PR with zero human touches and no skipped review (journal shows the review verdict and which model produced it).\n- `--escalate-after` produces a same-vendor different-model second opinion instead of failing.\n- Tier B merge requires the documented two-verdict rule; Tier C still queues for the human gate.\n- docs/11 documents the degraded-mode contract and its compensating controls.\n\nRefs: docs/11 (solo loop), docs/14 G12, docs/15 (escalation ladder), docs/20 rule 1, L-005/L-015/L-021 in memory/LESSONS.md. Complements the reviewer-identity and git-configure issues.",
   "split": "external_holdout_unseen",
   "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "bash scripts/tests/second-opinion.test.sh"

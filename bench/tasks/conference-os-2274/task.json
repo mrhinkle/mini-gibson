@@ -7,10 +7,18 @@
   "base_sha": "d7aeeadb0dbf8cd2a7b912cef8e1f18613cd63bf",
   "merge_sha": "5f86ac6743364c15f991b3b38964cca395d2101b",
   "issue_number": 2272,
+  "issues": [
+    2272
+  ],
   "issue_title": "CSP blocks Meta Pixel's form POST to www.facebook.com/tr/ (form-action 'self')",
   "problem_statement": "CSP blocks Meta Pixel's form POST to www.facebook.com/tr/ (form-action 'self')\n\n## Problem\nOn events.allthingsai.org (2026-10-12 check), the browser console logs:\n\n> Sending form data to 'https://www.facebook.com/tr/' violates the following Content Security Policy directive: \"form-action 'self'\".\n\nMeta Pixel (fbevents.js 2.9.x) falls back to a hidden-form POST to `https://www.facebook.com/tr/` when an event payload is too large for its GET beacon. `form-action 'self'` blocks that, so those events are lost. The GET beacon (`img-src https://www.facebook.com`) already works.\n\n## Fix\nAdd the exact origin `https://www.facebook.com` to `form-action` in `src/lib/security-headers.ts`, plus a unit test that pins `form-action` to exactly `'self' https://www.facebook.com` (no wildcards).\n\n## Explicitly not in scope\nThe pixel also tries `connect-src` to rotating hosts like `https://<id>.ecs.us-west-2.on.aws/events?cee=no` and `https://<id>.us-central1.run.app/events?cee=no`. Allowlisting `*.on.aws` / `*.run.app` would let any script exfiltrate to any AWS Lambda/ECS or Cloud Run service on a page with Clerk auth and Stripe, so they stay blocked. Those calls are optional; the pixel's core events don't depend on them.\n\n## Acceptance",
   "split": "external_holdout",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/security-headers.test.ts"

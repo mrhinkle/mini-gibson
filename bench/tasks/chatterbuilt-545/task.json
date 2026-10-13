@@ -7,10 +7,18 @@
   "base_sha": "c4cfef8f01c4e2b5c9c81dd36274412d6f776220",
   "merge_sha": "3561dfcc692efcf924c0807090d5bf6fbcad05d6",
   "issue_number": 535,
+  "issues": [
+    535
+  ],
   "issue_title": "Week 1: the private preview must show what changed, not just link to it",
   "problem_statement": "Week 1: the private preview must show what changed, not just link to it\n\n**Parent:** #442 \u00b7 **Spec:** `specs/provisioning-invisible-deployment.md` \u00a74.2\u2013\u00a74.3 \u00b7 **Scope:** DECISIONS #62 Week 1\n\n## The ask (DECISIONS #62, item 5)\n\nEvery change the owner makes by talking shows a private preview that gives a **clear visual sense of the change** \u2014 a diff or a before/after \u2014 not merely a link to a built site.\n\n## Why a link alone is not enough\n\nA link asks a non-technical owner to spot the difference themselves. On a phone, on a page they only half remember, after a change they described in one sentence. That is the moment where \"approve\" stops meaning anything, and an approval that means nothing is what makes the ownership promise hollow later.\n\n## Verified current state\n\n`apps/mcp/lib/preview-url.ts` (97 lines) does one job and does it well: it validates a **caller-supplied** preview URL and refuses placeholder/example hosts so an agent cannot pass a fake preview off as real. It has no notion of *what changed* \u2014 there is no diff surface anywhere on the MCP.\n\n`rewind_site` already computes a plain-language description of changed files and sections (`wouldChange.plainLanguage`, `wouldChange.sections`). That translation layer \u2014 file paths to \"your hours\", \"your services list\" \u2014 is the right precedent and should be reused, not reinvented.\n\n## Acceptance criteria\n\n1. For a proposed change, the owner receives a plain-language summary of what will differ \u2014 in the vocabulary of their business (\"your hours\", \"the plumbing service description\"), never file paths, hunks, or line numbers.\n2. Where a visual before/after is feasible, it is offered alongside the summary; where it is not, the summary stands alone and the response says so honestly rather than implying a visual exists.\n3. Nothing is invented. If the diff cannot be computed, or the preview has not built yet, say that plainly \u2014 do not describe a change that has not been verified, and do not emit a preview URL that was not returned by the platform. The existing posture in `preview-url.ts` extends here.\n4. Reuses the `rewind.ts` section-naming translation rather than a second, divergent mapping. If that mapping needs to move to a shared module, move it \u2014 do not fork it.\n5. Works on the MCP surface, in any client, per spec \u00a73.5. Phone-first: the summary must be readable in a chat bubble without horizontal scrolling.\n6. Contract tests with injected clients; includes the \"diff unavailable\" and \"preview still building\" paths, not just the happy case.\n\n## Honest boundary\n\n\"Visual sense of the change\" is satisfied by a *reliable, plain-language* account of the difference plus a preview link. A rendered image diff is a stretch goal, not the acceptance bar \u2014 and shipping a flaky image diff would trade the thing that must be perfect (the owner understands what they are approving) for the thing that is merely nice.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --config vitest.config.ts --root apps/mcp --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/entitlements.test.ts lib/preview-diff.test.ts lib/rewind.test.ts lib/site-section-labels.test.ts"

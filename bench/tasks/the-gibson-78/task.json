@@ -7,10 +7,18 @@
   "base_sha": "51594b578b87811ac3a4e6a87362247da259a6de",
   "merge_sha": "995b6e6df360ccbbbf746fe612ae77a9acbf9fff",
   "issue_number": 62,
+  "issues": [
+    62
+  ],
   "issue_title": "Harness: make legacy date-only claim staleness deterministic on BSD/macOS",
-  "problem_statement": "Harness: make legacy date-only claim staleness deterministic on BSD/macOS\n\n## Evidence\n\nDuring independent reviews of PR #58 and PR #60, the full sensor sweep intermittently reported:\n\n`claim.test.sh: 26 passed, 1 failed`\n\nEach immediate rerun passed `27 passed, 0 failed`; #58 then passed five more focused reruns and a final full suite, and #60's final suite passed 324/0. Neither PR changed `scripts/claim.sh`, `scripts/claims-status.sh`, or `scripts/tests/claim.test.sh`.\n\nAn independent fresh-main reproduction at `b4b9133ece37e9702372bbc26a144c559345d1af` failed once in 12 runs. The exact assertion was:\n\n`FAIL \u2014 flags a stale claim (missing 'STALE')`\n\nThe legacy row was present; only its `STALE` marker was absent.\n\n## Likely scope\n\n`scripts/tests/claim.test.sh` uses a date-only legacy timestamp exactly one calendar day old. On BSD/macOS, the fallback parser in `scripts/claims-status.sh` fills missing time fields from the current clock. Because `NOW` is captured before the parse, a second-boundary crossing can make the computed age 86,399 seconds (23 whole hours) instead of 24 hours.\n\n## Acceptance\n\n- Define deterministic UTC semantics for legacy date-only claim timestamps.\n- Add regression coverage for the exact 24-hour boundary with a controllable/fixed clock.\n- Keep the stale-claim assertion; do not weaken or remove it to make the test pass.\n- `claim.test.sh` passes repeated runs on macOS, and failures retain the specific failed assertion rather than only the summary count.",
+  "problem_statement": "Harness: make legacy date-only claim staleness deterministic on BSD/macOS\n\n## Evidence\n\nDuring independent reviews of PR #58 and PR #60, the full sensor sweep intermittently reported:\n\n`claim.test.sh: 26 passed, 1 failed`\n\nEach immediate rerun passed `27 passed, 0 failed`; #58 then passed five more focused reruns and a final full suite, and #60's final suite passed 324/0. Neither PR changed `scripts/claim.sh`, `scripts/claims-status.sh`, or `scripts/tests/claim.test.sh`.\n\nAn independent fresh-main reproduction at fresh main failed once in 12 runs. The exact assertion was:\n\n`FAIL \u2014 flags a stale claim (missing 'STALE')`\n\nThe legacy row was present; only its `STALE` marker was absent.\n\n## Likely scope\n\n`scripts/tests/claim.test.sh` uses a date-only legacy timestamp exactly one calendar day old. On BSD/macOS, the fallback parser in `scripts/claims-status.sh` fills missing time fields from the current clock. Because `NOW` is captured before the parse, a second-boundary crossing can make the computed age 86,399 seconds (23 whole hours) instead of 24 hours.\n\n## Acceptance\n\n- Define deterministic UTC semantics for legacy date-only claim timestamps.\n- Add regression coverage for the exact 24-hour boundary with a controllable/fixed clock.\n- Keep the stale-claim assertion; do not weaken or remove it to make the test pass.\n- `claim.test.sh` passes repeated runs on macOS, and failures retain the specific failed assertion rather than only the summary count.",
   "split": "external_holdout_unseen",
   "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "bash scripts/tests/claim.test.sh"

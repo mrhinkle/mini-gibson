@@ -7,10 +7,18 @@
   "base_sha": "bb62f8f7e9f39b0d05fb1e1a00822e3e73348401",
   "merge_sha": "22a8fe3e0bc9ae4988626dc74dfb3921512d44ea",
   "issue_number": 2258,
+  "issues": [
+    2258
+  ],
   "issue_title": "Public speaker pages and directory: derive speakers from SessionSpeaker rows, not only Session.speakerName",
   "problem_statement": "Public speaker pages and directory: derive speakers from SessionSpeaker rows, not only Session.speakerName\n\n## Context\n`src/lib/public-speaker-session.ts` (`findPublicEventSpeaker`) and the event speakers directory (`src/app/(public)/events/[eventSlug]/speakers/page.tsx`) resolve and list speakers only from the legacy flat field `Session.speakerName` (key = `slugify(speakerName)`). The per-person `SessionSpeaker` rows that the importers and the organizer UI write are ignored on the public side.\n\nConsequence, verified on events.allthingsai.org 2026-10-12: a two-speaker session whose `speakerName` is \"Achin Gupta & Divya Mahajan\" produces ONE speaker page at `/speakers/achin-gupta-divya-mahajan` and neither person has a page; the directory shows the pair as one card. Across the 2026 archive this is why 31 of 83 speakers return 404 even though their sessions exist. Same shape for any multi-speaker session on any tenant.\n\nMark's ask (2026-10-12): migrate the 2025 and 2026 speakers to the events site. The ATA data lane (The-AIE/ata-events-site#15) can rewrite the sessions with one `SessionSpeaker` row per person, but it cannot make the public pages show them until this lands.\n\n## Acceptance criteria\n\n## Affected area & files\n\n## Out of scope\n\nNot Tier C: public read path, no money, consent, auth or schema.",
   "split": "external_holdout",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-speaker-rows.test.ts"

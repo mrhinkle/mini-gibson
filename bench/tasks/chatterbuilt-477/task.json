@@ -7,10 +7,18 @@
   "base_sha": "62366a56b9983168c215310fab37084481e4bcca",
   "merge_sha": "d3553ddd5f3eeff1b43f4f38cdb89fa80ca61b07",
   "issue_number": 282,
+  "issues": [
+    282
+  ],
   "issue_title": "Messaging v2: 'Your AI advisor' reposition \u2014 organize data, build processes, run agents; choose-your-AI ladder",
   "problem_statement": "Messaging v2: 'Your AI advisor' reposition \u2014 organize data, build processes, run agents; choose-your-AI ladder\n\nMark, in chat 2026-07-31 (minutes after Direction A shipped via #279), sketched the next messaging evolution. Raw input, two messages:\n\n> \"We give you an assistant that runs on any AI you choose. It helps you organize your data, build the processes and then runs the agents. You own your data, you choose your AI and we make it happen. And it's self-improving \u2014 the more you use it the better it gets and the more productive you are. You can start small with ChatGPT and Claude and then evolve as the AI industry evolves \u2014 eventually run it with your favorite autonomous agents like Hermes and OpenClaw.\"\n\n> \"I think it's your AI advisor, not your agent team. What we provide is a way for non-technical people to run things.\"\n\n## What this changes (pending Mark's copy pick \u2014 iterate in chat before implementing)\n\n1. **Category identity:** `categoryLine` \"Your agent team to run the business\" \u2192 an **AI advisor** frame. Advisor is the interface/brain; agents remain the machinery it runs. Touches categoryLine, hero, SEO titles (\"Your Agent Team to Run the Business\"), crew framing, and the UNIT-197/UNIT-25 contract sensors.\n2. **The advisor arc:** organize your data \u2192 build the processes \u2192 run the agents. (Maps to Cortex \u2192 recipes/processes \u2192 Website/Answering/Visibility/Foreman.)\n3. **Adoption ladder for the AI side:** start small with ChatGPT/Claude \u2192 evolve as the industry evolves \u2192 autonomous agents (Hermes, OpenClaw named as examples). Mirrors the SPA\u2192native ladder. HONESTY GATE: frame as where the road goes, not as tested integrations \u2014 no vaporware theater; MCP is the mechanism that makes the claim true in principle.\n4. **Self-improving:** \"the more you use it the better it gets\" \u2014 extends the existing compounding block (which #279 already made double-sided: models + your data).\n\n## Keep (already true under advisor framing)\n\n- themeLine \"Run your business. We'll handle the AI.\" (#279) \u2014 the advisor is who \"we\" is\n- Ownership creed; \"you own your data, you choose your AI, we make it happen\" tricolon is candidate copy\n- Live/waitlist honesty; SPA\u2192native path\n\nDo not implement until Mark picks final copy in chat \u2014 this issue is the queue container.",
   "split": "external_holdout_unseen",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --config vitest.config.ts --root marketing --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 lib/issue-197-product-house-contract.test.ts lib/voice-key-pages-contract.test.ts"

@@ -7,10 +7,16 @@
   "base_sha": "e1ccbe4f93710d566f174116cded7f55f16790a9",
   "merge_sha": "9321f8076977e48fac8160d44cc1d8c5db8632c8",
   "issue_number": null,
+  "issues": [],
   "issue_title": "fix(public): mirror the footer legal links on the ATA parent bar",
   "problem_statement": "fix(public): mirror the footer legal links on the ATA parent bar\n\nFollows a public repository (pull request 180) and #181 (Mark, 2026-10-11): allthingsai.org gains Code of Conduct, Environmental Policy and Terms and Conditions in the footer's bottom row. (A Mission and Values About item was added in the first commit and removed in the second at Mark's request; the net diff is footer-only.) The ATA parent-bar mirror in `src/lib/atai-site-chrome.ts` adds the three legal links after Privacy Policy as absolute allthingsai.org URLs, per the file's own rule.\n\nTests updated in `tests/unit/atai-site-chrome.test.ts`. Verified at the current head: `vitest` 7/7 on that file, `tsc --noEmit` clean. Not Tier C. Promote to `ata/release` together with #2244.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)",
   "split": "temporal_gibson_holdout",
   "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
   "f2p": {
     "commands": [
       "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts"
