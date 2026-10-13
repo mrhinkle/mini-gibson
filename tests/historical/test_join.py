@@ -263,9 +263,19 @@ class JoinMethodTests(unittest.TestCase):
             commit_shas_from_events([("git rev-parse HEAD", full + "\n")]),
             [],
         )
-        self.assertEqual(usable_commit_shas(events, {other}), created + [other])
-        self.assertNotIn(displayed, usable_commit_shas(events, {other}))
+        # A SHA that only git log or git show printed is not a created SHA,
+        # even when it is a candidate pull request head.
+        self.assertNotIn(other, usable_commit_shas(events))
+        self.assertNotIn(displayed, usable_commit_shas(events))
         self.assertNotIn(logged, usable_commit_shas(events))
+
+    def test_displayed_only_sha_is_not_usable(self):
+        displayed = "f8f8f15b1939e73d4cb18e7ad824211e895fc853"
+        events = [
+            ("git log -1 --format=%H", displayed + "\n"),
+            ("git show --stat " + displayed, "commit " + displayed + "\n"),
+        ]
+        self.assertEqual(usable_commit_shas(events), [])
 
     def test_prompt_pr_ignores_later_tool_output(self):
         catalog = PrCatalog({
@@ -428,6 +438,16 @@ class JoinMethodTests(unittest.TestCase):
         self.assertEqual(weak["reason"], "no_file_overlap")
         reviewer = resolve_overlap(decision, set(), lambda key: {"other.py"}, role="reviewer")
         self.assertEqual(reviewer["join_method"], "prompt-pr")
+        unknown = resolve_overlap(decision, edited, lambda key: None, role="builder")
+        self.assertEqual(unknown["join_method"], "")
+        self.assertEqual(unknown["reason"], "pr_files_unknown")
+        self.assertEqual(unknown["pr"], "")
+        issue = dict(decision, join_method="issue", pr=70, repo="the-gibson")
+        unknown_issue = resolve_overlap(issue, edited, lambda key: None, role="builder")
+        self.assertEqual(unknown_issue["reason"], "pr_files_unknown")
+        reviewer_unknown = resolve_overlap(decision, edited, lambda key: None, role="reviewer")
+        self.assertEqual(reviewer_unknown["join_method"], "prompt-pr")
+        self.assertEqual(reviewer_unknown["pr"], 618)
 
     def _header_catalog(self) -> PrCatalog:
         return PrCatalog({
@@ -485,7 +505,41 @@ class JoinMethodTests(unittest.TestCase):
         )
         missed = self._decide_prompt(missing, self._header_catalog())
         self.assertEqual(missed["join_method"], "")
+        self.assertEqual(missed["reason"], "header_unresolved")
         self.assertNotEqual(missed.get("pr"), 618)
+
+    def test_unresolved_header_does_not_fall_through_to_worktree_issue(self):
+        """Header names unknown PR #999. The worktree issue would join PR #70."""
+        text = "TASK (Grok) — PR #999.\nWork the lane.\n"
+        catalog = _catalog()
+        header = header_target(text)
+        self.assertEqual(header["kind"], "pr")
+        self.assertEqual(header["pr"], 999)
+        header_keys = header_join_keys(header, catalog, "the-gibson")
+        self.assertEqual(header_keys, [])
+        issue_keys = catalog.issue_keys("the-gibson", [414])
+        self.assertEqual(issue_keys, [("the-gibson", 70)])
+        fallen = decide_join(
+            [],
+            [],
+            issue_keys,
+            commit_attempted=False,
+            issue_attempted=True,
+        )
+        self.assertEqual((fallen["repo"], fallen["pr"]), ("the-gibson", 70))
+        decision = decide_join(
+            [],
+            [],
+            issue_keys,
+            commit_attempted=False,
+            issue_attempted=True,
+            header_keys=header_keys,
+            header_declared=True,
+        )
+        self.assertEqual(decision["join_method"], "")
+        self.assertEqual(decision["reason"], "header_unresolved")
+        self.assertEqual(decision["pr"], "")
+        self.assertNotEqual(decision.get("pr"), 70)
         # "PR #370 and #371" is two numbers. It is not a header PR.
         pair = "Validate metadata for PR #370 and #371.\n"
         self.assertEqual(header_target(pair)["kind"], "")

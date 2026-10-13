@@ -1,11 +1,11 @@
 # Historical SFT corpus stats
 
-Generated: 2026-10-13T09:48:54Z
-Output: ~/gibson-traces/sft/historical-v6.jsonl (all roles on merged PRs, mode 600).
-Train: ~/gibson-traces/sft/train-v6.jsonl (builder only, temporal holdout removed, mode 600).
-Holdout: ~/gibson-traces/sft/holdout-v6.jsonl (builder episodes on the latest PRs, mode 600).
-Negatives: ~/gibson-traces/sft/negatives-v6.jsonl (builders on closed-unmerged PRs, mode 600).
-Assessor: ~/gibson-traces/sft/assessor-v6.jsonl (reviewers on merged PRs with a verdict, mode 600).
+Generated: 2026-10-13T11:20:19Z
+Output: ~/gibson-traces/sft/historical-v7.jsonl (all roles on merged PRs, mode 600).
+Train: ~/gibson-traces/sft/train-v7.jsonl (builder only, temporal holdout removed, mode 600).
+Holdout: ~/gibson-traces/sft/holdout-v7.jsonl (builder episodes on the latest PRs, mode 600).
+Negatives: ~/gibson-traces/sft/negatives-v7.jsonl (builders on closed-unmerged PRs, mode 600).
+Assessor: ~/gibson-traces/sft/assessor-v7.jsonl (reviewers on merged PRs with a verdict, mode 600).
 Source: Mac and Mini sessions joined to a pull request.
 Token estimate: 4 characters per token. Tool outputs over 4096 tokens are truncated.
 Episodes over 32768 tokens are split into windows that each keep the system and user task.
@@ -14,19 +14,19 @@ Episodes over 32768 tokens are split into windows that each keep the system and 
 
 | Metric | Count |
 | --- | ---: |
-| Usable episodes (sessions that produced a kept window) | 1335 |
-| Builder episodes on merged PRs | 131 |
-| Training windows written | 2515 |
+| Usable episodes (sessions that produced a kept window) | 1322 |
+| Builder episodes on merged PRs | 120 |
+| Training windows written | 2488 |
 | Target episodes | 300 |
 | Stretch band | 300–500 |
-| Gap to 300 episodes | 169 |
+| Gap to 300 episodes | 180 |
 
 ## Selection and drops
 
 | Reason | Count |
 | --- | ---: |
-| Selected merged sessions | 1384 |
-| Missing file | 1 |
+| Selected merged sessions | 1370 |
+| Missing file | 0 |
 | Unreadable | 0 |
 | Parse error | 0 |
 | No grok chat_history | 1 |
@@ -35,7 +35,7 @@ Episodes over 32768 tokens are split into windows that each keep the system and 
 | Dropped, schema | 0 |
 | Groups or windows over the episode cap | 0 |
 | PR metadata missing | 0 |
-| Issue task fetched from GitHub | 900 |
+| Issue task fetched from GitHub | 887 |
 | Issue task from PR metadata body | 0 |
 | Issue task fallback, old header | 435 |
 
@@ -49,35 +49,35 @@ Residual pattern hits on dropped sessions and on windows rejected inside a kept 
 
 | | Episodes | Windows |
 | --- | ---: | ---: |
-| Within 32768 tokens after tool truncation | 526 | 526 |
-| Over 32768 tokens, split | 809 | 1989 |
-| Total kept | 1335 | 2515 |
+| Within 32768 tokens after tool truncation | 523 | 523 |
+| Over 32768 tokens, split | 799 | 1965 |
+| Total kept | 1322 | 2488 |
 
 | Tool outputs | Count |
 | --- | ---: |
-| Seen | 32046 |
-| Truncated above 4096 tokens | 5012 |
-| Left whole | 27034 |
-| Estimated tokens in tool outputs before truncation | 58467580 |
-| Estimated tokens in tool outputs after truncation | 40829906 |
+| Seen | 31309 |
+| Truncated above 4096 tokens | 5000 |
+| Left whole | 26309 |
+| Estimated tokens in tool outputs before truncation | 58009316 |
+| Estimated tokens in tool outputs after truncation | 40404475 |
 | Orphan tool results skipped while windowing | 9 |
 
-Sum of window token_count estimates: 59689580
+Sum of window token_count estimates: 59042905
 
 ## By repo (episodes / windows)
 
 | Repo | Episodes | Windows |
 | --- | ---: | ---: |
 | chatterbuilt | 244 | 457 |
-| conference-os | 977 | 1829 |
-| the-gibson | 114 | 229 |
+| conference-os | 966 | 1806 |
+| the-gibson | 112 | 225 |
 
 ## By role (episodes / windows / tokens)
 
 | Role | Episodes | Windows | Tokens |
 | --- | ---: | ---: | ---: |
-| builder | 131 | 349 | 8885202 |
-| reviewer | 1109 | 2022 | 47796965 |
+| builder | 120 | 326 | 8316719 |
+| reviewer | 1107 | 2018 | 47718773 |
 | other | 95 | 144 | 3007413 |
 
 ## Splits
@@ -85,9 +85,9 @@ Sum of window token_count estimates: 59689580
 Sample seed: 414
 Train token cap: 16000000
 Holdout fraction of builder PRs: 0.15
-Holdout cutoff (earliest date-based mergedAt kept out): 2026-10-12T02:11:18Z
-Builder PRs: 77
-Holdout PRs: 13
+Holdout cutoff (earliest date-based mergedAt kept out): 2026-10-12T02:26:20Z
+Builder PRs: 71
+Holdout PRs: 12
 Holdout PRs added by shared issue: 1
 Holdout/train PR overlap: 0
 Holdout/train episode overlap: 0
@@ -96,35 +96,35 @@ Windows dropped for a residual on the joined text: 4
 
 | Split | Episodes | Windows | Tokens |
 | --- | ---: | ---: | ---: |
-| historical-v6, all roles | 1335 | 2515 | 59689580 |
-| holdout-v6, builder, latest PRs plus issue lineage | 17 | 46 | 1198987 |
-| train pool, builder, not held out | 114 | 303 | 7686215 |
-| train-v6, after sampling | 114 | 303 | 7686215 |
+| historical-v7, all roles | 1322 | 2488 | 59042905 |
+| holdout-v7, builder, latest PRs plus issue lineage | 16 | 43 | 1130030 |
+| train pool, builder, not held out | 104 | 283 | 7186689 |
+| train-v7, after sampling | 104 | 283 | 7186689 |
 | builder pool left out by the cap | 0 | 0 | 0 |
-| negatives-v6, builder, closed-unmerged | 25 | 61 | 1587920 |
-| assessor-v6, reviewer with verdict | 637 | 1093 | 25379082 |
+| negatives-v7, builder, closed-unmerged | 25 | 61 | 1587920 |
+| assessor-v7, reviewer with verdict | 637 | 1093 | 25379082 |
 
 ### Train by repo
 
 | Repo | Episodes | Windows | Tokens |
 | --- | ---: | ---: | ---: |
 | chatterbuilt | 46 | 138 | 3655561 |
-| conference-os | 65 | 160 | 3919764 |
+| conference-os | 55 | 140 | 3420238 |
 | the-gibson | 3 | 5 | 110890 |
 
 ### Holdout by repo
 
 | Repo | Episodes | Windows | Tokens |
 | --- | ---: | ---: | ---: |
-| conference-os | 17 | 46 | 1198987 |
+| conference-os | 16 | 43 | 1130030 |
 
 ## By vendor (episodes / windows)
 
 | Vendor | Episodes | Windows |
 | --- | ---: | ---: |
 | claude | 26 | 31 |
-| codex | 979 | 1798 |
-| grok | 330 | 686 |
+| codex | 977 | 1794 |
+| grok | 319 | 663 |
 
 ## Secret re-scan of the output file
 
@@ -132,7 +132,7 @@ Hits: 0
 
 ## Output validation
 
-JSONL records: 2515
+JSONL records: 2488
 Bad JSON lines: 0
 Schema error codes: {}
 
@@ -154,10 +154,10 @@ Schema error codes: {}
 | coverage | builder | the-gibson | grok | 3 | 6 | 156406 |
 | issue-merged-unique | builder | the-gibson | grok | 2 | 2 | 46690 |
 | issue-merged-unique | reviewer | conference-os | grok | 5 | 10 | 229714 |
-| issue-merged-unique | reviewer | the-gibson | codex | 4 | 6 | 83031 |
+| issue-merged-unique | reviewer | the-gibson | codex | 2 | 2 | 4839 |
 | issue-merged-unique | reviewer | the-gibson | grok | 1 | 2 | 50013 |
 | issue | builder | chatterbuilt | grok | 5 | 15 | 359974 |
-| issue | builder | conference-os | grok | 15 | 31 | 745564 |
+| issue | builder | conference-os | grok | 4 | 8 | 177081 |
 | issue | other | chatterbuilt | codex | 1 | 1 | 15137 |
 | issue | other | chatterbuilt | grok | 6 | 9 | 168134 |
 | issue | other | conference-os | grok | 5 | 10 | 204445 |
@@ -201,19 +201,20 @@ Schema error codes: {}
 | branch | 855 |
 | commit | 3 |
 | coverage | 11 |
-| issue | 69 |
-| issue-merged-unique | 12 |
+| issue | 58 |
+| issue-merged-unique | 10 |
 | prompt-branch | 51 |
-| prompt-header | 260 |
+| prompt-header | 259 |
 | prompt-pr | 349 |
 
 | Unjoined reason | Sessions |
 | --- | ---: |
 | ambiguous_branch | 14 |
-| ambiguous_issue | 211 |
+| ambiguous_issue | 209 |
 | ambiguous_prompt | 865 |
-| no_file_overlap | 32 |
-| no_match | 178 |
+| header_unresolved | 70 |
+| no_file_overlap | 30 |
+| no_match | 132 |
 | no_signal | 104 |
 
 ## Notes
@@ -235,7 +236,7 @@ The cutoff stays the earliest mergedAt among the date-based holdout PRs.
 A pull request, an episode, or an issue in the holdout is absent from the train split.
 Commit joins use SHAs the session created: git commit's [branch sha], or git rev-parse HEAD after that commit.
 A SHA printed by git log, git show, or rev-parse of another ref is ignored.
-That displayed SHA is kept when it equals a candidate pull request head or one of that pull request's commits.
+That displayed SHA is ignored even when it equals a candidate pull request head or one of that pull request's commits.
 commit-merged-unique and issue-merged-unique mean several pull requests shared a commit or an issue
 and exactly one of them was merged. Any other ambiguous session stays unjoined.
 The first user prompt can declare a branch or a PR number. That is prompt-branch or prompt-pr.
@@ -244,7 +245,8 @@ The header is the first non-empty line of that prompt, or a line that starts wit
 When the header names exactly one branch, that branch wins. Otherwise one PR. Otherwise one issue in one repo.
 Without a branch, that line must name exactly one number. PR #370 and #371 is two numbers, so it is not a header.
 Numbers later in the prompt do not override the header. That join method is prompt-header.
-A header the catalog cannot resolve does not fall through to those later numbers.
+A header the catalog cannot resolve stays unjoined with reason header_unresolved.
+That header does not fall through to later numbers, a commit join, or an issue join.
 A branch the catalog misses can still use one PR or one issue written on that same header line.
 When a prompt or an issue matches several pull requests, each candidate is scored by edit coverage,
 the share of the session's successful edits that the pull request also changes.
@@ -255,6 +257,8 @@ A builder joined by a header, a prompt, or an issue must have at least 30% of it
 That ratio is the share of the session's edits the pull request also changes, not Jaccard.
 A merged pull request is the union of every session plus the coordinator commit, so Jaccard rejects a true subset.
 An empty edit set scores 0. A builder below 0.3 is unjoined with reason no_file_overlap.
+A builder whose pull request file list is unknown is unjoined with reason pr_files_unknown.
+A reviewer is not rejected when that file list is unknown.
 Joining a reviewer does not make that session a builder.
 A session that still matches a secret pattern after redaction is dropped and counted.
 The secret re-scan decodes each JSON line, checks each string, and checks the concatenation of message and tool strings.
@@ -388,3 +392,49 @@ Ten of the 11 resolved sessions are in the v6 JSONL. The eleventh, `5883a9bd665d
 | cf7c9cf5a1f9aceb-w00 | coverage | the-gibson#374 | # Grok implementation round 2 of 5 — issue #348 / PR #374 |
 | 8dc15904d000fed9-w00 | coverage | the-gibson#374 | # Grok implementation round 3 of 5 — issue #348 / PR #374 |
 | 4c54ced30553d7e0-w00 | coverage | the-gibson#374 | # Grok implementation round 4 of 5 — issue #348 / PR #374 |
+
+## Round 8 versus v6 (2026-10-13)
+
+Three fail-open joins are closed. A SHA printed by git log, git show, or rev-parse of another ref is ignored even when it equals a candidate pull request head or commit. A builder whose pull request file list is unknown is unjoined with reason pr_files_unknown; a reviewer is kept. A declared header that the catalog cannot resolve stays unjoined with reason header_unresolved and does not fall through to a commit join or an issue join. The catalog is still ~/gibson-traces/inventory/v2. v7 has 3020 sessions. v6 had 3014. Seven session files appeared after the v6 inventory. One v6 prompt-header row is gone; it was the missing-file drop in v6 and produced no episode.
+
+On the 3013 sessions in both inventories, 2947 kept the same join label and the same pull request. 66 changed label, all to header_unresolved. No session changed pull request under the same label. Commit stays at 3. pr_files_unknown is 0. The displayed-SHA rule and the unknown-file rule changed no inventory row on this catalog.
+
+| Join label | v6 sessions | v7 sessions | Delta |
+| --- | ---: | ---: | ---: |
+| branch | 855 | 855 | 0 |
+| prompt-header | 260 | 259 | -1 |
+| prompt-branch | 51 | 51 | 0 |
+| prompt-pr | 349 | 349 | 0 |
+| commit | 3 | 3 | 0 |
+| issue | 69 | 58 | -11 |
+| issue-merged-unique | 12 | 10 | -2 |
+| coverage | 11 | 11 | 0 |
+| header_unresolved | 0 | 70 | +70 |
+| ambiguous_prompt | 865 | 865 | 0 |
+| ambiguous_issue | 211 | 209 | -2 |
+| ambiguous_branch | 14 | 14 | 0 |
+| no_file_overlap | 32 | 30 | -2 |
+| no_match | 178 | 132 | -46 |
+| no_signal | 104 | 104 | 0 |
+
+The 70 header_unresolved rows are 48 former no_match, 11 former issue, 3 former ambiguous_issue, 2 former issue-merged-unique, 2 former no_file_overlap, and 4 sessions new since v6. The 13 that had been joined are the ones that leave the corpus. Eleven are grok builders on merged conference-os pull requests, previously joined by issue: #2047 (issue 2037), #2048 (2031, two sessions), #2049 (2032, two sessions), #2053 (2050, two sessions), #2054 (2051), #2056 (2055), #2101 (2100), #2110 (2104). Two are Codex reviewers on merged The-AIE/the-gibson#52 (issue 11), previously issue-merged-unique. Their headers named a target the catalog does not resolve, and v6 then adopted the worktree issue.
+
+| Measure | v6 | v7 | Delta |
+| --- | ---: | ---: | ---: |
+| Builder episodes on merged PRs | 131 | 120 | -11 |
+| Train episodes | 114 | 104 | -10 |
+| Train tokens | 7686215 | 7186689 | -499526 |
+| Holdout episodes | 17 | 16 | -1 |
+| Holdout tokens | 1198987 | 1130030 | -68957 |
+| Historical episodes | 1335 | 1322 | -13 |
+| Historical windows | 2515 | 2488 | -27 |
+| Builder PRs | 77 | 71 | -6 |
+| Holdout PRs | 13 | 12 | -1 |
+| Holdout PRs added by shared issue | 1 | 1 | 0 |
+| Builder pool left out by the 16M cap | 0 | 0 | 0 |
+
+Holdout cutoff moved from 2026-10-12T02:11:18Z to 2026-10-12T02:26:20Z because the builder PR set shrank. Seed 414, fraction 0.15, issue-lineage closure. Train and holdout share 0 pull requests, 0 episodes, and 0 issues.
+
+Train repo mix (episodes / tokens): chatterbuilt 46 / 3655561 (same as v6), conference-os 55 / 3420238 (v6 65 / 3919764), the-gibson 3 / 110890 (same as v6). Holdout repo mix: conference-os 16 / 1130030 (v6 17 / 1198987). Historical episodes: chatterbuilt 244 (same as v6), conference-os 966 (v6 977), the-gibson 112 (v6 114). The 11 dropped builders are the conference-os train and holdout change (10 train, 1 holdout). The 2 dropped reviewers are the the-gibson historical change. Negatives stay 25 episodes / 61 windows / 1587920 tokens. Assessor stays 637 episodes / 1093 windows / 25379082 tokens.
+
+Merged builder episodes are still short of 300. The gap is 180.

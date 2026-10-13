@@ -14,16 +14,17 @@ set stays unjoined.
     Exactly one branch on that line wins. Otherwise exactly one PR.
     Otherwise exactly one issue in one repo. Later PR numbers, including
     "do not enter lane-…", do not count. A header the catalog cannot
-    resolve does not fall through to those later numbers.
+    resolve stays unjoined (`header_unresolved`). It does not fall through
+    to later numbers, a commit, or a worktree issue.
 (a3) the rest of that first user prompt declares a branch
     (`prompt-branch`) or a PR number (`prompt-pr`), when the header did
     not. Later tool output is not a declaration. A declared branch is
     resolved through the catalog. A declared PR number is that pull request.
 (b) commit SHAs the session itself created: `git commit` prints
-    `[branch sha]`, and `git rev-parse HEAD` counts only after that commit.
-    A SHA from git log, git show, or rev-parse of another ref is ignored
-    unless it is a candidate pull request's head or one of that pull
-    request's commits.
+    `[branch sha]`, and `git rev-parse HEAD` counts only after that commit
+    in the same session. A SHA from git log, git show, or rev-parse of
+    another ref is ignored, including when it matches a candidate pull
+    request head or commit.
 (c) an issue number from the worktree path, or from the prompt when the
     path has none. The pull request's closingIssuesReferences must contain it.
 (d) when a prompt or an issue matches two or more pull requests, each
@@ -34,7 +35,9 @@ set stays unjoined.
     number appears on the header line. Jaccard is not used to choose.
 A builder joined by a prompt or an issue must still have at least 30%
 of its successful edits on that pull request. Below that the session
-is unjoined (`no_file_overlap`). The confirm ratio is
+is unjoined (`no_file_overlap`). When that pull request's file list is
+unknown, the builder is unjoined (`pr_files_unknown`). A reviewer is
+not rejected for an unknown file list. The confirm ratio is
 |intersection| / |session edits|, not Jaccard: a merged pull request
 is the union of every session plus the coordinator's commit, so a
 session that edited a true subset scores a low Jaccard.
@@ -104,7 +107,6 @@ _COMMIT_BRACKET = re.compile(
     r"\[(?:detached HEAD|(?P<branch>[^\s\[\]]{1,120})) (?P<sha>[0-9a-f]{7,40})\]"
 )
 _BARE_SHA = re.compile(r"(?m)^[ \t]*([0-9a-f]{40})[ \t]*$")
-_SHA_TOKEN = re.compile(r"\b([0-9a-f]{7,40})\b")
 # `git -C <dir> commit` is still a commit. Quoted text is stripped before this runs.
 _GIT_COMMIT_SEG = re.compile(r"(?i)(?:^|\s)git\b[^\n]*\bcommit\b")
 _REV_PARSE_HEAD_SEG = re.compile(
@@ -779,7 +781,9 @@ def resolve_overlap(
     """Pick among ambiguous prompt or issue candidates, then confirm builders.
 
     pr_files_for(key) returns the pull request's path set, or None when the
-    file list is unknown. Unknown lists do not reject a join and do not vote.
+    file list is unknown. Unknown lists do not vote in a coverage pick.
+    A builder whose joined pull request has an unknown file list is
+    unjoined (`pr_files_unknown`). A reviewer is not rejected for that.
     The pick uses edit coverage. Role is not changed here: a reviewer stays
     a reviewer whether or not a pull request is chosen.
     """
@@ -811,7 +815,13 @@ def resolve_overlap(
         key = (decision.get("repo") or "", int(decision.get("pr")))
         pr_files = pr_files_for(key)
         if pr_files is None:
-            return decision
+            return {
+                "join_method": "",
+                "reason": "pr_files_unknown",
+                "repo": "",
+                "pr": "",
+                "candidates": [],
+            }
         if edit_coverage(files, set(pr_files)) + 1e-9 < OVERLAP_CONFIRM:
             return {"join_method": "", "reason": "no_file_overlap", "repo": "", "pr": "", "candidates": []}
     return decision
@@ -896,63 +906,15 @@ def commit_shas_from_events(events: list[tuple[str, str]]) -> list[str]:
     return found
 
 
-def _displayed_shas(events: list[tuple[str, str]], created: set[str]) -> list[str]:
-    found: list[str] = []
-    seen: set[str] = set()
-    for command, output in events:
-        if _is_commit_command(command or ""):
-            continue
-        for match in _SHA_TOKEN.finditer(output or ""):
-            sha = match.group(1)
-            if sha in created or sha in seen:
-                continue
-            seen.add(sha)
-            found.append(sha)
-    return found
+def usable_commit_shas(events: list[tuple[str, str]]) -> list[str]:
+    """SHAs the session created. A displayed SHA is not one of them.
 
-
-def _sha_matches_candidate(sha: str, candidate_shas: set[str]) -> bool:
-    needle = sha.lower()
-    if len(needle) < 7:
-        return False
-    for candidate in candidate_shas:
-        full = candidate.lower()
-        if full == needle or (len(needle) >= 7 and full.startswith(needle)):
-            return True
-    return False
-
-
-def usable_commit_shas(events: list[tuple[str, str]], candidate_shas: set[str] | None = None) -> list[str]:
-    """Session-created SHAs, plus a displayed SHA that is a candidate head or commit."""
-    created = commit_shas_from_events(events)
-    if not candidate_shas:
-        return created
-    out = list(created)
-    seen = set(out)
-    for sha in _displayed_shas(events, seen):
-        if sha in seen:
-            continue
-        if _sha_matches_candidate(sha, candidate_shas):
-            seen.add(sha)
-            out.append(sha)
-    return out
-
-
-def candidate_commit_shas(catalog: "PrCatalog", repo: str, issues: list[int]) -> set[str]:
-    """Head and commit SHAs on pull requests that close these issues, when the catalog has them."""
-    found: set[str] = set()
-    if catalog is None or not issues:
-        return found
-    for key in catalog.issue_keys(repo, issues):
-        pr = catalog.by_key.get(key) or {}
-        for value in (pr.get("headOid"), pr.get("headSha")):
-            if isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{7,40}", value):
-                found.add(value.lower())
-        for commit in pr.get("commits") or []:
-            sha = commit.get("oid") if isinstance(commit, dict) else commit
-            if isinstance(sha, str) and re.fullmatch(r"[0-9a-fA-F]{7,40}", sha):
-                found.add(sha.lower())
-    return found
+    `git commit` output counts, and so does `git rev-parse HEAD` after a
+    commit in the same session. A SHA that appears only in `git log`,
+    `git show`, or rev-parse of another ref does not, even when it equals
+    a candidate pull request head or one of that pull request's commits.
+    """
+    return commit_shas_from_events(events)
 
 
 def _parts_text(content) -> str:
@@ -1190,7 +1152,11 @@ def collect_signals(
     catalog: "PrCatalog | None" = None,
     repo: str = "",
 ) -> dict:
-    """Read a session once. Returns created SHAs, issue numbers, and a prompt repo."""
+    """Read a session once. Returns created SHAs, issue numbers, and a prompt repo.
+
+    catalog and repo stay on the signature for callers. They do not admit a
+    SHA the session only displayed.
+    """
     bag = _SignalBag()
     window = _PromptWindow()
     files: list[Path]
@@ -1212,10 +1178,8 @@ def collect_signals(
     prompt = window.text()
     declaration = parse_prompt_declaration(prompt)
     header = header_target(prompt)
-    candidates: set[str] = set()
-    if catalog is not None and issues:
-        candidates = candidate_commit_shas(catalog, repo or repo_hint(cwd, user_text), issues)
-    shas = usable_commit_shas(bag.finished(), candidates)
+    del catalog, repo
+    shas = usable_commit_shas(bag.finished())
     edited: list[str] = []
     role = ""
     if declaration.get("branch") or declaration.get("prs") or issues or header.get("kind"):
@@ -1363,6 +1327,13 @@ def decide_join(
             return ambiguous("ambiguous_prompt", uniq)
         if len(uniq) == 1:
             return finish(JOIN_PROMPT_HEADER, uniq[0])
+        return {
+            "join_method": "",
+            "reason": "header_unresolved",
+            "repo": "",
+            "pr": "",
+            "candidates": [],
+        }
     elif prompt_branch_attempted:
         uniq = _unique_keys(prompt_branch_keys or [])
         if len(uniq) > 1:
