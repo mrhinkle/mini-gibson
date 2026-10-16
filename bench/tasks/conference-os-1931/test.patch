@@ -1,0 +1,112 @@
+diff --git a/tests/unit/night-sky-canvas.test.ts b/tests/unit/night-sky-canvas.test.ts
+index bf0ad1df2..19d13c3df 100644
+--- a/tests/unit/night-sky-canvas.test.ts
++++ b/tests/unit/night-sky-canvas.test.ts
+@@ -4,7 +4,10 @@
+  * via any medium, is strictly prohibited.
+  */
+ 
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
+ import { act, createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
+ import { fireEvent } from '@testing-library/react';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { render, screen } from '../helpers/component-render';
+@@ -176,14 +179,20 @@ function runNextAnimationFrame(now = 16) {
+ }
+ 
+ describe('AmbientNightSky per-section opt-in (#1836)', () => {
+-  it('keeps bare canvases and the shared SpaceHeroBg control-free by default', () => {
++  it('keeps bare canvases control-free while the shared SpaceHeroBg is controlled', () => {
+     const view = render(createElement(NightSkyCanvas));
+     expect(view.container.querySelector('canvas')).not.toBeNull();
+     expect(screen.queryByRole('button')).toBeNull();
+ 
+     view.rerender(createElement(SpaceHeroBg));
+-    expect(view.container.querySelector('canvas')).not.toBeNull();
+-    expect(screen.queryByRole('button')).toBeNull();
++    const canvas = view.container.querySelector('canvas');
++    const button = screen.getByRole('button', { name: 'Pause animation' });
++    expect(canvas).not.toBeNull();
++    expect(canvas?.getAttribute('aria-hidden')).toBe('true');
++    expect(button.getAttribute('aria-controls')).toBe(canvas?.id);
++    expect(button.getAttribute('aria-pressed')).toBe('false');
++    expect(button.className).toContain('left-4');
++    expect(button.className).not.toContain('right-4');
+   });
+ 
+   it('is off by default and mounts the controlled decorative canvas only when enabled', () => {
+@@ -199,6 +208,72 @@ describe('AmbientNightSky per-section opt-in (#1836)', () => {
+     expect(canvas?.getAttribute('aria-hidden')).toBe('true');
+     expect(button.getAttribute('aria-controls')).toBe(canvas?.id);
+     expect(button.getAttribute('aria-pressed')).toBe('false');
++    expect(button.className).toContain('right-4');
++  });
++});
++
++describe('SpaceHeroBg motion control (#1929)', () => {
++  it('persists manual pause through offscreen and live reduced-motion changes', () => {
++    const motion = installMotionPreference(false);
++    render(createElement(SpaceHeroBg));
++    const observer = visibleObserver();
++
++    act(() => observer.trigger(true));
++    expect(rafCallbacks.size).toBe(1);
++
++    fireEvent.click(screen.getByRole('button', { name: 'Pause animation' }));
++    expect(rafCallbacks.size).toBe(0);
++    expect(
++      screen.getByRole('button', { name: 'Resume animation' })
++        .getAttribute('aria-pressed'),
++    ).toBe('true');
++
++    act(() => {
++      observer.trigger(false);
++      observer.trigger(true);
++      motion.set(true);
++      motion.set(false);
++    });
++    expect(rafCallbacks.size).toBe(0);
++
++    fireEvent.click(screen.getByRole('button', { name: 'Resume animation' }));
++    expect(rafCallbacks.size).toBe(1);
++  });
++
++  it('keeps page content and the accessible control in static markup at every public call path', () => {
++    const html = renderToStaticMarkup(
++      createElement(
++        'main',
++        null,
++        createElement('h1', null, 'Conference details'),
++        createElement(SpaceHeroBg),
++      ),
++    );
++    const canvasId = html.match(/<canvas id="([^"]+)"/)?.[1];
++
++    expect(html).toContain('Conference details');
++    expect(html).toContain('aria-hidden="true"');
++    expect(html).toContain('Pause animation');
++    expect(html).toContain('aria-pressed="false"');
++    expect(canvasId).toBeTruthy();
++    expect(html).toContain(`aria-controls="${canvasId}"`);
++
++    const homepageSource = readFileSync(
++      join(process.cwd(), 'src/components/homepage-renderers.tsx'),
++      'utf8',
++    );
++    const eventHeroSource = readFileSync(
++      join(
++        process.cwd(),
++        'src/app/(public)/events/[eventSlug]/components/landing-sections/hero.tsx',
++      ),
++      'utf8',
++    );
++
++    expect(homepageSource.match(/<SpaceHeroBg\b/g)).toHaveLength(3);
++    expect(eventHeroSource.match(/<SpaceHeroBg\b/g)).toHaveLength(1);
++    expect(homepageSource).not.toContain('NightSkyCanvas');
++    expect(eventHeroSource).not.toContain('NightSkyCanvas');
+   });
+ });
+ 

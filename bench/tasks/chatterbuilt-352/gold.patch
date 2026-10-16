@@ -1,0 +1,77 @@
+diff --git a/apps/mcp/app/api/[transport]/route.ts b/apps/mcp/app/api/[transport]/route.ts
+index 0e25e24a..42caa101 100644
+--- a/apps/mcp/app/api/[transport]/route.ts
++++ b/apps/mcp/app/api/[transport]/route.ts
+@@ -1281,7 +1281,7 @@ const handler = createMcpHandler(
+       {
+         title: "Prepare agent suggestion",
+         description:
+-          "PREVIEW ONLY — proposal package for external continuous agents (Hermes, OpenClaw, any MCP client). Never creates, merges, approves, rejects, or locks a PR. Given owner/repo, paths you plan to edit, a plain-language summary, and optional driver (hermes|openclaw|other), returns a branch name, PR title/body template, the same blast-radius checklist every agent must follow, and an advisory soft-lock via check_suggestion_overlap. Opening the PR still uses your own git access until the update-bot GitHub App lands (#18 residual). Requires Launch or Current.",
++          "PREVIEW ONLY — proposal package for external continuous agents (Hermes, OpenClaw, any MCP client). Never creates, merges, approves, rejects, or locks a PR. Given owner/repo, paths you plan to edit, a plain-language summary, and optional driver (hermes|openclaw|other), returns a branch name, PR title/body template, the same blast-radius checklist every agent must follow, and an advisory soft-lock via check_suggestion_overlap. Opening the PR still uses your own git access until Mark registers the update-bot GitHub App (#308 package shipped; registration pending). Requires Launch or Current.",
+         inputSchema: {
+           owner: z
+             .string()
+diff --git a/apps/mcp/lib/prepare-agent-suggestion.ts b/apps/mcp/lib/prepare-agent-suggestion.ts
+index ccc6af85..9702cf2c 100644
+--- a/apps/mcp/lib/prepare-agent-suggestion.ts
++++ b/apps/mcp/lib/prepare-agent-suggestion.ts
+@@ -1,5 +1,6 @@
+ /**
+- * Prepare an external-agent suggestion package (issue #26, part 2).
++ * Prepare an external-agent suggestion package (issue #26, part 2; residual
++ * honesty realignment #351).
+  *
+  * PREVIEW / PACKAGE ONLY — never creates, merges, approves, rejects, or
+  * locks a PR. Continuous agents (Hermes, OpenClaw, any MCP client) call this
+@@ -8,9 +9,10 @@
+  *   2. An advisory soft-lock via check_suggestion_overlap
+  *   3. A ready-to-use branch name + PR title/body template
+  *
+- * Does NOT require the GitHub App or branch-protection work tracked under
+- * #18 residual (Mark-gated). Opening the PR still uses the agent's own git
+- * credentials (or the future App propose path when that lands).
++ * Does NOT require the GitHub App. #18 collaboration design and #308
++ * registration package are shipped; Mark still registers the App. Opening the
++ * PR uses the agent's own git credentials until the App propose path lands.
++ * Identity model: person-licensed, agent-as-delegate (#309) — roles not built.
+  */
+ 
+ import {
+@@ -49,13 +51,13 @@ export type PrepareAgentSuggestionResult = {
+   blastRadius: string[];
+   /** Soft-lock result (same engine as check_suggestion_overlap). */
+   overlap: CheckSuggestionOverlapResult;
+-  /** Honest residual limits (App write path, per-agent identity). */
++  /** Honest residual limits (App write path, person-license + roles). */
+   residual: string[];
+   nextSteps: string[];
+ };
+ 
+ const NOTICE =
+-  "PREVIEW ONLY — proposal package. This tool never creates, merges, approves, rejects, or locks a PR. It prepares the same owner-gated suggestion path every agent must use (branch + PR + preview; owner merges). Opening the PR still requires your own git access until the update-bot GitHub App lands (#18 residual).";
++  "PREVIEW ONLY — proposal package. This tool never creates, merges, approves, rejects, or locks a PR. It prepares the same owner-gated suggestion path every agent must use (branch + PR + preview; owner merges). Opening the PR still requires your own git access until Mark registers the update-bot GitHub App (#308 package shipped; registration pending).";
+ 
+ const BLAST_RADIUS: string[] = [
+   "Edit the contract (`content/site.ts` and related content files) — not component prose.",
+@@ -67,9 +69,9 @@ const BLAST_RADIUS: string[] = [
+ ];
+ 
+ const RESIDUAL: string[] = [
+-  "Auto-propose via GitHub App (no personal GitHub access) is not shipped — tracked as #18 residual / Mark-gated App registration.",
+-  "Per-agent identity under one license key is not separate yet — every connection with the same key resolves to the same account.",
+-  "Branch protection / CODEOWNERS on customer repos is owner setup, not enforced by this tool.",
++  "Auto-propose via GitHub App (no personal GitHub access) is not shipped — registration package is ready (#308); Mark still registers the App and hosts credentials. App build stays unfiled until then.",
++  "Identity model is person-licensed, agent-as-delegate (driver label only) — site roles (owner/admin/draft-only) are not built yet (#309 design). Every connection with the same license key still resolves to the same account.",
++  "Branch protection / CODEOWNERS on customer repos is owner setup (checklist in #308), not enforced by this tool.",
+ ];
+ 
+ const MAX_SUMMARY = 280;
+@@ -169,7 +171,7 @@ export function buildPrBody(args: {
+     "",
+     "---",
+     "",
+-    "_Package prepared by Chatterbuilt MCP `prepare_agent_suggestion`. Does not use a GitHub App; residual App propose path is #18._",
++    "_Package prepared by Chatterbuilt MCP `prepare_agent_suggestion`. Does not use a GitHub App; residual App propose path awaits Mark registration (#308)._",
+   ].join("\n");
+ }
+ 

@@ -1,0 +1,123 @@
+diff --git a/tests/unit/protected-database-hosts.test.ts b/tests/unit/protected-database-hosts.test.ts
+index d919fdc06..7ef129514 100644
+--- a/tests/unit/protected-database-hosts.test.ts
++++ b/tests/unit/protected-database-hosts.test.ts
+@@ -16,6 +16,8 @@ import {
+   canonicalProductionEndpointFingerprint,
+   deriveAllProductionEndpointFingerprints,
+   deriveProtectedDatabaseHosts,
++  installMapDeploymentRefusal,
++  isDeploymentGuardContext,
+   isProvenSafeDatabaseHost,
+   matchesProtectedDatabaseHost,
+   normalizeDatabaseHost,
+@@ -677,6 +679,109 @@ const LIVE_MAP_ENV = {
+   INSTALL_DATABASE_MAP_JSON: JSON.stringify(LIVE_INSTALL_MAP),
+ };
+ 
++const CI_LOCAL_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/cos_ci";
++
++function ciOptInEnv(
++  extra: Record<string, string | undefined> = {},
++): Record<string, string | undefined> {
++  return {
++    CI: "true",
++    DATABASE_URL: CI_LOCAL_DATABASE_URL,
++    ALLOW_EXAMPLE_INSTALL_MAP: "1",
++    ...extra,
++  };
++}
++
++describe("CI example-map opt-in (#2235)", () => {
++  it("allows the example map for a local host when the opt-in is exactly 1 and Vercel is absent", () => {
++    expect(isDeploymentGuardContext(ciOptInEnv())).toBe(true);
++    expect(installMapDeploymentRefusal(ciOptInEnv())).toBeNull();
++    expect(
++      validateNonProductionDatabaseIsolation(CI_LOCAL_DATABASE_URL, {
++        env: ciOptInEnv(),
++      }),
++    ).toBeNull();
++    for (const databaseUrl of [
++      "postgresql://postgres:postgres@127.0.0.1:5432/cos_ci",
++      "postgresql://postgres:postgres@[::1]:5432/cos_ci",
++      "postgresql://postgres:postgres@0.0.0.0:5432/cos_ci",
++      "postgresql://postgres:postgres@db.localhost:5432/cos_ci",
++    ]) {
++      expect(
++        installMapDeploymentRefusal(ciOptInEnv({ DATABASE_URL: databaseUrl })),
++      ).toBeNull();
++    }
++  });
++
++  it("refuses when VERCEL=1 or VERCEL_ENV is production or preview", () => {
++    for (const extra of [
++      { VERCEL: "1" },
++      { VERCEL_ENV: "production" },
++      { VERCEL_ENV: "preview" },
++      { VERCEL: "1", VERCEL_ENV: "development" },
++    ]) {
++      expect(installMapDeploymentRefusal(ciOptInEnv(extra))).toBe(
++        EXAMPLE_INSTALL_MAP_REFUSAL,
++      );
++    }
++  });
++
++  it("refuses a non-local host, a production fingerprint, and an unreadable URL", () => {
++    const refused = [
++      "postgresql://u:p@ep-example-prod.us-east-1.aws.neon.tech/db",
++      "postgresql://u:p@db.example.org/db",
++      "postgresql://u:p@localhost/db?host=ep-example-prod.us-east-1.aws.neon.tech",
++      "postgresql://u:p@localhost/db?options=endpoint%3Dep-example-prod",
++      "postgresql://u:p@localhost/db?options=endpoint%3Dlocalhost",
++      "postgresql://u:p@localhost/db?options=project%3Dpostgres",
++      "postgresql://u:p@localhost/db?hostaddr=8.8.8.8",
++      "postgresql://u:p@ep-example-prod.localhost/db",
++      "postgresql://u:p@localhost.example.org/db",
++      "not a postgres url",
++    ];
++    for (const databaseUrl of refused) {
++      expect(
++        installMapDeploymentRefusal(ciOptInEnv({ DATABASE_URL: databaseUrl })),
++      ).toBe(EXAMPLE_INSTALL_MAP_REFUSAL);
++    }
++    const absent = ciOptInEnv();
++    delete absent.DATABASE_URL;
++    expect(installMapDeploymentRefusal(absent)).toBe(EXAMPLE_INSTALL_MAP_REFUSAL);
++    expect(
++      installMapDeploymentRefusal(
++        ciOptInEnv({ PROTECTED_DATABASE_HOSTS: "localhost" }),
++      ),
++    ).toBe(EXAMPLE_INSTALL_MAP_REFUSAL);
++  });
++
++  it("refuses when the opt-in is absent", () => {
++    const env = ciOptInEnv();
++    delete env.ALLOW_EXAMPLE_INSTALL_MAP;
++    expect(installMapDeploymentRefusal(env)).toBe(EXAMPLE_INSTALL_MAP_REFUSAL);
++  });
++
++  it("does not launder a missing or unparseable map", () => {
++    expect(
++      installMapDeploymentRefusal(
++        ciOptInEnv({
++          INSTALL_DATABASE_MAP_PATH: "/tmp/conference-os-missing-install-map.json",
++        }),
++      ),
++    ).toMatch(/could not be read/);
++    expect(
++      installMapDeploymentRefusal(ciOptInEnv({ INSTALL_DATABASE_MAP_JSON: "{" })),
++    ).toMatch(/not valid JSON/);
++  });
++
++  it("refuses every opt-in value other than exactly 1", () => {
++    for (const value of ["true", "yes", "0", "", "1 ", " 1", "TRUE", "2"]) {
++      expect(
++        installMapDeploymentRefusal(ciOptInEnv({ ALLOW_EXAMPLE_INSTALL_MAP: value })),
++      ).toBe(EXAMPLE_INSTALL_MAP_REFUSAL);
++    }
++  });
++});
++
+ describe("deployment isolation does not skip the map (#2235 hole 1)", () => {
+   const liveHost =
+     "postgresql://u:p@ep-live-prod.us-east-1.aws.neon.tech/db?sslmode=require";

@@ -1,0 +1,271 @@
+diff --git a/tests/unit/schedule-board-semantics.test.ts b/tests/unit/schedule-board-semantics.test.ts
+new file mode 100644
+index 000000000..285504e57
+--- /dev/null
++++ b/tests/unit/schedule-board-semantics.test.ts
+@@ -0,0 +1,265 @@
++/** @vitest-environment jsdom */
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { createElement, type ReactNode } from 'react';
++import { fireEvent } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { render, screen, within } from '../helpers/component-render';
++import { tzTimeWithZone } from '@/lib/format-time';
++
++vi.mock('next/link', () => ({
++  default: ({
++    children,
++    href,
++    ...rest
++  }: {
++    children: ReactNode;
++    href: string;
++    [key: string]: unknown;
++  }) => createElement('a', { href, ...rest }, children),
++}));
++
++import {
++  ScheduleBoardView,
++  type BoardSession,
++} from '../../src/app/(public)/events/[eventSlug]/schedule/schedule-board-view';
++import ScheduleClient from '../../src/app/(public)/events/[eventSlug]/schedule/schedule-client';
++
++const EVENT_SLUG = 'test-event';
++const TIMEZONE = 'UTC';
++
++const tracks = [
++  { id: 'builders', name: 'Builders', color: '#0055ff' },
++  { id: 'users', name: 'Users', color: '#00aa55' },
++];
++
++function makeSession(
++  overrides: Partial<BoardSession> &
++    Pick<BoardSession, 'id' | 'title' | 'trackId' | 'startTime' | 'endTime'>
++): BoardSession {
++  const track = tracks.find((item) => item.id === overrides.trackId);
++  return {
++    description: null,
++    speakerName: 'Ada Lovelace',
++    speakerTitle: null,
++    speakerCompany: null,
++    sessionType: 'TALK',
++    roomName: 'Hall A',
++    trackName: track?.name ?? null,
++    trackColor: track?.color ?? null,
++    hasVirtualSession: false,
++    ...overrides,
++  };
++}
++
++const dayOneBuilders = makeSession({
++  id: 'sess-builders-1',
++  title: 'Building Agents',
++  trackId: 'builders',
++  startTime: '2026-09-12T14:00:00.000Z',
++  endTime: '2026-09-12T15:00:00.000Z',
++  roomName: 'Hall A',
++});
++
++const dayOneUsers = makeSession({
++  id: 'sess-users-1',
++  title: 'Using Agents',
++  trackId: 'users',
++  startTime: '2026-09-12T14:30:00.000Z',
++  endTime: '2026-09-12T15:30:00.000Z',
++  roomName: 'Hall B',
++});
++
++const dayTwoBuilders = makeSession({
++  id: 'sess-builders-2',
++  title: 'Shipping Agents',
++  trackId: 'builders',
++  startTime: '2026-09-13T16:00:00.000Z',
++  endTime: '2026-09-13T17:00:00.000Z',
++  roomName: 'Hall A',
++});
++
++const allSessions = [dayOneBuilders, dayOneUsers, dayTwoBuilders];
++
++function sessionHref(id: string): string {
++  return `/events/${EVENT_SLUG}/schedule/${id}`;
++}
++
++function expectedAriaLabel(session: BoardSession): string {
++  return `${session.title}, ${tzTimeWithZone(session.startTime, TIMEZONE)} to ${tzTimeWithZone(session.endTime, TIMEZONE)}${session.roomName ? `, ${session.roomName}` : ''}`;
++}
++
++function assertNoAriaGridRoles(container: HTMLElement): void {
++  expect(container.querySelector('[role="grid"]')).toBeNull();
++  expect(container.querySelector('[role="columnheader"]')).toBeNull();
++  expect(container.querySelector('[role="gridcell"]')).toBeNull();
++  expect(container.querySelector('[role="row"]')).toBeNull();
++}
++
++function assertBoardSemantics(
++  container: HTMLElement,
++  expected: {
++    trackIds: string[];
++    trackNames: string[];
++    sessions: BoardSession[];
++  }
++): void {
++  assertNoAriaGridRoles(container);
++
++  const region = container.querySelector(
++    '[role="region"][aria-label="Visual schedule by track"]'
++  );
++  expect(region).not.toBeNull();
++
++  for (let index = 0; index < expected.trackIds.length; index += 1) {
++    const trackId = expected.trackIds[index]!;
++    const trackName = expected.trackNames[index]!;
++    const headerTile = container.querySelector(`#track-column-${trackId}`);
++    expect(headerTile).not.toBeNull();
++
++    expect(headerTile?.getAttribute('role')).toBe('group');
++    const headerLabelId = headerTile?.getAttribute('aria-labelledby');
++    expect(headerLabelId).toBeTruthy();
++    const headerLabel = container.querySelector(
++      `#${CSS.escape(headerLabelId ?? '')}`
++    );
++    expect(headerLabel?.textContent?.trim()).toBe(trackName);
++
++    const namedColumns = Array.from(
++      container.querySelectorAll(
++        '[role="group"][aria-labelledby], [role="list"][aria-labelledby]'
++      )
++    ).filter((element) => {
++      const labelId = element.getAttribute('aria-labelledby');
++      if (!labelId) return false;
++      const label = container.querySelector(`#${CSS.escape(labelId)}`);
++      return label?.textContent?.trim() === trackName;
++    });
++    expect(namedColumns.length).toBeGreaterThanOrEqual(1);
++
++    const trackSession = expected.sessions.find(
++      (session) => session.trackId === trackId
++    );
++    expect(trackSession).toBeDefined();
++    const sessionLink = container.querySelector(
++      `[data-board-session-id="${trackSession!.id}"]`
++    );
++    expect(sessionLink).not.toBeNull();
++    const sessionColumn = sessionLink?.closest('[role="group"]');
++    expect(sessionColumn).not.toBeNull();
++    expect(sessionColumn).not.toBe(headerTile);
++    expect(sessionColumn?.getAttribute('role')).toBe('group');
++    const sessionLabelId = sessionColumn?.getAttribute('aria-labelledby');
++    expect(sessionLabelId).toBe(headerLabelId);
++    const sessionLabel = container.querySelector(
++      `#${CSS.escape(sessionLabelId ?? '')}`
++    );
++    expect(sessionLabel?.textContent?.trim()).toBe(trackName);
++  }
++
++  for (const session of expected.sessions) {
++    const link = container.querySelector<HTMLAnchorElement>(
++      `[data-board-session-id="${session.id}"]`
++    );
++    expect(link).not.toBeNull();
++    expect(link?.getAttribute('href')).toBe(sessionHref(session.id));
++    expect(link?.getAttribute('aria-label')).toBe(expectedAriaLabel(session));
++  }
++}
++
++function renderBoard(props?: {
++  sessions?: BoardSession[];
++  selectedTrackId?: string | null;
++}) {
++  return render(
++    createElement(ScheduleBoardView, {
++      eventSlug: EVENT_SLUG,
++      timezone: TIMEZONE,
++      tracks,
++      sessions: props?.sessions ?? allSessions,
++      selectedTrackId: props?.selectedTrackId ?? null,
++    })
++  );
++}
++
++describe('public schedule board semantics (#2032)', () => {
++  beforeEach(() => {
++    Element.prototype.scrollIntoView = vi.fn();
++  });
++
++  it('uses a labelled region and named track groups instead of an ARIA grid', () => {
++    const { container } = renderBoard();
++    assertBoardSemantics(container, {
++      trackIds: ['builders', 'users'],
++      trackNames: ['Builders', 'Users'],
++      sessions: [dayOneBuilders, dayOneUsers],
++    });
++  });
++
++  it('keeps semantics after switching day and after a track-filter re-render', () => {
++    const { container, rerender } = renderBoard();
++
++    fireEvent.click(screen.getByRole('button', { name: 'Sun, Sep 13' }));
++    expect(
++      container.querySelector('[data-board-session-id="sess-builders-2"]')
++    ).not.toBeNull();
++    expect(
++      container.querySelector('[data-board-session-id="sess-builders-1"]')
++    ).toBeNull();
++    assertBoardSemantics(container, {
++      trackIds: ['builders'],
++      trackNames: ['Builders'],
++      sessions: [dayTwoBuilders],
++    });
++
++    rerender(
++      createElement(ScheduleBoardView, {
++        eventSlug: EVENT_SLUG,
++        timezone: TIMEZONE,
++        tracks,
++        sessions: allSessions,
++        selectedTrackId: 'users',
++      })
++    );
++    fireEvent.click(screen.getByRole('button', { name: 'Sat, Sep 12' }));
++    assertBoardSemantics(container, {
++      trackIds: ['users'],
++      trackNames: ['Users'],
++      sessions: [dayOneUsers],
++    });
++  });
++
++  it('applies the same semantics after switching out of Table into Grid', () => {
++    const { container } = render(
++      createElement(ScheduleClient, {
++        eventSlug: EVENT_SLUG,
++        timezone: TIMEZONE,
++        tracks,
++        sessions: allSessions,
++      })
++    );
++
++    expect(container.querySelector('[data-testid="schedule-table"]')).not.toBeNull();
++    expect(
++      container.querySelector('[role="region"][aria-label="Visual schedule by track"]')
++    ).toBeNull();
++
++    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
++    assertBoardSemantics(container, {
++      trackIds: ['builders', 'users'],
++      trackNames: ['Builders', 'Users'],
++      sessions: [dayOneBuilders, dayOneUsers],
++    });
++
++    const filters = within(screen.getByRole('group', { name: 'Tracks' }));
++    fireEvent.click(filters.getByRole('button', { name: 'Users' }));
++    assertBoardSemantics(container, {
++      trackIds: ['users'],
++      trackNames: ['Users'],
++      sessions: [dayOneUsers],
++    });
++  });
++});

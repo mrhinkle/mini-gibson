@@ -1,0 +1,825 @@
+diff --git a/tests/unit/public-speaker-rows.test.ts b/tests/unit/public-speaker-rows.test.ts
+new file mode 100644
+index 000000000..17259da66
+--- /dev/null
++++ b/tests/unit/public-speaker-rows.test.ts
+@@ -0,0 +1,819 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle
++ * SPDX-License-Identifier: AGPL-3.0-or-later
++ */
++
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const mocks = vi.hoisted(() => ({
++  eventFindUnique: vi.fn(),
++  sessionFindFirst: vi.fn(),
++  sessionFindMany: vi.fn(),
++  userProfileFindMany: vi.fn(),
++}));
++
++vi.mock('@/lib/db', () => ({
++  prisma: {
++    event: { findUnique: mocks.eventFindUnique },
++    session: { findFirst: mocks.sessionFindFirst, findMany: mocks.sessionFindMany },
++    userProfile: { findMany: mocks.userProfileFindMany },
++  },
++}));
++vi.mock('next/navigation', () => ({
++  notFound: () => {
++    throw new Error('NEXT_NOT_FOUND');
++  },
++}));
++vi.mock('@/components/speaker-card', () => ({
++  SpeakerCard: (props: {
++    speakerName: string;
++    speakerPhoto: string | null;
++    jobTitle: string | null;
++    organization: string | null;
++    talks?: Array<{ title: string }>;
++  }) =>
++    createElement('article', {
++      'data-card': [props.speakerName, props.speakerPhoto, props.jobTitle, props.organization].join('|'),
++      'data-talks': (props.talks ?? []).map((talk) => talk.title).join('|'),
++    }),
++}));
++
++import EventSpeakersPage from '../../src/app/(public)/events/[eventSlug]/speakers/page';
++import { findPublicEventSpeaker } from '@/lib/public-speaker-session';
++import {
++  directorySpeakerIdentities,
++  peopleOnSession,
++} from '@/lib/public-speaker-people';
++import { slugify } from '@/lib/slug';
++import type { LinkedSpeakerProfile } from '@/lib/speaker-display';
++
++const EVENT_START = new Date('2026-03-23T00:00:00Z');
++const EVENT_END = new Date('2026-03-25T23:00:00Z');
++
++const adaProfile: LinkedSpeakerProfile = {
++  avatarUrl: 'https://images.example.com/ada-own.png',
++  workplace: 'Own Company',
++  jobTitle: 'Own Title',
++  bio: 'Own bio',
++  linkedinUrl: null,
++  xHandle: 'ada_own',
++  youtubeUrl: null,
++  websiteUrl: null,
++};
++const graceProfile: LinkedSpeakerProfile = {
++  ...adaProfile,
++  avatarUrl: 'https://images.example.com/grace-own.png',
++  workplace: 'Grace Own Co',
++  jobTitle: 'Grace Own Title',
++  bio: 'Grace own bio',
++  xHandle: 'grace_own',
++};
++const PROFILES: Record<string, LinkedSpeakerProfile> = {
++  user_ada: adaProfile,
++  user_grace: graceProfile,
++};
++
++type SpeakerRow = {
++  name: string;
++  title?: string | null;
++  company?: string | null;
++  imageUrl?: string | null;
++  linkedinUrl?: string | null;
++  bio?: string | null;
++  displayOrder?: number;
++  clerkUserId?: string | null;
++};
++
++type EventFixture = {
++  name: string;
++  slug: string;
++  hashtag: null;
++  xHandle: null;
++  timezone: string;
++  scheduleStatus: 'PUBLISHED' | 'DRAFT';
++  startDate: Date;
++  endDate: Date;
++};
++
++type SessionFixture = {
++  id: string;
++  title: string;
++  description: null;
++  sessionType: string;
++  isPublished: boolean;
++  speakerName: string | null;
++  speakerTitle: string | null;
++  speakerCompany: string | null;
++  speakerBio: string | null;
++  speakerPhoto: string | null;
++  speakerXHandle: string | null;
++  speakerLinkedin: string | null;
++  speakerClerkUserId: string | null;
++  startTime: Date;
++  endTime: Date;
++  room: null;
++  speakers: SpeakerRow[];
++  event: EventFixture;
++};
++
++function eventFor(
++  slug: string,
++  scheduleStatus: EventFixture['scheduleStatus'] = 'PUBLISHED',
++): EventFixture {
++  return {
++    name: 'All Things AI 2026',
++    slug,
++    hashtag: null,
++    xHandle: null,
++    timezone: 'America/New_York',
++    scheduleStatus,
++    startDate: EVENT_START,
++    endDate: EVENT_END,
++  };
++}
++
++function session(
++  slug: string,
++  overrides: Partial<SessionFixture> & Pick<SessionFixture, 'id'>,
++): SessionFixture {
++  return {
++    title: 'Talk',
++    description: null,
++    sessionType: 'TALK',
++    isPublished: true,
++    speakerName: null,
++    speakerTitle: null,
++    speakerCompany: null,
++    speakerBio: null,
++    speakerPhoto: null,
++    speakerXHandle: null,
++    speakerLinkedin: null,
++    speakerClerkUserId: null,
++    startTime: new Date('2026-03-23T14:00:00Z'),
++    endTime: new Date('2026-03-23T15:00:00Z'),
++    room: null,
++    speakers: [],
++    ...overrides,
++    event: overrides.event ?? eventFor(slug),
++  };
++}
++
++type Where = {
++  id?: string;
++  isPublished?: boolean;
++  speakerName?: string | { not?: null };
++  sessionType?: { notIn?: string[] };
++  event?: { slug?: string };
++  OR?: Array<{ speakerName?: { not?: null }; speakers?: { some?: object } }>;
++};
++
++function matches(row: SessionFixture, where: Where = {}): boolean {
++  if (where.id && row.id !== where.id) return false;
++  if (where.isPublished === true && !row.isPublished) return false;
++  if (where.sessionType?.notIn?.includes(row.sessionType)) return false;
++  if (where.event?.slug && row.event.slug !== where.event.slug) return false;
++  if (typeof where.speakerName === 'string' && row.speakerName !== where.speakerName) return false;
++  if (
++    where.speakerName &&
++    typeof where.speakerName === 'object' &&
++    where.speakerName.not === null &&
++    row.speakerName == null
++  ) {
++    return false;
++  }
++  if (where.OR) {
++    const ok = where.OR.some((clause) => {
++      if (clause.speakerName?.not === null) return row.speakerName != null;
++      if (clause.speakers && 'some' in clause.speakers) {
++        return row.speakers.some((speaker) => speaker.name.trim());
++      }
++      return false;
++    });
++    if (!ok) return false;
++  }
++  return true;
++}
++
++let table: SessionFixture[] = [];
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  table = [];
++  mocks.sessionFindFirst.mockImplementation(
++    async ({ where }: { where: Where }) => table.find((row) => matches(row, where)) ?? null,
++  );
++  mocks.sessionFindMany.mockImplementation(async ({ where }: { where?: Where }) =>
++    table
++      .filter((row) => matches(row, where))
++      .sort((a, b) => a.startTime.getTime() - b.startTime.getTime()),
++  );
++  mocks.eventFindUnique.mockImplementation(async ({ where }: { where: { slug: string } }) => {
++    const row = table.find((session) => session.event.slug === where.slug);
++    return row?.event ?? null;
++  });
++  mocks.userProfileFindMany.mockImplementation(
++    async ({ where }: { where: { clerkUserId: { in: string[] } } }) =>
++      where.clerkUserId.in
++        .filter((id) => PROFILES[id])
++        .map((id) => ({ clerkUserId: id, ...PROFILES[id]! })),
++  );
++});
++
++describe('speaker people (#2258)', () => {
++  it('uses the flat name only when the session has no named rows', () => {
++    expect(
++      peopleOnSession({
++        speakerName: 'Grace Hopper',
++        speakerTitle: 'Rear Admiral',
++        speakers: [],
++      }).map((person) => person.name),
++    ).toEqual(['Grace Hopper']);
++  });
++
++  it('orders rows by displayOrder and drops a repeated name and the joined flat name', () => {
++    const people = peopleOnSession({
++      speakerName: 'Achin Gupta & Divya Mahajan',
++      speakers: [
++        { name: 'Achin Gupta', displayOrder: 1 },
++        { name: 'Divya Mahajan', displayOrder: 0 },
++        { name: 'Achin Gupta', displayOrder: 2 },
++      ],
++    });
++    expect(people.map((person) => person.name)).toEqual(['Divya Mahajan', 'Achin Gupta']);
++  });
++
++  it('keeps one person when the row and the flat name are the same', () => {
++    expect(
++      peopleOnSession({
++        speakerName: 'Achin Gupta',
++        speakers: [{ name: 'Achin Gupta', displayOrder: 0 }],
++      }),
++    ).toHaveLength(1);
++  });
++
++  it('keeps CFP title and organization on a flat directory card', () => {
++    expect(
++      directorySpeakerIdentities({
++        speakerName: 'Grace Hopper',
++        speakerTitle: 'Rear Admiral',
++        speakerCompany: 'US Navy',
++        speakerPhoto: 'https://cdn.example.com/grace.jpg',
++        cfpSubmission: { jobTitle: 'CFP Title', organization: 'Navy' },
++      }),
++    ).toEqual([
++      {
++        name: 'Grace Hopper',
++        photo: 'https://cdn.example.com/grace.jpg',
++        jobTitle: 'CFP Title',
++        organization: 'Navy',
++        clerkUserId: null,
++      },
++    ]);
++  });
++});
++
++describe('public speaker resolution (#2258)', () => {
++  it('resolves a flat-name session with no rows from the session fields', async () => {
++    table = [
++      session('flat-event', {
++        id: 'sess-grace',
++        title: 'Compilers',
++        speakerName: 'Grace Hopper',
++        speakerTitle: 'Rear Admiral',
++        speakerCompany: 'US Navy',
++        speakerBio: 'Grace bio',
++        speakerPhoto: 'https://cdn.example.com/grace.jpg',
++        speakers: [],
++      }),
++    ];
++    const profile = await findPublicEventSpeaker('flat-event', 'grace-hopper');
++    expect(profile?.speakerName).toBe('Grace Hopper');
++    expect(profile?.sessions.map((item) => item.id)).toEqual(['sess-grace']);
++    expect(profile?.display).toMatchObject({
++      jobTitle: 'Rear Admiral',
++      company: 'US Navy',
++      bio: 'Grace bio',
++      photo: 'https://cdn.example.com/grace.jpg',
++    });
++  });
++
++  it('resolves each row and does not resolve the joined speakerName slug', async () => {
++    table = [
++      session('pair-event', {
++        id: 'sess-pair',
++        title: 'Two-speaker talk',
++        speakerName: 'Achin Gupta & Divya Mahajan',
++        speakers: [
++          { name: 'Achin Gupta', displayOrder: 0, title: 'Achin Title' },
++          { name: 'Divya Mahajan', displayOrder: 1, title: 'Divya Title' },
++        ],
++      }),
++    ];
++    expect(slugify('Achin Gupta & Divya Mahajan')).toBe('achin-gupta-divya-mahajan');
++
++    const achin = await findPublicEventSpeaker('pair-event', 'achin-gupta');
++    const divya = await findPublicEventSpeaker('pair-event', 'divya-mahajan');
++    const joined = await findPublicEventSpeaker('pair-event', 'achin-gupta-divya-mahajan');
++
++    expect(achin?.speakerName).toBe('Achin Gupta');
++    expect(achin?.sessions.map((item) => item.id)).toEqual(['sess-pair']);
++    expect(divya?.speakerName).toBe('Divya Mahajan');
++    expect(divya?.sessions.map((item) => item.id)).toEqual(['sess-pair']);
++    expect(joined).toBeNull();
++  });
++
++  it('lists both talks for one person, earliest start first', async () => {
++    table = [
++      session('repeat-event', {
++        id: 'sess-late',
++        title: 'Afternoon',
++        speakerName: 'Achin Gupta',
++        startTime: new Date('2026-03-23T18:00:00Z'),
++        endTime: new Date('2026-03-23T19:00:00Z'),
++        speakers: [{ name: 'Achin Gupta', displayOrder: 0 }],
++      }),
++      session('repeat-event', {
++        id: 'sess-early',
++        title: 'Morning',
++        speakerName: 'Achin Gupta & Divya Mahajan',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakers: [
++          { name: 'Achin Gupta', displayOrder: 0 },
++          { name: 'Divya Mahajan', displayOrder: 1 },
++        ],
++      }),
++      session('repeat-event', {
++        id: 'sess-flat',
++        title: 'Flat encore',
++        speakerName: 'Achin Gupta',
++        startTime: new Date('2026-03-24T14:00:00Z'),
++        endTime: new Date('2026-03-24T15:00:00Z'),
++        speakers: [],
++      }),
++    ];
++    const profile = await findPublicEventSpeaker('repeat-event', 'achin-gupta');
++    expect(profile?.sessions.map((item) => item.title)).toEqual([
++      'Morning',
++      'Afternoon',
++      'Flat encore',
++    ]);
++    const divya = await findPublicEventSpeaker('repeat-event', 'divya-mahajan');
++    expect(divya?.sessions.map((item) => item.id)).toEqual(['sess-early']);
++  });
++
++  it('prefers row fields and falls back to flat speaker fields when the row field is null', async () => {
++    table = [
++      session('precedence-event', {
++        id: 'sess-row',
++        speakerName: 'Achin Gupta',
++        speakerTitle: 'Flat Title',
++        speakerCompany: 'Flat Co',
++        speakerBio: 'Flat bio',
++        speakerPhoto: 'https://images.example.com/flat.png',
++        speakerLinkedin: 'https://www.linkedin.com/in/flat',
++        speakers: [
++          {
++            name: 'Achin Gupta',
++            displayOrder: 0,
++            title: 'Row Title',
++            company: null,
++            bio: 'Row bio',
++            imageUrl: 'https://images.example.com/row.png',
++            linkedinUrl: null,
++          },
++        ],
++      }),
++    ];
++    const profile = await findPublicEventSpeaker('precedence-event', 'achin-gupta');
++    expect(profile?.display).toMatchObject({
++      jobTitle: 'Row Title',
++      company: 'Flat Co',
++      bio: 'Row bio',
++      photo: 'https://images.example.com/row.png',
++      linkedinUrl: 'https://www.linkedin.com/in/flat',
++    });
++  });
++
++  it("uses a row's linked account, and shows snapshots when one name has two accounts", async () => {
++    table = [
++      session('linked-event', {
++        id: 'sess-linked',
++        speakerName: 'Ada Lovelace',
++        speakerTitle: 'Row Title',
++        speakerCompany: 'Row Co',
++        speakerBio: 'Row bio',
++        speakers: [
++          {
++            name: 'Ada Lovelace',
++            displayOrder: 0,
++            title: 'Row Title',
++            company: 'Row Co',
++            bio: 'Row bio',
++            clerkUserId: 'user_ada',
++          },
++        ],
++      }),
++    ];
++    const linked = await findPublicEventSpeaker('linked-event', 'ada-lovelace');
++    expect(linked?.display).toMatchObject({
++      photo: adaProfile.avatarUrl,
++      company: 'Own Company',
++      jobTitle: 'Own Title',
++      bio: 'Own bio',
++      xHandle: 'ada_own',
++    });
++
++    table = [
++      session('conflict-event', {
++        id: 'sess-a',
++        title: 'A talk',
++        speakerName: 'Alex Smith',
++        speakerBio: 'Snapshot A',
++        speakerCompany: 'Snapshot A Co',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakers: [
++          { name: 'Alex Smith', displayOrder: 0, bio: 'Snapshot A', company: 'Snapshot A Co', clerkUserId: 'user_ada' },
++        ],
++      }),
++      session('conflict-event', {
++        id: 'sess-b',
++        title: 'B talk',
++        speakerName: 'Alex Smith',
++        speakerBio: 'Snapshot B',
++        startTime: new Date('2026-03-23T16:00:00Z'),
++        endTime: new Date('2026-03-23T17:00:00Z'),
++        speakers: [
++          { name: 'Alex Smith', displayOrder: 0, bio: 'Snapshot B', clerkUserId: 'user_grace' },
++        ],
++      }),
++    ];
++    mocks.userProfileFindMany.mockClear();
++    const conflict = await findPublicEventSpeaker('conflict-event', 'alex-smith');
++    expect(conflict?.display).toMatchObject({ bio: 'Snapshot A', company: 'Snapshot A Co' });
++    expect(JSON.stringify(conflict?.display)).not.toContain('Own Company');
++    expect(JSON.stringify(conflict?.display)).not.toContain('Grace Own Co');
++    expect(mocks.userProfileFindMany).not.toHaveBeenCalled();
++  });
++
++  it("by session id, an unlinked row does not borrow a same-name peer's account", async () => {
++    table = [
++      session('own-link-event', {
++        id: 'sess-unlinked',
++        speakerName: 'Ada Lovelace',
++        speakerBio: 'Early bio',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakers: [{ name: 'Ada Lovelace', displayOrder: 0, bio: 'Early bio', clerkUserId: null }],
++      }),
++      session('own-link-event', {
++        id: 'sess-linked',
++        speakerName: 'Ada Lovelace',
++        startTime: new Date('2026-03-23T16:00:00Z'),
++        endTime: new Date('2026-03-23T17:00:00Z'),
++        speakers: [{ name: 'Ada Lovelace', displayOrder: 0, bio: 'Late bio', clerkUserId: 'user_ada' }],
++      }),
++    ];
++    const byId = await findPublicEventSpeaker('own-link-event', 'sess-unlinked');
++    expect(byId?.display).toMatchObject({ bio: 'Early bio' });
++    expect(JSON.stringify(byId?.display)).not.toContain('Own bio');
++    expect(mocks.userProfileFindMany).not.toHaveBeenCalled();
++  });
++
++  it('by session id, a later unlinked appearance shows its own fields, not the earliest appearance', async () => {
++    table = [
++      session('own-snapshot-event', {
++        id: 'sess-early',
++        speakerName: 'Ada Lovelace',
++        startTime: new Date('2026-03-23T10:00:00Z'),
++        endTime: new Date('2026-03-23T11:00:00Z'),
++        speakers: [{ name: 'Ada Lovelace', displayOrder: 0, title: 'Early Title', bio: 'Early bio', clerkUserId: null }],
++      }),
++      session('own-snapshot-event', {
++        id: 'sess-late',
++        speakerName: 'Ada Lovelace',
++        startTime: new Date('2026-03-23T16:00:00Z'),
++        endTime: new Date('2026-03-23T17:00:00Z'),
++        speakers: [{ name: 'Ada Lovelace', displayOrder: 0, title: 'Late Title', bio: 'Late bio', clerkUserId: null }],
++      }),
++    ];
++    const byId = await findPublicEventSpeaker('own-snapshot-event', 'sess-late');
++    expect(byId?.display).toMatchObject({ jobTitle: 'Late Title', bio: 'Late bio' });
++    expect(byId?.sessions.map((item) => item.id)).toEqual(['sess-early', 'sess-late']);
++    expect(mocks.userProfileFindMany).not.toHaveBeenCalled();
++  });
++
++  it('resolves a two-row session id to the first row by displayOrder', async () => {
++    table = [
++      session('id-event', {
++        id: 'sess-pair',
++        speakerName: 'Achin Gupta & Divya Mahajan',
++        speakers: [
++          { name: 'Achin Gupta', displayOrder: 1, title: 'Achin Title' },
++          { name: 'Divya Mahajan', displayOrder: 0, title: 'Divya Title' },
++        ],
++      }),
++    ];
++    const profile = await findPublicEventSpeaker('id-event', 'sess-pair');
++    expect(profile?.speakerName).toBe('Divya Mahajan');
++    expect(profile?.speakerSlug).toBe('divya-mahajan');
++    expect(profile?.display).toMatchObject({ jobTitle: 'Divya Title' });
++    expect(profile?.sessions.map((item) => item.id)).toEqual(['sess-pair']);
++  });
++
++  it('omits unpublished sessions, a draft schedule, break sessions, and out-of-window sessions', async () => {
++    table = [
++      session('gate-event', {
++        id: 'sess-hidden',
++        isPublished: false,
++        speakerName: 'Hidden Person',
++        speakers: [{ name: 'Hidden Person', displayOrder: 0 }],
++      }),
++      session('gate-event', {
++        id: 'sess-break',
++        sessionType: 'BREAK',
++        speakerName: 'Break Person',
++        speakers: [{ name: 'Break Person', displayOrder: 0 }],
++      }),
++      session('gate-event', {
++        id: 'sess-late',
++        title: 'After the event',
++        speakerName: 'Late Person',
++        startTime: new Date('2026-03-26T14:00:00Z'),
++        endTime: new Date('2026-03-26T15:00:00Z'),
++        speakers: [{ name: 'Late Person', displayOrder: 0 }],
++      }),
++      session('gate-event', {
++        id: 'sess-live',
++        title: 'Live talk',
++        speakerName: 'Live Person',
++        speakers: [{ name: 'Live Person', displayOrder: 0 }],
++      }),
++    ];
++    expect(await findPublicEventSpeaker('gate-event', 'hidden-person')).toBeNull();
++    expect(await findPublicEventSpeaker('gate-event', 'break-person')).toBeNull();
++    expect(await findPublicEventSpeaker('gate-event', 'late-person')).toBeNull();
++    expect(await findPublicEventSpeaker('gate-event', 'sess-late')).toBeNull();
++    const live = await findPublicEventSpeaker('gate-event', 'live-person');
++    expect(live?.sessions.map((item) => item.id)).toEqual(['sess-live']);
++
++    table = [
++      session('draft-event', {
++        id: 'sess-draft',
++        speakerName: 'Draft Person',
++        speakers: [{ name: 'Draft Person', displayOrder: 0 }],
++        event: eventFor('draft-event', 'DRAFT'),
++      }),
++    ];
++    expect(await findPublicEventSpeaker('draft-event', 'draft-person')).toBeNull();
++    expect(await findPublicEventSpeaker('draft-event', 'sess-draft')).toBeNull();
++  });
++});
++
++describe('event speaker directory (#2258)', () => {
++  const renderDirectory = async (
++    slug: string,
++    sessions: Array<Record<string, unknown>>,
++    eventOverrides: Record<string, unknown> = {},
++  ) => {
++    mocks.eventFindUnique.mockResolvedValue({
++      slug,
++      name: 'All Things AI 2026',
++      scheduleStatus: 'PUBLISHED',
++      startDate: EVENT_START,
++      endDate: EVENT_END,
++      features: null,
++      cfpOpen: false,
++      sessions,
++      ...eventOverrides,
++    });
++    return renderToStaticMarkup(
++      await EventSpeakersPage({ params: Promise.resolve({ eventSlug: slug }) }),
++    );
++  };
++
++  const cards = (markup: string) =>
++    [...markup.matchAll(/data-card="([^"]*)"/g)].map((match) => match[1]);
++
++  it('shows one card for a flat-name session and keeps the CFP title', async () => {
++    const markup = await renderDirectory('flat-dir', [
++      {
++        id: 'sess-grace',
++        title: 'Compilers',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakerName: 'Grace Hopper',
++        speakerTitle: 'Rear Admiral',
++        speakerCompany: 'US Navy',
++        speakerPhoto: 'https://cdn.example.com/grace.jpg',
++        speakerClerkUserId: null,
++        speakers: [],
++        room: null,
++        cfpSubmission: { jobTitle: 'CFP Title', organization: 'Navy' },
++      },
++    ]);
++    expect(cards(markup)).toEqual([
++      'Grace Hopper|https://cdn.example.com/grace.jpg|CFP Title|Navy',
++    ]);
++    expect(markup).toContain('data-talks="Compilers"');
++    expect(mocks.eventFindUnique).toHaveBeenCalledWith(
++      expect.objectContaining({
++        include: expect.objectContaining({
++          sessions: expect.objectContaining({
++            where: expect.objectContaining({
++              isPublished: true,
++              sessionType: { notIn: ['BREAK', 'LUNCH', 'NETWORKING'] },
++            }),
++            include: expect.objectContaining({
++              speakers: expect.anything(),
++            }),
++          }),
++        }),
++      }),
++    );
++  });
++
++  it('splits a two-row session into two cards and keeps one card for a repeated person', async () => {
++    const markup = await renderDirectory('pair-dir', [
++      {
++        id: 'sess-pair',
++        title: 'Two-speaker talk',
++        sessionType: 'KEYNOTE',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakerName: 'Achin Gupta & Divya Mahajan',
++        speakerPhoto: 'https://images.example.com/session.png',
++        speakerTitle: null,
++        speakerCompany: null,
++        speakerClerkUserId: null,
++        room: { name: 'Main' },
++        cfpSubmission: null,
++        speakers: [
++          {
++            name: 'Achin Gupta',
++            displayOrder: 0,
++            title: 'Achin Title',
++            company: 'Achin Co',
++            imageUrl: 'https://images.example.com/achin.png',
++            clerkUserId: null,
++          },
++          {
++            name: 'Divya Mahajan',
++            displayOrder: 1,
++            title: null,
++            company: null,
++            imageUrl: null,
++            clerkUserId: null,
++          },
++        ],
++      },
++      {
++        id: 'sess-again',
++        title: 'Achin returns',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T18:00:00Z'),
++        endTime: new Date('2026-03-23T19:00:00Z'),
++        speakerName: 'Achin Gupta',
++        speakerPhoto: null,
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: null,
++        speakers: [{ name: 'Achin Gupta', displayOrder: 0, title: 'Achin Title', company: 'Achin Co' }],
++      },
++    ]);
++    expect(cards(markup)).toEqual([
++      'Achin Gupta|https://images.example.com/achin.png|Achin Title|Achin Co',
++      'Divya Mahajan|https://images.example.com/session.png||',
++    ]);
++    expect(markup).toContain('data-talks="Two-speaker talk|Achin returns"');
++    expect(markup).toContain('data-talks="Two-speaker talk"');
++    expect(markup).toContain('id="keynote-speakers-heading"');
++    expect(markup).not.toContain('achin-gupta-divya-mahajan');
++  });
++
++  it('shows the linked profile for a row account and snapshots when the name has two accounts', async () => {
++    const linked = await renderDirectory('linked-dir', [
++      {
++        id: 'sess-ada',
++        title: 'Ada talk',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakerName: 'Ada Lovelace',
++        speakerPhoto: 'https://cdn.example.com/ada.jpg',
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: { jobTitle: 'Imported Title', organization: 'Imported Co' },
++        speakers: [
++          {
++            name: 'Ada Lovelace',
++            displayOrder: 0,
++            title: 'Row Title',
++            company: 'Row Co',
++            clerkUserId: 'user_ada',
++          },
++        ],
++      },
++    ]);
++    expect(cards(linked)).toEqual([
++      `Ada Lovelace|${adaProfile.avatarUrl}|Own Title|Own Company`,
++    ]);
++
++    const conflict = await renderDirectory('conflict-dir', [
++      {
++        id: 'sess-a',
++        title: 'A talk',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakerName: 'Alex Smith',
++        speakerPhoto: 'https://cdn.example.com/a.jpg',
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: { jobTitle: 'Imported A', organization: 'Imported A Co' },
++        speakers: [
++          { name: 'Alex Smith', displayOrder: 0, title: 'Imported A', company: 'Imported A Co', clerkUserId: 'user_ada' },
++        ],
++      },
++      {
++        id: 'sess-b',
++        title: 'B talk',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T16:00:00Z'),
++        endTime: new Date('2026-03-23T17:00:00Z'),
++        speakerName: 'Alex Smith',
++        speakerPhoto: null,
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: null,
++        speakers: [
++          { name: 'Alex Smith', displayOrder: 0, title: 'Imported B', clerkUserId: 'user_grace' },
++        ],
++      },
++    ]);
++    expect(cards(conflict)).toEqual([
++      'Alex Smith|https://cdn.example.com/a.jpg|Imported A|Imported A Co',
++    ]);
++    expect(conflict).not.toContain('Own Company');
++    expect(conflict).not.toContain('Grace Own Co');
++  });
++
++  it('drops an out-of-window session and a draft schedule', async () => {
++    const markup = await renderDirectory('window-dir', [
++      {
++        id: 'sess-live',
++        title: 'Live talk',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-23T14:00:00Z'),
++        endTime: new Date('2026-03-23T15:00:00Z'),
++        speakerName: 'Live Person',
++        speakerPhoto: null,
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: { jobTitle: 'Live Title', organization: 'Live Co' },
++        speakers: [],
++      },
++      {
++        id: 'sess-late',
++        title: 'After the event',
++        sessionType: 'TALK',
++        startTime: new Date('2026-03-26T14:00:00Z'),
++        endTime: new Date('2026-03-26T15:00:00Z'),
++        speakerName: 'Late Person',
++        speakerPhoto: null,
++        speakerClerkUserId: null,
++        room: null,
++        cfpSubmission: { jobTitle: 'Late Title', organization: 'Late Co' },
++        speakers: [],
++      },
++    ]);
++    expect(cards(markup)).toEqual(['Live Person||Live Title|Live Co']);
++    expect(markup).not.toContain('Late Person');
++
++    const draft = await renderDirectory(
++      'draft-dir',
++      [
++        {
++          id: 'sess-draft',
++          title: 'Draft talk',
++          sessionType: 'TALK',
++          startTime: new Date('2026-03-23T14:00:00Z'),
++          endTime: new Date('2026-03-23T15:00:00Z'),
++          speakerName: 'Draft Person',
++          speakerPhoto: null,
++          speakerClerkUserId: null,
++          room: null,
++          cfpSubmission: null,
++          speakers: [],
++        },
++      ],
++      { scheduleStatus: 'DRAFT' },
++    );
++    expect(cards(draft)).toEqual([]);
++    expect(draft).toContain('Speakers will be announced soon.');
++  });
++});

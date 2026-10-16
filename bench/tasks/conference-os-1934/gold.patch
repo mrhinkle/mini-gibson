@@ -1,0 +1,241 @@
+diff --git a/src/app/(admin)/organizer/events/[slug]/schedule/actions.ts b/src/app/(admin)/organizer/events/[slug]/schedule/actions.ts
+index bccfb56ca..4db2169f5 100644
+--- a/src/app/(admin)/organizer/events/[slug]/schedule/actions.ts
++++ b/src/app/(admin)/organizer/events/[slug]/schedule/actions.ts
+@@ -16,6 +16,7 @@ import {
+   moveScheduledSession,
+   scheduleAcceptedTalk,
+   ScheduleMutationError,
++  validateSessionRelations,
+ } from '@/lib/schedule-service';
+ import {
+   buildEventScopedTrackWhere,
+@@ -91,37 +92,6 @@ function scheduleActionError(error: unknown) {
+   };
+ }
+ 
+-async function validateSessionRelations(
+-  eventId: string,
+-  relations: { trackId?: string | null; roomId?: string | null }
+-) {
+-  if (relations.trackId) {
+-    const track = await prisma.track.findFirst({
+-      where: buildEventScopedTrackWhere(eventId, relations.trackId),
+-      select: { id: true },
+-    });
+-    if (!track) {
+-      throw new Error('The selected track does not belong to this event.');
+-    }
+-  }
+-
+-  if (relations.roomId) {
+-    const [event, room] = await Promise.all([
+-      prisma.event.findUnique({
+-        where: { id: eventId },
+-        select: { venueId: true },
+-      }),
+-      prisma.room.findUnique({
+-        where: { id: relations.roomId },
+-        select: { venueId: true },
+-      }),
+-    ]);
+-    if (!event || !room || !roomBelongsToEventVenue(event.venueId, room.venueId)) {
+-      throw new Error('The selected room does not belong to this event venue.');
+-    }
+-  }
+-}
+-
+ export async function setScheduleVisibility(eventId: string, input: unknown) {
+   await requireAdmin();
+   const parsedEventId = z.string().min(1).max(200).safeParse(eventId);
+diff --git a/src/lib/mcp-tools/handlers.ts b/src/lib/mcp-tools/handlers.ts
+index 33b0df3d7..d8e6aa7cb 100644
+--- a/src/lib/mcp-tools/handlers.ts
++++ b/src/lib/mcp-tools/handlers.ts
+@@ -4,14 +4,26 @@
+  * via any medium, is strictly prohibited.
+  */
+ import { prisma } from "../db";
+-import type { Prisma } from "@prisma/client";
++import type { Prisma, SessionType } from "@prisma/client";
+ import { eventInScope, isContentOnlyPrincipal, mcpAuditActor, type McpAuthContext } from "../mcp-acl";
+ import { notifyCfpStatusChange } from "../cfp-comms";
+ import { mintApiKey } from "../api-keys";
+ import { buildSegmentRegistrationWhere } from "../segments";
+ import { invalidatePublicTicketRemainingCounts } from "../public-ticket-remaining-cache";
++import {
++  assertSessionRoomPlacement,
++  ScheduleMutationError,
++  validateSessionRelations,
++} from "../schedule-service";
+ import { CFP_STATUSES, EVENT_STATUSES, SESSION_TYPES, str, reqStr, optDate, buildPatch, audit, MAX_SEGMENT_SAMPLE, clampSegmentSampleSize } from "./_shared";
+ 
++function rethrowSchedulePlacement(error: unknown): never {
++  if (error instanceof ScheduleMutationError) {
++    throw new Error(error.message);
++  }
++  throw error;
++}
++
+ export async function getEventInfo(
+   params: Record<string, unknown>,
+   _ctx: McpAuthContext,
+@@ -628,6 +640,24 @@ export async function createSession(
+     throw new Error(`Invalid sessionType. One of: ${SESSION_TYPES.join(", ")}`);
+   }
+ 
++  const trackId = str(params.trackId);
++  const roomId = str(params.roomId);
++  await validateSessionRelations(evId, { trackId, roomId });
++  try {
++    await assertSessionRoomPlacement({
++      eventId: evId,
++      candidateId: `new:${evId}:${startTime.toISOString()}`,
++      roomId: roomId ?? null,
++      startTime,
++      endTime,
++      speakerName: str(params.speakerName) ?? null,
++      sessionType: ((sessionType as (typeof SESSION_TYPES)[number]) ?? "TALK") as SessionType,
++      title,
++    });
++  } catch (error) {
++    rethrowSchedulePlacement(error);
++  }
++
+   const created = await prisma.session.create({
+     data: {
+       eventId: evId,
+@@ -640,8 +670,8 @@ export async function createSession(
+       speakerCompany: str(params.speakerCompany),
+       speakerBio: str(params.speakerBio),
+       sessionType: (sessionType as (typeof SESSION_TYPES)[number]) ?? "TALK",
+-      trackId: str(params.trackId),
+-      roomId: str(params.roomId),
++      trackId,
++      roomId,
+       isPublished: typeof params.isPublished === "boolean" ? params.isPublished : false,
+     },
+     select: { id: true, title: true, startTime: true, endTime: true, isPublished: true },
+@@ -654,7 +684,16 @@ export async function updateSession(params: Record<string, unknown>, ctx: McpAut
+   const sessionId = reqStr(params, "sessionId");
+   const existing = await prisma.session.findUnique({
+     where: { id: sessionId },
+-    select: { eventId: true },
++    select: {
++      eventId: true,
++      roomId: true,
++      startTime: true,
++      endTime: true,
++      speakerName: true,
++      sessionType: true,
++      capacityOverride: true,
++      title: true,
++    },
+   });
+   if (!existing) throw new Error("Session not found");
+   if (!eventInScope(ctx, existing.eventId)) {
+@@ -681,6 +720,46 @@ export async function updateSession(params: Record<string, unknown>, ctx: McpAut
+   });
+   if (Object.keys(patch).length === 0) throw new Error("No updatable session fields provided");
+ 
++  const nextRoomId =
++    patch.roomId !== undefined ? (patch.roomId as string) : existing.roomId;
++  const nextStart =
++    patch.startTime !== undefined ? (patch.startTime as Date) : existing.startTime;
++  const nextEnd =
++    patch.endTime !== undefined ? (patch.endTime as Date) : existing.endTime;
++  const nextSpeaker =
++    patch.speakerName !== undefined
++      ? (patch.speakerName as string)
++      : existing.speakerName;
++  const nextType =
++    patch.sessionType !== undefined
++      ? (patch.sessionType as SessionType)
++      : existing.sessionType;
++  const nextCapacity =
++    patch.capacityOverride !== undefined
++      ? (patch.capacityOverride as number | null)
++      : existing.capacityOverride;
++  const nextTitle = patch.title !== undefined ? (patch.title as string) : existing.title;
++
++  await validateSessionRelations(existing.eventId, {
++    trackId: patch.trackId !== undefined ? (patch.trackId as string) : undefined,
++    roomId: nextRoomId,
++  });
++  try {
++    await assertSessionRoomPlacement({
++      eventId: existing.eventId,
++      candidateId: sessionId,
++      roomId: nextRoomId,
++      startTime: nextStart,
++      endTime: nextEnd,
++      speakerName: nextSpeaker,
++      sessionType: nextType,
++      capacityOverride: nextCapacity,
++      title: nextTitle,
++    });
++  } catch (error) {
++    rethrowSchedulePlacement(error);
++  }
++
+   const updated = await prisma.session.update({
+     where: { id: sessionId },
+     data: patch as Prisma.SessionUpdateInput,
+diff --git a/src/lib/schedule-service.ts b/src/lib/schedule-service.ts
+index 37442c55f..ae5bc2d11 100644
+--- a/src/lib/schedule-service.ts
++++ b/src/lib/schedule-service.ts
+@@ -17,6 +17,10 @@ import {
+   HttpUrlValidationError,
+   normalizeOptionalHttpUrl,
+ } from '@/lib/url-validation';
++import {
++  buildEventScopedTrackWhere,
++  roomBelongsToEventVenue,
++} from '@/lib/track-management';
+ 
+ export type ScheduleMutationCode =
+   | 'CONFLICT'
+@@ -123,6 +127,42 @@ async function placementContext(
+   return { room, sessions };
+ }
+ 
++/**
++ * Track/event ownership and room-venue membership for create/edit session
++ * actions. Room *availability* (isActive + venue hosts this event) is
++ * enforced separately by assertSessionRoomPlacement.
++ */
++export async function validateSessionRelations(
++  eventId: string,
++  relations: { trackId?: string | null; roomId?: string | null }
++) {
++  if (relations.trackId) {
++    const track = await prisma.track.findFirst({
++      where: buildEventScopedTrackWhere(eventId, relations.trackId),
++      select: { id: true },
++    });
++    if (!track) {
++      throw new Error('The selected track does not belong to this event.');
++    }
++  }
++
++  if (relations.roomId) {
++    const [event, room] = await Promise.all([
++      prisma.event.findUnique({
++        where: { id: eventId },
++        select: { venueId: true },
++      }),
++      prisma.room.findUnique({
++        where: { id: relations.roomId },
++        select: { venueId: true },
++      }),
++    ]);
++    if (!event || !room || !roomBelongsToEventVenue(event.venueId, room.venueId)) {
++      throw new Error('The selected room does not belong to this event venue.');
++    }
++  }
++}
++
+ /**
+  * Hard-block room and speaker double-bookings for create/edit session actions
+  * (#390 room, #743 speaker). Unassigned sessions (null roomId) still enforce

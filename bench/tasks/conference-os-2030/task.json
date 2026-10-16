@@ -1,0 +1,63 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2030",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2030,
+  "base_sha": "3e05014cc40086484a8c816c1dd1de27ce622deb",
+  "merge_sha": "84d6a73b712e1c871d7c1bee14377252e0bcc871",
+  "issue_number": 2029,
+  "issues": [
+    2029
+  ],
+  "issue_title": "fix(schedule): render public track descriptions in the conference schedule",
+  "problem_statement": "fix(schedule): render public track descriptions in the conference schedule\n\nThe public Conference Schedule currently sends only track id, name, and color to its client renderer. Track descriptions cannot appear in either Table or Grid view. Reported on https://events.allthingsai.org/events/all-things-ai-2026/schedule.\n\nRender a readable track guide on the schedule using the existing public-facing marketingDescription field. Preserve the explicit boundary that operational Track.description is not a public fallback. The guide should show the available descriptions on initial render, support reading a selected track, work in Grid/Table/Broadside, and remain usable on mobile and with keyboard/screen readers. Missing or whitespace-only public copy must not produce empty cards. Track filters, dates, session ordering, publication gates, and other-event branding must remain unchanged.\n\nUse existing schema and organization/event data. Verify actual public data availability separately; do not invent descriptions or expose operational notes. Cover server serialization and rendering, run the repository green gate and independent exact-head review, then verify the requested ATA deployment.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-schedule-page.test.ts tests/unit/schedule-track-guide.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate projects only public track copy (\"  Learn to build AI products.  \")",
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate projects only public track copy (\" \\n\\t \")",
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate projects only public track copy (\"\")",
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate projects only public track copy (null)",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide includes all public descriptions in initial HTML as escaped, untruncated text",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide keeps descriptions in sync with broadside track filters",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide keeps descriptions in sync with grid track filters",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide keeps descriptions in sync with table track filters",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits an empty guide for \" \\n\\t \" public copy",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits an empty guide for \"\" public copy",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits an empty guide for null public copy",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits an empty guide for undefined public copy",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits the guide for a selection with no public copy: keynote",
+      "tests/unit/schedule-track-guide.test.ts::public schedule track guide omits the guide for a selection with no public copy: unknown"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-schedule-page.test.ts tests/unit/schedule-track-guide.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate renders the coming-soon state without serializing draft sessions",
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate renders the schedule for PUBLISHED state",
+      "tests/unit/public-schedule-page.test.ts::public schedule page gate renders the schedule for null state"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

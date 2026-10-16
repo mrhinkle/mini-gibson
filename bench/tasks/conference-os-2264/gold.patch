@@ -1,0 +1,818 @@
+diff --git a/DESIGN.md b/DESIGN.md
+index 88f55173e..4c86bb773 100644
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -47,15 +47,15 @@ typography:
+   console-mono:
+     fontFamily: Geist Mono
+     role: Code, IDs, tokens, technical values
+-  ata-body:
++  public-body:
+     fontFamily: Montserrat
+-    role: Public allthingsai.org-themed event pages, body copy (scoped .ata-theme)
+-  ata-heading:
++    role: Public event pages, body copy (scoped .public-theme) — the type ramp for every tenant
++  public-heading:
+     fontFamily: Verdana
+-    role: Public .ata-theme headings — deliberate brand choice, not a fallback failure
+-  ata-stat:
++    role: Public .public-theme headings — deliberate system stack, not a fallback failure
++  public-stat:
+     fontFamily: JetBrains Mono
+-    role: Stat numbers on public .ata-theme pages
++    role: Stat numbers on public .public-theme pages
+ rounded:
+   base: 0.625rem
+   scale: sm 0.6x / md 0.8x / lg 1x / xl 1.4x / 2xl 1.8x / 3xl 2.2x / 4xl 2.6x
+@@ -76,9 +76,9 @@ ConferenceOS has **two visual layers on one token system**:
+    backgrounds. Blue is the brand's voice; orange is its energy — used
+    sparingly, never as wallpaper.
+ 
+-Public event pages may additionally carry a **scoped tenant theme** (today:
+-`.ata-theme` for allthingsai.org) which restyles typography inside its scope
+-without touching the console.
++Public event pages carry a **scoped public type ramp** (`.public-theme`)
++which restyles typography inside its scope without touching the console.
++The ramp is the same for every tenant.
+ 
+ The normative source for every value on this page is `src/app/globals.css`.
+ This file is a mirror for agents and designers; if the two disagree, the CSS
+@@ -103,9 +103,12 @@ is right and this file has a bug.
+ 
+ - **Console:** Geist (body) and Geist Mono (code/IDs), loaded via `next/font`
+   in `src/app/layout.tsx`.
+-- **Public `.ata-theme` scope:** Montserrat body, Verdana headings (a
+-  deliberate allthingsai.org brand choice — do not "fix" it), JetBrains Mono
+-  for stat numbers. Self-hosted in `src/app/ata-fonts.css`.
++- **Public `.public-theme` scope:** Montserrat body, Verdana headings (a
++  deliberate system stack — do not "fix" it to a webfont), JetBrains Mono
++  for stat numbers. `next/font` in `src/app/layout.tsx` loads Montserrat
++  and JetBrains Mono onto `--font-public-sans` and `--font-public-mono`.
++  Matching `@font-face` rules live in `src/app/public-fonts.css`; that file
++  is not imported, so it is not what the browser uses.
+ - Never introduce a new font family without adding it here and to the
+   contract test in the same commit.
+ 
+@@ -141,7 +144,7 @@ is right and this file has a bug.
+ 
+ - **Do** consume semantic tokens in components; **don't** hardcode hex values
+   or raw oklch anywhere outside `globals.css`.
+-- **Do** keep the console neutral; **don't** leak `.ata-theme` (or any tenant
++- **Do** keep the console neutral; **don't** leak `.public-theme` (or any tenant
+   theme) into organizer/admin surfaces.
+ - **Do** use Rocket Orange for the one action that matters on a view;
+   **don't** use it decoratively.
+diff --git a/config/install-database-map.example.json b/config/install-database-map.example.json
+index 428d6fe1f..beb800ca7 100644
+--- a/config/install-database-map.example.json
++++ b/config/install-database-map.example.json
+@@ -1,12 +1,12 @@
+ {
+   "_example": true,
+-  "_comment": "FICTIONAL. This file is the open-source sample, not a live install. Neon project ids and endpoint fingerprints use the example- / ep-example- sentinels and must not be copied into a real map. Runtime resolution order: INSTALL_DATABASE_MAP_JSON (the JSON document), else INSTALL_DATABASE_MAP_PATH (an uncommitted file), else config/install-database-map.json (gitignored local file), else this example. In a Vercel build (VERCEL=1, or VERCEL_ENV production|preview — even when VITEST is set) or in CI when VERCEL_ENV is absent and the unit runner is not running, a missing or unparseable map fails the database guard. An example-valued map fails too unless ALLOW_EXAMPLE_INSTALL_MAP is exactly 1, the process is not on Vercel, and DATABASE_URL is a local host. production-migrate must not set that variable. Local npm run dev warns and continues. The install keys match .github/workflows/production-migrate.yml choice options; renaming a key without that workflow (lane C2, not this change) fails assertCommittedWorkflowInstallChoices. The pinned entry's vercelProject is example-install; its key stays conference-os-ata until lane C2 renames the workflow choice. pinBranch and branchPrefix are neutral. PROTECTED_DATABASE_HOSTS may only add hosts.",
++  "_comment": "FICTIONAL sample, not a live install. Keys are example-canonical, example-pinned, and example-demo. Their vercelProject values are fictional too (the pinned entry's vercelProject is example-install). Scripts resolve an install by the key in the loaded map, or by slug (canonical, pinned, demo; aliases production and flagship mean canonical). Runtime resolution order: INSTALL_DATABASE_MAP_JSON (the JSON document), else INSTALL_DATABASE_MAP_PATH (an uncommitted file), else config/install-database-map.json (gitignored local file), else this example. The runtime map keeps real project names and is never committed. Neon ids and endpoint fingerprints use the example- / ep-example- sentinels and must not be copied into a real map. In a Vercel build (VERCEL=1, or VERCEL_ENV production|preview, even when VITEST is set) or in CI when VERCEL_ENV is absent and the unit runner is not running, a missing or unparseable map fails the database guard. An example-valued map fails too unless ALLOW_EXAMPLE_INSTALL_MAP is exactly 1, the process is not on Vercel, and DATABASE_URL is a local host. production-migrate must not set that variable. Local npm run dev warns and continues. pinBranch and branchPrefix are neutral. PROTECTED_DATABASE_HOSTS may only add hosts.",
+   "neonOrgId": "org-example-00000000",
+   "defaultDatabaseName": "neondb",
+   "installs": {
+-    "conference-os-vercel": {
++    "example-canonical": {
+       "slug": "canonical",
+-      "vercelProject": "conference-os-vercel",
++      "vercelProject": "example-canonical",
+       "pinBranch": "release",
+       "controlledApplyBranch": "release",
+       "branchPrefix": null,
+@@ -26,7 +26,7 @@
+         }
+       }
+     },
+-    "conference-os-ata": {
++    "example-pinned": {
+       "slug": "pinned",
+       "vercelProject": "example-install",
+       "pinBranch": "pinned/release",
+@@ -48,9 +48,9 @@
+         }
+       }
+     },
+-    "conference-os-demo": {
++    "example-demo": {
+       "slug": "demo",
+-      "vercelProject": "conference-os-demo",
++      "vercelProject": "example-demo",
+       "pinBranch": null,
+       "controlledApplyBranch": "release",
+       "branchPrefix": null,
+diff --git a/next.config.ts b/next.config.ts
+index 097cc1418..a1701f827 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -82,7 +82,7 @@ const nextConfig: NextConfig = {
+   // The dynamic legacy favicon route serves one of these exact local ICO files.
+   outputFileTracingIncludes: {
+     '/favicon.ico': [
+-      './public/brand/atai-favicon-v1/favicon.ico',
++      './public/brand/product-favicon-v1/favicon.ico',
+       './public/icons/favicon-default.ico',
+     ],
+   },
+diff --git a/public/brand/atai-navigation-sky-v2.svg b/public/brand/navigation-sky-v2.svg
+similarity index 100%
+rename from public/brand/atai-navigation-sky-v2.svg
+rename to public/brand/navigation-sky-v2.svg
+diff --git a/public/brand/atai-favicon-v1/apple-touch-icon.png b/public/brand/product-favicon-v1/apple-touch-icon.png
+similarity index 100%
+rename from public/brand/atai-favicon-v1/apple-touch-icon.png
+rename to public/brand/product-favicon-v1/apple-touch-icon.png
+diff --git a/public/brand/atai-favicon-v1/favicon-16x16.png b/public/brand/product-favicon-v1/favicon-16x16.png
+similarity index 100%
+rename from public/brand/atai-favicon-v1/favicon-16x16.png
+rename to public/brand/product-favicon-v1/favicon-16x16.png
+diff --git a/public/brand/atai-favicon-v1/favicon-32x32.png b/public/brand/product-favicon-v1/favicon-32x32.png
+similarity index 100%
+rename from public/brand/atai-favicon-v1/favicon-32x32.png
+rename to public/brand/product-favicon-v1/favicon-32x32.png
+diff --git a/public/brand/atai-favicon-v1/favicon.ico b/public/brand/product-favicon-v1/favicon.ico
+similarity index 100%
+rename from public/brand/atai-favicon-v1/favicon.ico
+rename to public/brand/product-favicon-v1/favicon.ico
+diff --git a/public/brand/atai-favicon-v1/favicon.svg b/public/brand/product-favicon-v1/favicon.svg
+similarity index 100%
+rename from public/brand/atai-favicon-v1/favicon.svg
+rename to public/brand/product-favicon-v1/favicon.svg
+diff --git a/public/brand/allthingsai-favicon.svg b/public/brand/product-favicon.svg
+similarity index 100%
+rename from public/brand/allthingsai-favicon.svg
+rename to public/brand/product-favicon.svg
+diff --git a/public/brand/allthingsai-horizontal.png b/public/brand/product-horizontal.png
+similarity index 100%
+rename from public/brand/allthingsai-horizontal.png
+rename to public/brand/product-horizontal.png
+diff --git a/scripts/apply-production-migrations.mjs b/scripts/apply-production-migrations.mjs
+index 4af8d0594..5e927e4e5 100644
+--- a/scripts/apply-production-migrations.mjs
++++ b/scripts/apply-production-migrations.mjs
+@@ -91,9 +91,10 @@ const NEON_API_TIMEOUT_MS = 15_000;
+ const SAFE_TOKEN = /^[A-Za-z0-9._/-]{1,200}$/;
+ 
+ /**
+- * Canonical install key in config/install-database-map.json. Callers must
+- * name the install explicitly — this is not a missing-input default
+- * (#1405 round-3 residual E).
++ * Install key allowed to use a preset DATABASE_URL. This is the canonical
++ * project's runtime name on a real install map. It is not a key in the
++ * committed example map, and a blank PRODUCTION_MIGRATE_INSTALL does not
++ * fall through to it (#1405 round-3 residual E).
+  */
+ export const DEFAULT_INSTALL = "conference-os-vercel";
+ 
+@@ -475,12 +476,17 @@ export function assertInstallHasControlledApplyPath(target) {
+ }
+ 
+ /**
+- * Load the canonical production Neon project/branch for conference-os-vercel.
++ * Load the production Neon target for the one install whose slug is
++ * "canonical". The map key is not fixed: the committed example uses a
++ * fictional key, and a runtime map may use a real project name.
+  *
+  * Return shape is deliberately the original three fields so existing callers
+  * and their tests stay byte-identical. New code should call
+  * loadInstallProductionNeonTarget.
+  *
++ * Missing installs, an unreadable map, or any count other than exactly one
++ * canonical slug throws. Zero matches is not treated as a successful load.
++ *
+  * @param {string | null} [mapPath]
+  * @param {{ readFileSync: Function }} [fsModule]
+  * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+@@ -490,8 +496,23 @@ export function loadCanonicalProductionNeonTarget(
+   fsModule = fs,
+   env = process.env
+ ) {
++  const { map } = readResolvedInstallMap(mapPath, fsModule, env);
++  const installs = map?.installs;
++  if (!installs || typeof installs !== "object" || Array.isArray(installs)) {
++    throw new Error(
++      "install database map is missing installs; refusing to treat that as an empty canonical set"
++    );
++  }
++  const matches = Object.entries(installs).filter(
++    ([, entry]) => entry?.slug === "canonical"
++  );
++  if (matches.length !== 1) {
++    throw new Error(
++      `config/install-database-map.json must name exactly one install with slug "canonical" (found ${matches.length}).`
++    );
++  }
+   const target = loadInstallProductionNeonTarget(
+-    DEFAULT_INSTALL,
++    matches[0][0],
+     mapPath,
+     fsModule,
+     env
+diff --git a/scripts/promote-install.mjs b/scripts/promote-install.mjs
+index 8c409ecf7..84d16d215 100644
+--- a/scripts/promote-install.mjs
++++ b/scripts/promote-install.mjs
+@@ -24,7 +24,7 @@
+  *
+  * Usage:
+  *   node scripts/promote-install.mjs --site pinned --target v0.1.21 --dry-run
+- *   node scripts/promote-install.mjs --site conference-os-vercel --target 3afd40a --dry-run
++ *   node scripts/promote-install.mjs --site canonical --target 3afd40a --dry-run
+  *   node scripts/promote-install.mjs --site pinned --target v0.1.21 --dry-run --json
+  *
+  * Parents: #462, #464, ADR-001 (#1037). Runbook: docs/runbooks/tenant-upgrade-pipeline.md
+@@ -47,11 +47,14 @@ import {
+ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+ const DEFAULT_MAP_PATH = null;
+ 
++// Alias values are install slugs, not project names. The committed example
++// map and a runtime map can use different keys for the same slug.
+ const SLUG_ALIASES = Object.freeze({
+-  demo: "conference-os-demo",
+-  canonical: "conference-os-vercel",
+-  production: "conference-os-vercel",
+-  flagship: "conference-os-vercel",
++  demo: "demo",
++  pinned: "pinned",
++  canonical: "canonical",
++  production: "canonical",
++  flagship: "canonical",
+ });
+ 
+ /**
+@@ -214,13 +217,28 @@ function have(bin) {
+   return spawnSync("which", [bin], { stdio: "ignore" }).status === 0;
+ }
+ 
++function installKeyForSlug(map, slug) {
++  if (slug == null || slug === "") return null;
++  if (map.installs[slug]) return slug;
++  const needle = String(slug).toLowerCase();
++  for (const [key, cfg] of Object.entries(map.installs)) {
++    if (cfg?.slug === slug || String(cfg?.slug ?? "").toLowerCase() === needle) {
++      return key;
++    }
++  }
++  return null;
++}
++
+ function resolveInstallKey(input, map) {
++  if (!map?.installs || typeof map.installs !== "object" || Array.isArray(map.installs)) {
++    throw new Error("Install map is missing installs. Refusing to treat that as an empty key set.");
++  }
+   if (map.installs[input]) return input;
+   const alias = SLUG_ALIASES[String(input).toLowerCase()];
+-  if (alias && map.installs[alias]) return alias;
+-  for (const [key, cfg] of Object.entries(map.installs)) {
+-    if (cfg.slug === input) return key;
+-  }
++  const fromAlias = alias ? installKeyForSlug(map, alias) : null;
++  if (fromAlias) return fromAlias;
++  const fromSlug = installKeyForSlug(map, input);
++  if (fromSlug) return fromSlug;
+   throw new Error(`Unknown site/install: ${input}`);
+ }
+ 
+diff --git a/scripts/promote-install.test.mjs b/scripts/promote-install.test.mjs
+index d47d299d6..ecfbc91c0 100644
+--- a/scripts/promote-install.test.mjs
++++ b/scripts/promote-install.test.mjs
+@@ -29,28 +29,28 @@ test("parseArgs requires explicit dry-run for safe plan", () => {
+ 
+ test("validatePromoteInputs refuses floating refs and non-dry-run", () => {
+   const map = loadInstallMap(MAP);
+-  const install = map.installs["conference-os-ata"];
++  const install = map.installs["example-pinned"];
+   const floating = validatePromoteInputs(
+     { site: "pinned", targetVersion: "latest", dryRun: true },
+-    { installKey: "conference-os-ata", install },
++    { installKey: "example-pinned", install },
+   );
+   assert.ok(floating.some((r) => /floating|latest/i.test(r)));
+ 
+   const live = validatePromoteInputs(
+     { site: "pinned", targetVersion: "v0.1.21", dryRun: false },
+-    { installKey: "conference-os-ata", install },
++    { installKey: "example-pinned", install },
+   );
+   assert.ok(live.some((r) => /out of scope|dry-run/i.test(r)));
+ });
+ 
+ test("buildPromotePlan dry-run with clear freeze is skipped not refused", () => {
+   const map = loadInstallMap(MAP);
+-  const install = map.installs["conference-os-ata"];
++  const install = map.installs["example-pinned"];
+   const freeze = evaluateFreezeState([], { label: FREEZE_LABEL });
+   const out = buildPromotePlan(
+     { site: "pinned", targetVersion: "v0.1.21", dryRun: true },
+     {
+-      installKey: "conference-os-ata",
++      installKey: "example-pinned",
+       install,
+       freeze,
+       currentPin: "abc1234",
+@@ -66,14 +66,14 @@ test("buildPromotePlan dry-run with clear freeze is skipped not refused", () =>
+ 
+ test("buildPromotePlan refuses when freeze active without override", () => {
+   const map = loadInstallMap(MAP);
+-  const install = map.installs["conference-os-ata"];
++  const install = map.installs["example-pinned"];
+   const freeze = evaluateFreezeState(
+     [{ number: 1, title: "live", url: "u" }],
+     { label: FREEZE_LABEL },
+   );
+   const out = buildPromotePlan(
+     { site: "pinned", targetVersion: "v0.1.21", dryRun: true },
+-    { installKey: "conference-os-ata", install, freeze },
++    { installKey: "example-pinned", install, freeze },
+   );
+   assert.equal(out.promoteResult, "refused");
+   assert.ok(out.refusals.some((r) => /freeze/i.test(r)));
+diff --git a/scripts/rehearse-install-upgrade.mjs b/scripts/rehearse-install-upgrade.mjs
+index bfefc4a8c..d95cd045c 100644
+--- a/scripts/rehearse-install-upgrade.mjs
++++ b/scripts/rehearse-install-upgrade.mjs
+@@ -23,7 +23,7 @@
+  *
+  * Usage:
+  *   node scripts/rehearse-install-upgrade.mjs pinned <target-sha>
+- *   node scripts/rehearse-install-upgrade.mjs conference-os-vercel <target-sha> --name upgrade-2026-08-08
++ *   node scripts/rehearse-install-upgrade.mjs canonical <target-sha> --name upgrade-2026-08-08
+  *   node scripts/rehearse-install-upgrade.mjs pinned <sha> --dry-run
+  *   node scripts/rehearse-install-upgrade.mjs pinned <sha> --skip-push   # branch already on origin
+  *   node scripts/rehearse-install-upgrade.mjs pinned <sha> --logs-only <deployment-url>
+@@ -75,11 +75,14 @@ export const SAFETY_SIGNALS = Object.freeze({
+   },
+ });
+ 
++// Alias values are install slugs, not project names. The committed example
++// map and a runtime map can use different keys for the same slug.
+ const SLUG_ALIASES = Object.freeze({
+-  demo: "conference-os-demo",
+-  canonical: "conference-os-vercel",
+-  production: "conference-os-vercel",
+-  flagship: "conference-os-vercel",
++  demo: "demo",
++  pinned: "pinned",
++  canonical: "canonical",
++  production: "canonical",
++  flagship: "canonical",
+ });
+ 
+ /**
+@@ -141,15 +144,30 @@ function need(argv, i, flag) {
+  * @param {string} input
+  * @param {ReturnType<typeof loadInstallMap>} map
+  */
++function installKeyForSlug(map, slug) {
++  if (slug == null || slug === "") return null;
++  if (map.installs[slug]) return slug;
++  const needle = String(slug).toLowerCase();
++  for (const [key, cfg] of Object.entries(map.installs)) {
++    if (cfg?.slug === slug || String(cfg?.slug ?? "").toLowerCase() === needle) {
++      return key;
++    }
++  }
++  return null;
++}
++
+ export function resolveInstallKey(input, map) {
+   if (!input) throw new Error("install is required");
++  if (!map?.installs || typeof map.installs !== "object" || Array.isArray(map.installs)) {
++    throw new Error("Install map is missing installs. Refusing to treat that as an empty key set.");
++  }
+   const raw = String(input).trim();
+   if (map.installs[raw]) return raw;
+   const alias = SLUG_ALIASES[raw.toLowerCase()];
+-  if (alias && map.installs[alias]) return alias;
+-  for (const [key, cfg] of Object.entries(map.installs)) {
+-    if (cfg.slug === raw || cfg.slug === raw.toLowerCase()) return key;
+-  }
++  const fromAlias = alias ? installKeyForSlug(map, alias) : null;
++  if (fromAlias) return fromAlias;
++  const fromSlug = installKeyForSlug(map, raw);
++  if (fromSlug) return fromSlug;
+   throw new Error(
+     `Unknown install "${raw}". Known: ${Object.keys(map.installs).join(", ")} (aliases: ${Object.keys(SLUG_ALIASES).join(", ")})`,
+   );
+diff --git a/scripts/rehearse-install-upgrade.test.mjs b/scripts/rehearse-install-upgrade.test.mjs
+index dee5be12d..fa65d9343 100644
+--- a/scripts/rehearse-install-upgrade.test.mjs
++++ b/scripts/rehearse-install-upgrade.test.mjs
+@@ -32,22 +32,26 @@ test("parseArgs positional install + sha", () => {
+ 
+ test("resolveInstallKey aliases", () => {
+   const map = loadInstallMap(MAP);
+-  assert.equal(resolveInstallKey("pinned", map), "conference-os-ata");
+-  assert.equal(resolveInstallKey("conference-os-demo", map), "conference-os-demo");
+-  assert.equal(resolveInstallKey("canonical", map), "conference-os-vercel");
++  assert.equal(resolveInstallKey("pinned", map), "example-pinned");
++  assert.equal(resolveInstallKey("example-demo", map), "example-demo");
++  assert.equal(resolveInstallKey("demo", map), "example-demo");
++  assert.equal(resolveInstallKey("canonical", map), "example-canonical");
++  assert.equal(resolveInstallKey("production", map), "example-canonical");
++  assert.equal(resolveInstallKey("flagship", map), "example-canonical");
+   assert.throws(() => resolveInstallKey("nope", map), /Unknown install/);
++  assert.throws(() => resolveInstallKey("pinned", { installs: null }), /missing installs/);
+ });
+ 
+ test("previewBranchName enforces the install branchPrefix", () => {
+   const map = loadInstallMap(MAP);
+-  const pinnedInstall = map.installs["conference-os-ata"];
++  const pinnedInstall = map.installs["example-pinned"];
+   assert.equal(previewBranchName(pinnedInstall, "upgrade-test"), "pinned/upgrade-test");
+   assert.equal(previewBranchName(pinnedInstall, "pinned/already"), "pinned/already");
+ });
+ 
+ test("previewBranchName uses rehearse/ for canonical", () => {
+   const map = loadInstallMap(MAP);
+-  const can = map.installs["conference-os-vercel"];
++  const can = map.installs["example-canonical"];
+   assert.equal(previewBranchName(can, "foo"), "rehearse/foo");
+ });
+ 
+diff --git a/scripts/resolve-deployment-database-url.mjs b/scripts/resolve-deployment-database-url.mjs
+index 638478e69..9a959f08d 100644
+--- a/scripts/resolve-deployment-database-url.mjs
++++ b/scripts/resolve-deployment-database-url.mjs
+@@ -30,8 +30,8 @@
+  * Usage:
+  *   node scripts/resolve-deployment-database-url.mjs dpl_…
+  *   node scripts/resolve-deployment-database-url.mjs https://….vercel.app
+- *   node scripts/resolve-deployment-database-url.mjs --project conference-os-vercel --branch pinned/upgrade-preview
+- *   node scripts/resolve-deployment-database-url.mjs --project conference-os-vercel --target production
++ *   node scripts/resolve-deployment-database-url.mjs --project example-canonical --branch pinned/upgrade-preview
++ *   node scripts/resolve-deployment-database-url.mjs --project example-canonical --target production
+  *   node scripts/resolve-deployment-database-url.mjs dpl_… --host-only
+  *   node scripts/resolve-deployment-database-url.mjs dpl_… --json
+  *   node scripts/resolve-deployment-database-url.mjs dpl_… --export SHELL_VAR
+@@ -197,7 +197,7 @@ export function getInstallConfig(map, vercelProject) {
+ 
+ /**
+  * Parse a git branch from Vercel branch aliases like
+- * `conference-os-vercel-git-pinned-release-the-aie.vercel.app`.
++ * `example-canonical-git-pinned-release-the-aie.vercel.app`.
+  * Vercel flattens `/` to `-` in the alias slug, so recovery is best-effort —
+  * prefer an explicit --branch when available.
+  *
+diff --git a/scripts/resolve-deployment-database-url.test.mjs b/scripts/resolve-deployment-database-url.test.mjs
+index e52404f3b..d9e0926fa 100644
+--- a/scripts/resolve-deployment-database-url.test.mjs
++++ b/scripts/resolve-deployment-database-url.test.mjs
+@@ -57,8 +57,8 @@ test("parseArgs rejects bad target", () => {
+ test("parseGitBranchFromAliases recovers pinned/release from branchPrefix", () => {
+   const map = loadInstallMap(MAP);
+   const branch = parseGitBranchFromAliases(
+-    ["conference-os-vercel-git-pinned-release-the-aie.vercel.app"],
+-    "conference-os-ata",
++    ["example-canonical-git-pinned-release-the-aie.vercel.app"],
++    "example-pinned",
+     map,
+   );
+   assert.equal(branch, "pinned/release");
+@@ -66,7 +66,7 @@ test("parseGitBranchFromAliases recovers pinned/release from branchPrefix", () =
+ 
+ test("parseGitBranchFromAliases recovers feat prefix", () => {
+   const branch = parseGitBranchFromAliases([
+-    "https://conference-os-vercel-git-feat-foo-bar-the-aie.vercel.app",
++    "https://example-canonical-git-feat-foo-bar-the-aie.vercel.app",
+   ]);
+   assert.equal(branch, "feat/foo-bar");
+ });
+@@ -78,7 +78,7 @@ test("parseGitBranchFromAliases returns null when no git alias", () => {
+ 
+ test("loadInstallMap + getInstallConfig", () => {
+   const map = loadInstallMap(MAP);
+-  const pinnedInstall = getInstallConfig(map, "conference-os-ata");
++  const pinnedInstall = getInstallConfig(map, "example-pinned");
+   assert.equal(pinnedInstall.pinBranch, "pinned/release");
+   assert.equal(pinnedInstall.neon.production.projectId, "example-pinned-1234");
+   assert.throws(() => getInstallConfig(map, "nope"), /Unknown Vercel project/);
+@@ -86,7 +86,7 @@ test("loadInstallMap + getInstallConfig", () => {
+ 
+ test("selectNeonTarget production uses production branch", () => {
+   const map = loadInstallMap(MAP);
+-  const pinnedInstall = getInstallConfig(map, "conference-os-ata");
++  const pinnedInstall = getInstallConfig(map, "example-pinned");
+   const t = selectNeonTarget(pinnedInstall, { target: "production", gitBranch: "pinned/x" });
+   assert.equal(t.branch, "main");
+   assert.equal(t.strategy, "neon-production-branch");
+@@ -95,7 +95,7 @@ test("selectNeonTarget production uses production branch", () => {
+ 
+ test("selectNeonTarget prefers live preview/<branch> when listed", () => {
+   const map = loadInstallMap(MAP);
+-  const pinnedInstall = getInstallConfig(map, "conference-os-ata");
++  const pinnedInstall = getInstallConfig(map, "example-pinned");
+   const t = selectNeonTarget(pinnedInstall, {
+     target: "preview",
+     gitBranch: "feat/917-schema",
+@@ -107,7 +107,7 @@ test("selectNeonTarget prefers live preview/<branch> when listed", () => {
+ 
+ test("selectNeonTarget falls back to default preview branch when clone missing", () => {
+   const map = loadInstallMap(MAP);
+-  const canonical = getInstallConfig(map, "conference-os-vercel");
++  const canonical = getInstallConfig(map, "example-canonical");
+   const t = selectNeonTarget(canonical, {
+     target: "preview",
+     gitBranch: "feat/missing",
+@@ -289,7 +289,7 @@ test("resolveDeploymentDatabaseUrl uses neonctl strategy via deps", () => {
+       loadMap: () => map,
+       inspect: () => ({
+         id: "dpl_test",
+-        name: "conference-os-ata",
++        name: "example-pinned",
+         url: "example-install-xxx.vercel.app",
+         target: "preview",
+         readyState: "READY",
+@@ -305,7 +305,7 @@ test("resolveDeploymentDatabaseUrl uses neonctl strategy via deps", () => {
+   );
+   assert.equal(result.host, "ep-preview-clone.neon.tech");
+   assert.equal(result.neon.strategy, "neon-preview-branch");
+-  assert.equal(result.vercelProject, "conference-os-ata");
++  assert.equal(result.vercelProject, "example-pinned");
+   assert.equal(result.gitBranch, "pinned/upgrade-test");
+   assert.match(result.strategy, /neonctl-connection-string/);
+ });
+diff --git a/src/app/(public)/_components/legal-page-shell.tsx b/src/app/(public)/_components/legal-page-shell.tsx
+index 32d69cb5f..bce5c1874 100644
+--- a/src/app/(public)/_components/legal-page-shell.tsx
++++ b/src/app/(public)/_components/legal-page-shell.tsx
+@@ -42,7 +42,7 @@ export function LegalPageShell({
+   const noticeEntityName = legalEntityName?.trim() || '[ORGANISATION NAME]';
+ 
+   return (
+-    <div className="ata-theme min-h-full bg-space-900 text-white">
++    <div className="public-theme min-h-full bg-space-900 text-white">
+       <div className="mx-auto max-w-[70ch] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+         {showTemplateNotice ? (
+           <div
+diff --git a/src/app/(public)/events/[eventSlug]/access/page.tsx b/src/app/(public)/events/[eventSlug]/access/page.tsx
+index a87262003..c325f6a9a 100644
+--- a/src/app/(public)/events/[eventSlug]/access/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/access/page.tsx
+@@ -72,7 +72,7 @@ export default async function EventAccessPage({
+   }
+ 
+   return (
+-    <div className="ata-theme flex min-h-[70vh] items-center justify-center bg-space-900 px-4 py-16">
++    <div className="public-theme flex min-h-[70vh] items-center justify-center bg-space-900 px-4 py-16">
+       <div className="w-full max-w-md rounded-xl border border-white/10 bg-space-800 p-8 shadow-lg">
+         <h1 className="text-2xl font-bold text-white">Private event</h1>
+         <p className="mt-2 text-sm text-gray-400">
+diff --git a/src/app/(public)/events/[eventSlug]/page.tsx b/src/app/(public)/events/[eventSlug]/page.tsx
+index 8b5fce4f6..c68474d60 100644
+--- a/src/app/(public)/events/[eventSlug]/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/page.tsx
+@@ -507,7 +507,7 @@ export default async function EventPage({ params, searchParams }: EventPageProps
+       supportEmail={event.supportEmail}
+     >
+       <JsonLdScript data={eventJsonLd} />
+-      <div className="ata-theme flex flex-col">
++      <div className="public-theme flex flex-col">
+         <EventLandingSections
+           eventSlug={eventSlug}
+           eventId={event.id}
+diff --git a/src/app/(public)/events/[eventSlug]/review/page.tsx b/src/app/(public)/events/[eventSlug]/review/page.tsx
+index 073de952a..89d48422c 100644
+--- a/src/app/(public)/events/[eventSlug]/review/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/review/page.tsx
+@@ -67,7 +67,7 @@ export default async function EventReviewPage({
+       agentAvatarUrl={event.agentAvatarUrl}
+       supportEmail={event.supportEmail}
+     >
+-      <div className="ata-theme mx-auto max-w-2xl px-4 py-12 sm:px-6">
++      <div className="public-theme mx-auto max-w-2xl px-4 py-12 sm:px-6">
+         <nav className="mb-6 text-sm text-gray-500">
+           <Link
+             href={`/events/${event.slug}`}
+diff --git a/src/app/(public)/news/[slug]/page.tsx b/src/app/(public)/news/[slug]/page.tsx
+index 05f40639f..2b24ce6c6 100644
+--- a/src/app/(public)/news/[slug]/page.tsx
++++ b/src/app/(public)/news/[slug]/page.tsx
+@@ -68,7 +68,7 @@ export default async function NewsPostPage({ params }: NewsPostPageProps) {
+   });
+ 
+   return (
+-    <div className="ata-theme min-h-full bg-space-900 text-white">
++    <div className="public-theme min-h-full bg-space-900 text-white">
+       <article className="mx-auto max-w-[72ch] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+         <Link
+           href="/news"
+diff --git a/src/app/(public)/news/page.tsx b/src/app/(public)/news/page.tsx
+index 924dd5b5f..edcf4352c 100644
+--- a/src/app/(public)/news/page.tsx
++++ b/src/app/(public)/news/page.tsx
+@@ -50,7 +50,7 @@ export default async function NewsIndexPage() {
+     .catch(() => []);
+ 
+   return (
+-    <div className="ata-theme min-h-full bg-space-900 text-white">
++    <div className="public-theme min-h-full bg-space-900 text-white">
+       <header className="starfield relative overflow-hidden border-b border-white/10">
+         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-nebula-900/30 via-transparent to-space-900" />
+         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+diff --git a/src/app/(public)/public-layout-client.tsx b/src/app/(public)/public-layout-client.tsx
+index aa835e6b6..d71886136 100644
+--- a/src/app/(public)/public-layout-client.tsx
++++ b/src/app/(public)/public-layout-client.tsx
+@@ -927,7 +927,7 @@ export default function PublicLayoutClient({
+   return (
+     <HomepageCampaignPhaseProvider setPhase={setHomepageCampaignPhase}>
+       <div
+-        className={`ata-theme vt-public-shell flex min-h-screen flex-col ${
++        className={`public-theme vt-public-shell flex min-h-screen flex-col ${
+           isBroadside ? 'bg-[#faf9f7]' : 'bg-white'
+         }`}
+         data-visual-template={visualTemplate}
+diff --git a/src/app/globals.css b/src/app/globals.css
+index ad14d1cdc..dabef6915 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -167,21 +167,21 @@
+  * keeps its Geist typography. The class and custom properties below are
+  * the product tokens for that ramp.
+  */
+-.ata-theme {
+-  font-family: var(--font-ata-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+-}
+-.ata-theme h1,
+-.ata-theme h2,
+-.ata-theme h3,
+-.ata-theme h4,
+-.ata-theme h5,
+-.ata-theme h6 {
++.public-theme {
++  font-family: var(--font-public-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
++}
++.public-theme h1,
++.public-theme h2,
++.public-theme h3,
++.public-theme h4,
++.public-theme h5,
++.public-theme h6 {
+   font-family: Verdana, Geneva, Tahoma, sans-serif;
+   letter-spacing: -0.02em;
+   line-height: 1.1;
+ }
+-.ata-theme .font-mono-stat {
+-  font-family: var(--font-ata-mono), monospace;
++.public-theme .font-mono-stat {
++  font-family: var(--font-public-mono), monospace;
+ }
+ 
+ /* Star twinkle animation — subtle pulse between dim and bright */
+@@ -235,20 +235,20 @@
+    speedSeconds prop (default 220s — up from 150s, per Mark's 2026-08-08
+    follow-up after #1176 shipped bigger, full-color logos: slower reads
+    better at the larger size). The 220s fallback here only covers a caller
+-   that renders .ata-ticker-track without going through the component. */
+-.ata-ticker-track {
+-  animation: ata-ticker var(--marquee-duration, 220s) linear infinite;
++   that renders .public-ticker-track without going through the component. */
++.public-ticker-track {
++  animation: public-ticker var(--marquee-duration, 220s) linear infinite;
+   will-change: transform;
+ }
+ 
+ /* Pause control (WCAG 2.2.2): the visible pause/resume button toggles this
+    data attribute; hover/focus alone is not sufficient on its own, but pausing
+    on hover is a reasonable supplement while the button is the primary control. */
+-.ata-ticker-track[data-paused="true"] {
++.public-ticker-track[data-paused="true"] {
+   animation-play-state: paused;
+ }
+ 
+-@keyframes ata-ticker {
++@keyframes public-ticker {
+   0% { transform: translateX(0); }
+   100% { transform: translateX(-50%); }
+ }
+@@ -436,7 +436,7 @@
+ @media (prefers-reduced-motion: reduce) {
+   .star-twinkle { animation: none; }
+   .shooting-star { display: none; }
+-  .ata-ticker-track { animation: none; overflow-x: auto; }
++  .public-ticker-track { animation: none; overflow-x: auto; }
+ 
+   [data-visual-template="orbit"] .vt-speaker-card,
+   [data-visual-template="orbit"] .vt-speaker-card:hover,
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index cd9c53b86..a7f94b8ee 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -36,14 +36,14 @@ const geistMono = Geist_Mono({
+   preload: false,
+ });
+ 
+-const ataSans = Montserrat({
+-  variable: "--font-ata-sans",
++const publicSans = Montserrat({
++  variable: "--font-public-sans",
+   subsets: ["latin"],
+   preload: false,
+ });
+ 
+-const ataMono = JetBrains_Mono({
+-  variable: "--font-ata-mono",
++const publicMono = JetBrains_Mono({
++  variable: "--font-public-mono",
+   subsets: ["latin"],
+   preload: false,
+ });
+@@ -216,7 +216,7 @@ export default async function RootLayout({
+   return (
+     <html
+       lang="en"
+-      className={`${geistSans.variable} ${geistMono.variable} ${ataSans.variable} ${ataMono.variable} h-full antialiased`}
++      className={`${geistSans.variable} ${geistMono.variable} ${publicSans.variable} ${publicMono.variable} h-full antialiased`}
+     >
+       <body className="min-h-full flex flex-col">
+         {isStaging && (
+diff --git a/src/app/ata-fonts.css b/src/app/public-fonts.css
+similarity index 93%
+rename from src/app/ata-fonts.css
+rename to src/app/public-fonts.css
+index ab811e1e3..471186c33 100644
+--- a/src/app/ata-fonts.css
++++ b/src/app/public-fonts.css
+@@ -4,7 +4,7 @@
+  *
+  * Self-hosted faces for the public type ramp:
+  * Montserrat (body), JetBrains Mono (stats/numbers). Headings use the
+- * Verdana system stack (see .ata-theme in globals.css) — no webfont needed.
++ * Verdana system stack (see .public-theme in globals.css) — no webfont needed.
+  */
+ 
+ @font-face {
+diff --git a/src/components/company-marquee.tsx b/src/components/company-marquee.tsx
+index ec1f1b4e8..d2351703c 100644
+--- a/src/components/company-marquee.tsx
++++ b/src/components/company-marquee.tsx
+@@ -32,7 +32,7 @@ import { Pause, Play } from 'lucide-react';
+  * and render as a grey silhouette — transparent vectors tint safely, and
+  * black-on-white boxes read as harsh against the dark strip.
+  *
+- * CSS animation (.ata-ticker-track) drives the scroll; a visible
++ * CSS animation (.public-ticker-track) drives the scroll; a visible
+  * pause/resume button satisfies WCAG 2.2.2 (Pause, Stop, Hide) for content
+  * that auto-moves for more than 5 seconds — hover/focus alone would not
+  * help a user who can't hover/focus reliably or who needs it paused
+@@ -248,7 +248,7 @@ export function CompanyMarquee({
+         }}
+       >
+         <div
+-          className="ata-ticker-track flex w-max items-center gap-10 sm:gap-16"
++          className="public-ticker-track flex w-max items-center gap-10 sm:gap-16"
+           data-paused={paused ? 'true' : undefined}
+           style={{ '--marquee-duration': `${duration}s` } as CSSProperties}
+           onMouseEnter={() => setHovering(true)}
+diff --git a/src/components/space-jam-logo.tsx b/src/components/space-jam-logo.tsx
+index 45a190844..3858595ec 100644
+--- a/src/components/space-jam-logo.tsx
++++ b/src/components/space-jam-logo.tsx
+@@ -693,7 +693,7 @@ export function SpaceJamLockup({
+             className="sj-lockup-wordmark"
+             style={{
+               fontFamily:
+-                "var(--font-ata-sans), Montserrat, system-ui, sans-serif",
++                "var(--font-public-sans), Montserrat, system-ui, sans-serif",
+               // Matches public/brand/space-jam-lockup.svg and the event logo
+               // (#665): Montserrat 800 with wide positive tracking. Keep the
+               // three in step — 5.5px at 35px is 0.157em, so the ratio holds
+@@ -716,7 +716,7 @@ export function SpaceJamLockup({
+           style={{
+             margin: 0,
+             fontFamily:
+-              "var(--font-ata-sans), Montserrat, system-ui, sans-serif",
++              "var(--font-public-sans), Montserrat, system-ui, sans-serif",
+             fontSize: "0.875rem",
+             letterSpacing: "0.04em",
+             color: "rgba(255, 255, 255, 0.8)",
+diff --git a/tests/e2e/hero-save-the-date.spec.ts b/tests/e2e/hero-save-the-date.spec.ts
+index d00f02a5c..6d4956615 100644
+--- a/tests/e2e/hero-save-the-date.spec.ts
++++ b/tests/e2e/hero-save-the-date.spec.ts
+@@ -145,7 +145,7 @@ async function paintHero(page: Page, origin: string, sectionHtml: string): Promi
+ 
+   const safeClass = htmlClass.replace(/"/g, '&quot;');
+   const fixtureUrl = `${origin}/__hero-save-the-date-fixture`;
+-  const fixtureHtml = `<!doctype html><html class="${safeClass}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${head}</head><body class="ata-theme" style="margin:0"><div style="height:4rem;background:#0B1426" data-fixture-header></div>${sectionHtml}</body></html>`;
++  const fixtureHtml = `<!doctype html><html class="${safeClass}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${head}</head><body class="public-theme" style="margin:0"><div style="height:4rem;background:#0B1426" data-fixture-header></div>${sectionHtml}</body></html>`;
+   await page.route(fixtureUrl, (route) =>
+     route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: fixtureHtml }),
+   );
+diff --git a/tests/e2e/place-town-lights.spec.ts b/tests/e2e/place-town-lights.spec.ts
+index 7fe7321ed..ce21f194f 100644
+--- a/tests/e2e/place-town-lights.spec.ts
++++ b/tests/e2e/place-town-lights.spec.ts
+@@ -126,7 +126,7 @@ async function paintSection(page: Page, origin: string, sectionHtml: string): Pr
+   // same-origin assets such as the app's fonts load without CORS errors, and no
+   // app script runs in the measured page.
+   const fixtureUrl = `${origin}/__place-town-lights-fixture`;
+-  const fixtureHtml = `<!doctype html><html class="${safeClass}"><head><meta charset="utf-8">${head}</head><body><div class="ata-theme">${sectionHtml}</div></body></html>`;
++  const fixtureHtml = `<!doctype html><html class="${safeClass}"><head><meta charset="utf-8">${head}</head><body><div class="public-theme">${sectionHtml}</div></body></html>`;
+   await page.route(fixtureUrl, (route) =>
+     route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: fixtureHtml }),
+   );

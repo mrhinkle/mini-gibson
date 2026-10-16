@@ -1,0 +1,345 @@
+diff --git a/tests/unit/contextual-help-panel.test.ts b/tests/unit/contextual-help-panel.test.ts
+index eedeaec48..acc82db43 100644
+--- a/tests/unit/contextual-help-panel.test.ts
++++ b/tests/unit/contextual-help-panel.test.ts
+@@ -105,7 +105,7 @@ describe("ContextualHelpPanel", () => {
+   });
+ 
+   it("uses a legible trigger treatment on light public headers", async () => {
+-    vi.stubGlobal("fetch", vi.fn());
++    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+ 
+     await act(async () => {
+       root.render(createElement(ContextualHelpPanel, { headerTone: "light" }));
+@@ -119,6 +119,19 @@ describe("ContextualHelpPanel", () => {
+     expect(trigger?.classList.contains("text-gray-300")).toBe(false);
+   });
+ 
++  it("supports an icon-only trigger without changing its accessible name", async () => {
++    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
++    await act(async () => {
++      root.render(createElement(ContextualHelpPanel, { headerTone: "light", iconOnly: true }));
++    });
++    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Open schedule help"]');
++    expect(trigger?.textContent).not.toContain("Help");
++    expect(trigger?.getAttribute("title")).toBe("Schedule help");
++    act(() => trigger?.click());
++    await flushEffects();
++    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
++  });
++
+   it("announces loading failures without exposing an empty dialog", async () => {
+     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+ 
+diff --git a/tests/unit/get-involved-page.test.ts b/tests/unit/get-involved-page.test.ts
+new file mode 100644
+index 000000000..5b1e13e2c
+--- /dev/null
++++ b/tests/unit/get-involved-page.test.ts
+@@ -0,0 +1,111 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { renderToStaticMarkup } from 'react-dom/server';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const event = { name: 'AI Space Jam', slug: 'ai-space-jam', status: 'SCHEDULED' };
++const prisma = vi.hoisted(() => ({ event: { findUnique: vi.fn() } }));
++const brand = vi.hoisted(() => ({
++  getPublicBrand: vi.fn(),
++}));
++vi.mock('@/lib/db', () => ({ prisma }));
++vi.mock('@/lib/public-brand', () => brand);
++vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NOT_FOUND'); } }));
++
++import GetInvolvedPage, { generateMetadata } from '@/app/(public)/events/[eventSlug]/get-involved/page';
++
++const renderPage = async () =>
++  renderToStaticMarkup(await GetInvolvedPage({ params: Promise.resolve({ eventSlug: event.slug }) }));
++
++describe('Get Involved page', () => {
++  beforeEach(() => {
++    prisma.event.findUnique.mockReset();
++    brand.getPublicBrand.mockReset();
++  });
++
++  it('derives cards from the shared brand participation options', async () => {
++    prisma.event.findUnique.mockResolvedValue(event);
++    brand.getPublicBrand.mockResolvedValue({ cfpOpen: true, showRegisterCta: true, externalTicketUrl: null });
++    const html = await renderPage();
++    // The header's SSR brand call hides Register for viewers who already hold a ticket; match it.
++    expect(brand.getPublicBrand).toHaveBeenCalledWith(event.slug, expect.objectContaining({ respectViewerRegistration: true }));
++    expect(html).toContain('Submit a Talk');
++    expect(html).toContain('href="/events/ai-space-jam/register"');
++    expect(html).toContain('Apply for a Scholarship');
++    expect(html).toContain('Volunteer');
++    expect(html).toContain('href="/events/ai-space-jam/sponsors/prospectus"');
++  });
++
++  it('omits CFP and register when their shared options are closed', async () => {
++    prisma.event.findUnique.mockResolvedValue(event);
++    brand.getPublicBrand.mockResolvedValue({ cfpOpen: false, showRegisterCta: false, externalTicketUrl: null });
++    const html = await renderPage();
++    expect(html).not.toContain('Submit a Talk');
++    expect(html).not.toContain('/register');
++    expect(html).not.toContain('Get tickets');
++    expect(html).toContain('Volunteer');
++  });
++
++  it('opens an external ticket page in a new tab', async () => {
++    prisma.event.findUnique.mockResolvedValue(event);
++    brand.getPublicBrand.mockResolvedValue({
++      cfpOpen: false,
++      showRegisterCta: true,
++      externalTicketUrl: 'https://tickets.example/ai-space-jam',
++    });
++    const html = await renderPage();
++    const anchor = [...html.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map((m) => m[0]).find((a) => a.includes('Get tickets'));
++    expect(anchor, html).toBeDefined();
++    expect(anchor).toContain('href="https://tickets.example/ai-space-jam"');
++    expect(anchor).toContain('target="_blank"');
++    expect(anchor).toContain('rel="noopener noreferrer"');
++  });
++
++  it('gives every card an action that does not repeat its heading', async () => {
++    prisma.event.findUnique.mockResolvedValue(event);
++    brand.getPublicBrand.mockResolvedValue({ cfpOpen: true, showRegisterCta: true, externalTicketUrl: null });
++    const html = await renderPage();
++    const headings = [...html.matchAll(/<h2[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1]);
++    const actions = [...html.matchAll(/<article[\s\S]*?<a[^>]*>([^<]+)<\/a>/g)].map((m) => m[1]);
++    expect(actions).toEqual([
++      'Send a talk proposal',
++      'Get tickets',
++      'Start an application',
++      'Sign up to volunteer',
++      'See the sponsorship prospectus',
++    ]);
++    const lower = headings.map((heading) => heading.toLowerCase());
++    for (const action of actions) expect(lower).not.toContain(action.toLowerCase());
++  });
++
++  it('does not render a second main landmark', async () => {
++    prisma.event.findUnique.mockResolvedValue(event);
++    brand.getPublicBrand.mockResolvedValue({ cfpOpen: false, showRegisterCta: false, externalTicketUrl: null });
++    expect(await renderPage()).not.toContain('<main');
++  });
++
++  it('returns notFound for an unknown event', async () => {
++    prisma.event.findUnique.mockResolvedValue(null);
++    brand.getPublicBrand.mockResolvedValue(null);
++    await expect(GetInvolvedPage({ params: Promise.resolve({ eventSlug: 'nope' }) })).rejects.toThrow('NOT_FOUND');
++  });
++
++  it('shows the cancelled notice instead of options for a cancelled event', async () => {
++    prisma.event.findUnique.mockResolvedValue({ ...event, status: 'CANCELLED' });
++    brand.getPublicBrand.mockResolvedValue({ cfpOpen: true, showRegisterCta: true, externalTicketUrl: null });
++    const html = await renderPage();
++    expect(html).toContain('AI Space Jam has been cancelled.');
++    expect(html).not.toContain('Submit a Talk');
++  });
++
++  it('returns event metadata', async () => {
++    prisma.event.findUnique.mockResolvedValue({ name: event.name });
++    await expect(generateMetadata({ params: Promise.resolve({ eventSlug: event.slug }) })).resolves.toMatchObject({
++      title: expect.stringContaining('Get Involved'),
++      description: expect.stringContaining(event.name),
++    });
++  });
++});
+diff --git a/tests/unit/public-event-nav.test.ts b/tests/unit/public-event-nav.test.ts
+index 34ece79b6..8548d1140 100644
+--- a/tests/unit/public-event-nav.test.ts
++++ b/tests/unit/public-event-nav.test.ts
+@@ -6,6 +6,7 @@
+ import { describe, expect, it } from 'vitest';
+ import {
+   publicEventNav,
++  publicEventParticipateLinks,
+   isNavGroup,
+   isNavGroupActive,
+   isNavItemActive,
+@@ -24,6 +25,19 @@ const eventInfo = groups.find((g) => g.label === 'Event Info') as NavGroup;
+ const participate = groups.find((g) => g.label === 'Participate') as NavGroup;
+ 
+ describe('public event navigation', () => {
++  it('keeps Participate children equal to the shared link helper', () => {
++    for (const cfpOpen of [true, false]) {
++      for (const showRegister of [true, false]) {
++        for (const externalTicketUrl of [null, 'https://tickets.example/register']) {
++          const group = publicEventNav(SLUG, { cfpOpen, showRegister, externalTicketUrl })[0];
++          expect(group).toEqual({
++            label: 'Participate',
++            children: publicEventParticipateLinks(SLUG, { cfpOpen, showRegister, externalTicketUrl }),
++          });
++        }
++      }
++    }
++  });
+   it('leads with Participate, then browse surfaces, then Event Info (#835 / #1983)', () => {
+     // #719: Sessions is no longer top-level — Schedule is the single session listing.
+     // #720: participation actions move under Participate; Tickets top-level drops
+diff --git a/tests/unit/public-two-bar-header.test.ts b/tests/unit/public-two-bar-header.test.ts
+index f07729709..6bdf1fbcb 100644
+--- a/tests/unit/public-two-bar-header.test.ts
++++ b/tests/unit/public-two-bar-header.test.ts
+@@ -29,8 +29,11 @@ vi.mock('@/components/clerk-provider-wrapper', () => ({
+     : createElement('a', { href: '/sign-in', 'data-testid': 'user-button' }, 'Sign in'),
+ }));
+ vi.mock('@/components/contextual-help-panel', () => ({
+-  ContextualHelpPanel: ({ headerTone }: { headerTone: string }) =>
+-    createElement('button', { 'data-testid': 'help-button', 'data-tone': headerTone }, 'Help'),
++  ContextualHelpPanel: ({ headerTone, iconOnly }: { headerTone: string; iconOnly?: boolean }) =>
++    createElement('button', { 'data-testid': 'help-button', 'data-tone': headerTone, 'data-icon-only': iconOnly }, iconOnly ? null : 'Help'),
++}));
++vi.mock('@/components/search-toggle', () => ({
++  SearchToggle: () => createElement('div', { 'data-testid': 'search-toggle' }),
+ }));
+ vi.mock('@/components/search-form', () => ({
+   SearchForm: () => createElement('div', { 'data-testid': 'search-form' }),
+@@ -309,8 +312,10 @@ describe('public shell: two bars, one family (#1983)', () => {
+       await render(featuredEventSeed(template), '/events/brand-2027', 'brand-2027');
+       const utilities = container.querySelector('[data-testid="parent-site-utilities"]')!;
+       expect(utilities.closest('[data-testid="parent-site-bar"]')).not.toBeNull();
+-      expect(utilities.querySelector('[data-testid="search-form"]')).not.toBeNull();
++      expect(utilities.querySelector('[data-testid="search-toggle"]')).not.toBeNull();
+       expect(utilities.querySelector('[data-testid="help-button"]')?.getAttribute('data-tone')).toBe('light');
++      expect(utilities.querySelector('[data-testid="help-button"]')?.getAttribute('data-icon-only')).toBe('true');
++      expect(container.querySelector('#event-mobile-navigation [data-testid="search-form"]')).not.toBeNull();
+       expect(utilities.querySelector('[data-testid="user-button"]')?.textContent).toBe(signedIn ? 'Account' : 'Sign in');
+       expect(container.querySelectorAll('[data-testid="user-button"]')).toHaveLength(1);
+       const eventHeader = container.querySelector('[data-header-layout="events-bar"]')!;
+diff --git a/tests/unit/search-toggle-contract.test.ts b/tests/unit/search-toggle-contract.test.ts
+new file mode 100644
+index 000000000..c7ae77544
+--- /dev/null
++++ b/tests/unit/search-toggle-contract.test.ts
+@@ -0,0 +1,26 @@
++/** @vitest-environment jsdom
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { act, createElement } from 'react';
++import { createRoot } from 'react-dom/client';
++import { expect, it, vi } from 'vitest';
++
++const { searchForm } = vi.hoisted(() => ({
++  searchForm: vi.fn((_props: Record<string, unknown>) => createElement('input')),
++}));
++vi.mock('@/components/search-form', () => ({ SearchForm: searchForm }));
++vi.mock('next/navigation', () => ({}));
++import { SearchToggle } from '@/components/search-toggle';
++
++it('owns the keyboard shortcut instead of binding the inner form', () => {
++  const container = document.createElement('div');
++  const root = createRoot(container);
++  act(() => root.render(createElement(SearchToggle, { action: '/search' })));
++  act(() => container.querySelector('button')?.click());
++  // React 19 calls function components with (props, undefined); assert the props only.
++  expect(searchForm).toHaveBeenCalled();
++  expect(searchForm.mock.calls.at(-1)?.[0]).toMatchObject({ enableShortcut: false });
++  act(() => root.unmount());
++});
+diff --git a/tests/unit/search-toggle.test.ts b/tests/unit/search-toggle.test.ts
+new file mode 100644
+index 000000000..2aa209d00
+--- /dev/null
++++ b/tests/unit/search-toggle.test.ts
+@@ -0,0 +1,95 @@
++/** @vitest-environment jsdom
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { act, createElement } from 'react';
++import { createRoot, type Root } from 'react-dom/client';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const push = vi.fn();
++vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
++import { SearchToggle } from '@/components/search-toggle';
++
++describe('SearchToggle', () => {
++  let root: Root;
++  let container: HTMLDivElement;
++  beforeEach(() => {
++    push.mockReset();
++    container = document.createElement('div');
++    document.body.appendChild(container);
++    root = createRoot(container);
++    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
++  });
++  afterEach(() => {
++    act(() => root.unmount());
++    container.remove();
++  });
++  const render = async () => act(async () => root.render(createElement(SearchToggle, { action: '/search', placeholder: 'Search' })));
++
++  it('starts closed and opens with focus', async () => {
++    await render();
++    const button = container.querySelector<HTMLButtonElement>('button');
++    expect(container.querySelector('input')).toBeNull();
++    await act(async () => button?.click());
++    expect(button?.getAttribute('aria-expanded')).toBe('true');
++    expect(document.activeElement?.tagName).toBe('INPUT');
++  });
++  it.each([['Meta', 'metaKey'], ['Control', 'ctrlKey']])('%s-K opens and focuses', async (_name, key) => {
++    await render();
++    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', [key]: true })));
++    expect(document.activeElement?.tagName).toBe('INPUT');
++  });
++  it('ignores the shortcut while the toggle is hidden below its breakpoint', async () => {
++    container.style.display = 'none';
++    await render();
++    const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, cancelable: true });
++    await act(async () => window.dispatchEvent(event));
++    expect(container.querySelector('input')).toBeNull();
++    expect(event.defaultPrevented).toBe(false);
++    container.style.display = '';
++    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true })));
++    expect(document.activeElement?.tagName).toBe('INPUT');
++  });
++  it('points aria-controls at the panel only while it exists', async () => {
++    await render();
++    const button = container.querySelector<HTMLButtonElement>('button')!;
++    expect(button.hasAttribute('aria-controls')).toBe(false);
++    await act(async () => button.click());
++    const id = button.getAttribute('aria-controls');
++    expect(id).toBeTruthy();
++    expect(document.getElementById(id!)).not.toBeNull();
++  });
++  it('Meta-K while open pulls focus back to the search field', async () => {
++    await render();
++    const button = container.querySelector<HTMLButtonElement>('button')!;
++    await act(async () => button.click());
++    await act(async () => button.focus());
++    expect(document.activeElement).toBe(button);
++    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true })));
++    expect(document.activeElement?.tagName).toBe('INPUT');
++  });
++  it('Escape closes and restores focus; outside click closes', async () => {
++    await render();
++    const button = container.querySelector<HTMLButtonElement>('button');
++    await act(async () => button?.click());
++    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
++    await act(async () => undefined);
++    expect(document.activeElement).toBe(button);
++    await act(async () => button?.click());
++    await act(async () => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
++    expect(container.querySelector('input')).toBeNull();
++  });
++  it('submits through the existing search navigation', async () => {
++    await render();
++    act(() => container.querySelector<HTMLButtonElement>('button')?.click());
++    const input = container.querySelector<HTMLInputElement>('input')!;
++    act(() => {
++      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
++      setter.call(input, 'agents');
++      input.dispatchEvent(new Event('change', { bubbles: true }));
++      input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
++    });
++    expect(push).toHaveBeenCalledWith('/search?q=agents');
++  });
++});

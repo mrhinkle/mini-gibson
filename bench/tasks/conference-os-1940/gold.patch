@@ -1,0 +1,2202 @@
+diff --git a/src/components/homepage/audience-band-config.ts b/src/components/homepage/audience-band-config.ts
+new file mode 100644
+index 000000000..6f50b7ff4
+--- /dev/null
++++ b/src/components/homepage/audience-band-config.ts
+@@ -0,0 +1,127 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++export const FEATURED_EVENT_TRACK_COUNT = 'FEATURED_EVENT_TRACK_COUNT' as const;
++
++interface AudienceBandLiteralTile {
++  value: string;
++  metric?: never;
++  label: string;
++  source: string;
++}
++
++interface AudienceBandMetricTile {
++  value?: never;
++  metric: typeof FEATURED_EVENT_TRACK_COUNT;
++  label: string;
++  source: string;
++}
++
++export type AudienceBandTile = AudienceBandLiteralTile | AudienceBandMetricTile;
++
++export interface AudienceBandConfig {
++  anchor: string;
++  tiles: AudienceBandTile[];
++}
++
++const MAX_TILES = 12;
++const MISSING = Symbol('missing-own-property');
++
++function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
++  try {
++    return value !== null && typeof value === 'object' && !Array.isArray(value);
++  } catch {
++    return false;
++  }
++}
++
++function readOwn(value: object, key: PropertyKey): unknown | typeof MISSING {
++  try {
++    if (!Object.prototype.hasOwnProperty.call(value, key)) return MISSING;
++    return Reflect.get(value, key);
++  } catch {
++    return MISSING;
++  }
++}
++
++function hasOwn(value: object, key: PropertyKey): boolean | null {
++  try {
++    return Object.prototype.hasOwnProperty.call(value, key);
++  } catch {
++    return null;
++  }
++}
++
++function readOwnNonEmptyString(value: object, key: PropertyKey): string | null {
++  const candidate = readOwn(value, key);
++  if (typeof candidate !== 'string') return null;
++  const trimmed = candidate.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function parseTile(value: unknown): AudienceBandTile | null {
++  if (!isRecord(value)) return null;
++
++  const hasValue = hasOwn(value, 'value');
++  const hasMetric = hasOwn(value, 'metric');
++  if (hasValue === null || hasMetric === null || hasValue === hasMetric) {
++    return null;
++  }
++
++  const label = readOwnNonEmptyString(value, 'label');
++  const source = readOwnNonEmptyString(value, 'source');
++  if (!label || !source) return null;
++
++  if (hasValue) {
++    const rawValue = readOwn(value, 'value');
++    if (typeof rawValue !== 'string') return null;
++    const tileValue = rawValue.trim();
++    if (!tileValue) return null;
++    return { value: tileValue, label, source };
++  }
++
++  const rawMetric = readOwn(value, 'metric');
++  if (rawMetric !== FEATURED_EVENT_TRACK_COUNT) return null;
++  return { metric: FEATURED_EVENT_TRACK_COUNT, label, source };
++}
++
++function parseTiles(value: unknown): AudienceBandTile[] {
++  try {
++    if (!Array.isArray(value)) return [];
++    const length = readOwn(value, 'length');
++    if (
++      typeof length !== 'number' ||
++      !Number.isSafeInteger(length) ||
++      length < 0
++    ) {
++      return [];
++    }
++
++    const tiles: AudienceBandTile[] = [];
++    for (let index = 0; index < length && tiles.length < MAX_TILES; index += 1) {
++      const candidate = readOwn(value, index);
++      if (candidate === MISSING) continue;
++      const tile = parseTile(candidate);
++      if (tile) tiles.push(tile);
++    }
++    return tiles;
++  } catch {
++    return [];
++  }
++}
++
++export function parseAudienceBandConfig(
++  config: unknown,
++): AudienceBandConfig | null {
++  if (!isRecord(config)) return null;
++
++  const anchor = readOwnNonEmptyString(config, 'anchor');
++  const tilesValue = readOwn(config, 'tiles');
++  if (!anchor || tilesValue === MISSING) return null;
++
++  const tiles = parseTiles(tilesValue);
++  return tiles.length > 0 ? { anchor, tiles } : null;
++}
+diff --git a/src/components/homepage/audience-band.tsx b/src/components/homepage/audience-band.tsx
+index c63cfaf51..351f870a6 100644
+--- a/src/components/homepage/audience-band.tsx
++++ b/src/components/homepage/audience-band.tsx
+@@ -5,35 +5,21 @@
+  */
+ 
+ import { useId, type ReactNode } from 'react';
++import {
++  FEATURED_EVENT_TRACK_COUNT,
++  parseAudienceBandConfig,
++  type AudienceBandTile,
++} from '@/components/homepage/audience-band-config';
+ import type { HomeRenderContext } from '@/components/homepage-renderers';
+ import { prisma } from '@/lib/db';
+ import type { SectionDataLoader } from '@/lib/homepage-section-data';
+ import { createLogger } from '@/lib/logger';
+ 
+-const FEATURED_EVENT_TRACK_COUNT = 'FEATURED_EVENT_TRACK_COUNT' as const;
+-
+-interface AudienceBandLiteralTile {
+-  value: string;
+-  metric?: never;
+-  label: string;
+-  source: string;
+-}
+-
+-interface AudienceBandMetricTile {
+-  value?: never;
+-  metric: typeof FEATURED_EVENT_TRACK_COUNT;
+-  label: string;
+-  source: string;
+-}
+-
+-export type AudienceBandTile =
+-  | AudienceBandLiteralTile
+-  | AudienceBandMetricTile;
+-
+-export interface AudienceBandConfig {
+-  anchor: string;
+-  tiles: AudienceBandTile[];
+-}
++export {
++  parseAudienceBandConfig,
++  type AudienceBandConfig,
++  type AudienceBandTile,
++} from '@/components/homepage/audience-band-config';
+ 
+ export interface AudienceProofMetrics {
+   FEATURED_EVENT_TRACK_COUNT: number;
+@@ -51,7 +37,6 @@ interface ResolvedAudienceBandTile {
+   source: string;
+ }
+ 
+-const MAX_TILES = 12;
+ const MISSING = Symbol('missing-own-property');
+ const log = createLogger('homepage-audience-band');
+ 
+@@ -75,88 +60,6 @@ function readOwn(
+   }
+ }
+ 
+-function hasOwn(value: object, key: PropertyKey): boolean | null {
+-  try {
+-    return Object.prototype.hasOwnProperty.call(value, key);
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-function readOwnNonEmptyString(
+-  value: object,
+-  key: PropertyKey,
+-): string | null {
+-  const candidate = readOwn(value, key);
+-  if (typeof candidate !== 'string') return null;
+-  const trimmed = candidate.trim();
+-  return trimmed.length > 0 ? trimmed : null;
+-}
+-
+-function parseTile(value: unknown): AudienceBandTile | null {
+-  if (!isRecord(value)) return null;
+-
+-  const hasValue = hasOwn(value, 'value');
+-  const hasMetric = hasOwn(value, 'metric');
+-  if (hasValue === null || hasMetric === null || hasValue === hasMetric) {
+-    return null;
+-  }
+-
+-  const label = readOwnNonEmptyString(value, 'label');
+-  const source = readOwnNonEmptyString(value, 'source');
+-  if (!label || !source) return null;
+-
+-  if (hasValue) {
+-    const rawValue = readOwn(value, 'value');
+-    if (typeof rawValue !== 'string') return null;
+-    const tileValue = rawValue.trim();
+-    if (!tileValue) return null;
+-    return { value: tileValue, label, source };
+-  }
+-
+-  const rawMetric = readOwn(value, 'metric');
+-  if (rawMetric !== FEATURED_EVENT_TRACK_COUNT) return null;
+-  return { metric: FEATURED_EVENT_TRACK_COUNT, label, source };
+-}
+-
+-function parseTiles(value: unknown): AudienceBandTile[] {
+-  try {
+-    if (!Array.isArray(value)) return [];
+-    const length = readOwn(value, 'length');
+-    if (
+-      typeof length !== 'number' ||
+-      !Number.isSafeInteger(length) ||
+-      length < 0
+-    ) {
+-      return [];
+-    }
+-
+-    const tiles: AudienceBandTile[] = [];
+-    for (let index = 0; index < length && tiles.length < MAX_TILES; index += 1) {
+-      const candidate = readOwn(value, index);
+-      if (candidate === MISSING) continue;
+-      const tile = parseTile(candidate);
+-      if (tile) tiles.push(tile);
+-    }
+-    return tiles;
+-  } catch {
+-    return [];
+-  }
+-}
+-
+-export function parseAudienceBandConfig(
+-  config: unknown,
+-): AudienceBandConfig | null {
+-  if (!isRecord(config)) return null;
+-
+-  const anchor = readOwnNonEmptyString(config, 'anchor');
+-  const tilesValue = readOwn(config, 'tiles');
+-  if (!anchor || tilesValue === MISSING) return null;
+-
+-  const tiles = parseTiles(tilesValue);
+-  return tiles.length > 0 ? { anchor, tiles } : null;
+-}
+-
+ function AudienceBandSection({
+   anchor,
+   tiles,
+diff --git a/src/components/homepage/commitment-config.ts b/src/components/homepage/commitment-config.ts
+new file mode 100644
+index 000000000..00459f499
+--- /dev/null
++++ b/src/components/homepage/commitment-config.ts
+@@ -0,0 +1,231 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++export interface CommitmentColumn {
++  eyebrow: string;
++  title: string;
++  body: string;
++}
++
++export interface CommitmentStat {
++  value: string;
++  label: string;
++  source: string | null;
++}
++
++export interface CommitmentCta {
++  label: string;
++  href: string;
++}
++
++export interface CommitmentConfig {
++  eyebrow: string;
++  title: string;
++  intro: string;
++  columns: CommitmentColumn[];
++  stats: CommitmentStat[];
++  cta: CommitmentCta | null;
++}
++
++const DEFAULT_COMMITMENT = Object.freeze({
++  eyebrow: 'Our commitment',
++  title: 'A region doesn’t get good at AI one company at a time.',
++  intro:
++    'So we build the room for all three at once — government, education and business, hearing the same talks on the same day.',
++  columns: Object.freeze([
++    Object.freeze({
++      eyebrow: 'Government',
++      title: 'The people writing the rules',
++      body:
++        'Economic development, state and municipal teams. If policy is going to keep up with the technology, the people setting it need to hear the same sessions as the people shipping it — not a summary six months later.',
++    }),
++    Object.freeze({
++      eyebrow: 'Education',
++      title: 'Faculty on stage, students in the seats',
++      body:
++        'NC State, Duke, and the community colleges that quietly do most of the region’s retraining. Scholarship seats go to students and career-changers, and faculty belong on the program rather than in the audience.',
++    }),
++    Object.freeze({
++      eyebrow: 'Business',
++      title: 'Two-person shops and the Fortune 50',
++      body:
++        'In the same hallway, on purpose. The startup learns what enterprise procurement actually needs, and the enterprise finds out what is possible this quarter instead of next year.',
++    }),
++  ]),
++  stats: Object.freeze([]),
++  cta: null,
++});
++
++const MAX_COLUMNS = 6;
++const MAX_STATS = 6;
++const MAX_CTA_HREF_LENGTH = 2_048;
++const MISSING = Symbol('missing-commitment-property');
++const INVISIBLE_OR_CONTROL =
++  /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u;
++const NUMERIC_CLAIM = /\p{Number}/u;
++
++function isArray(value: unknown): value is unknown[] {
++  try {
++    return Array.isArray(value);
++  } catch {
++    return false;
++  }
++}
++
++function isPlainRecord(value: unknown): value is Record<PropertyKey, unknown> {
++  try {
++    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
++      return false;
++    }
++    const prototype = Object.getPrototypeOf(value);
++    return prototype === null || prototype === Object.prototype;
++  } catch {
++    return false;
++  }
++}
++
++/** Read only own data properties; organizer-supplied accessors never run. */
++function ownValue(value: unknown, key: PropertyKey): unknown | typeof MISSING {
++  if (!isPlainRecord(value) && !isArray(value)) return MISSING;
++  try {
++    const descriptor = Object.getOwnPropertyDescriptor(value, key);
++    return descriptor && Object.hasOwn(descriptor, 'value')
++      ? descriptor.value
++      : MISSING;
++  } catch {
++    return MISSING;
++  }
++}
++
++function nonEmptyString(value: unknown): string | null {
++  if (typeof value !== 'string') return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function safeVisibleSource(value: unknown): string | null {
++  const source = nonEmptyString(value);
++  if (!source || INVISIBLE_OR_CONTROL.test(source)) return null;
++  return source;
++}
++
++function boundedItems(value: unknown, maximum: number): unknown[] | null {
++  if (!isArray(value)) return null;
++  const length = ownValue(value, 'length');
++  if (
++    typeof length !== 'number' ||
++    !Number.isSafeInteger(length) ||
++    length < 0 ||
++    length > maximum
++  ) {
++    return null;
++  }
++
++  const items: unknown[] = [];
++  for (let index = 0; index < length; index += 1) {
++    items.push(ownValue(value, String(index)));
++  }
++  return items;
++}
++
++function parseColumn(value: unknown): CommitmentColumn | null {
++  if (!isPlainRecord(value)) return null;
++  const eyebrow = nonEmptyString(ownValue(value, 'eyebrow'));
++  const title = nonEmptyString(ownValue(value, 'title'));
++  const body = nonEmptyString(ownValue(value, 'body'));
++  return eyebrow && title && body ? { eyebrow, title, body } : null;
++}
++
++function parseColumns(value: unknown): CommitmentColumn[] | null {
++  const items = boundedItems(value, MAX_COLUMNS);
++  if (!items) return null;
++  const columns = items
++    .map(parseColumn)
++    .filter((column): column is CommitmentColumn => column !== null);
++  return columns.length > 0 ? columns : null;
++}
++
++function parseStat(value: unknown): CommitmentStat | null {
++  if (!isPlainRecord(value)) return null;
++  const statValue = nonEmptyString(ownValue(value, 'value'));
++  const label = nonEmptyString(ownValue(value, 'label'));
++  const source = safeVisibleSource(ownValue(value, 'source'));
++  if (
++    !statValue ||
++    !label ||
++    ((NUMERIC_CLAIM.test(statValue) || NUMERIC_CLAIM.test(label)) && !source)
++  ) {
++    return null;
++  }
++  return { value: statValue, label, source };
++}
++
++function parseStats(value: unknown): CommitmentStat[] {
++  const items = boundedItems(value, MAX_STATS);
++  if (!items) return [];
++  return items
++    .map(parseStat)
++    .filter((stat): stat is CommitmentStat => stat !== null);
++}
++
++function safeSameSitePath(value: unknown): string | null {
++  if (typeof value !== 'string' || value.length > MAX_CTA_HREF_LENGTH) {
++    return null;
++  }
++  const href = value.trim();
++  if (
++    !href ||
++    !href.startsWith('/') ||
++    href.startsWith('//') ||
++    /[\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\\]/u.test(
++      href,
++    )
++  ) {
++    return null;
++  }
++
++  try {
++    const base = new URL('https://conferenceos.invalid');
++    return new URL(href, base).origin === base.origin ? href : null;
++  } catch {
++    return null;
++  }
++}
++
++function parseCta(value: unknown): CommitmentCta | null {
++  if (!isPlainRecord(value)) return null;
++  const label = nonEmptyString(ownValue(value, 'label'));
++  const href = safeSameSitePath(ownValue(value, 'href'));
++  return label && href ? { label, href } : null;
++}
++
++function freshDefaults(): CommitmentConfig {
++  return {
++    eyebrow: DEFAULT_COMMITMENT.eyebrow,
++    title: DEFAULT_COMMITMENT.title,
++    intro: DEFAULT_COMMITMENT.intro,
++    columns: DEFAULT_COMMITMENT.columns.map((column) => ({ ...column })),
++    stats: [],
++    cta: null,
++  };
++}
++
++export function parseCommitmentConfig(config: unknown): CommitmentConfig {
++  try {
++    if (!isPlainRecord(config)) return freshDefaults();
++    const defaults = freshDefaults();
++    return {
++      eyebrow: nonEmptyString(ownValue(config, 'eyebrow')) ?? defaults.eyebrow,
++      title: nonEmptyString(ownValue(config, 'title')) ?? defaults.title,
++      intro: nonEmptyString(ownValue(config, 'intro')) ?? defaults.intro,
++      columns: parseColumns(ownValue(config, 'columns')) ?? defaults.columns,
++      stats: parseStats(ownValue(config, 'stats')),
++      cta: parseCta(ownValue(config, 'cta')),
++    };
++  } catch {
++    return freshDefaults();
++  }
++}
+diff --git a/src/components/homepage/commitment.tsx b/src/components/homepage/commitment.tsx
+index 92a302c71..7c6bd8718 100644
+--- a/src/components/homepage/commitment.tsx
++++ b/src/components/homepage/commitment.tsx
+@@ -6,234 +6,19 @@
+ 
+ import Link from 'next/link';
+ import { useId, type ReactNode } from 'react';
++import {
++  parseCommitmentConfig,
++  type CommitmentConfig,
++} from '@/components/homepage/commitment-config';
+ import type { HomeRenderContext } from '@/components/homepage-renderers';
+ 
+-export interface CommitmentColumn {
+-  eyebrow: string;
+-  title: string;
+-  body: string;
+-}
+-
+-export interface CommitmentStat {
+-  value: string;
+-  label: string;
+-  source: string | null;
+-}
+-
+-export interface CommitmentCta {
+-  label: string;
+-  href: string;
+-}
+-
+-export interface CommitmentConfig {
+-  eyebrow: string;
+-  title: string;
+-  intro: string;
+-  columns: CommitmentColumn[];
+-  stats: CommitmentStat[];
+-  cta: CommitmentCta | null;
+-}
+-
+-const DEFAULT_COMMITMENT = Object.freeze({
+-  eyebrow: 'Our commitment',
+-  title: 'A region doesn’t get good at AI one company at a time.',
+-  intro:
+-    'So we build the room for all three at once — government, education and business, hearing the same talks on the same day.',
+-  columns: Object.freeze([
+-    Object.freeze({
+-      eyebrow: 'Government',
+-      title: 'The people writing the rules',
+-      body:
+-        'Economic development, state and municipal teams. If policy is going to keep up with the technology, the people setting it need to hear the same sessions as the people shipping it — not a summary six months later.',
+-    }),
+-    Object.freeze({
+-      eyebrow: 'Education',
+-      title: 'Faculty on stage, students in the seats',
+-      body:
+-        'NC State, Duke, and the community colleges that quietly do most of the region’s retraining. Scholarship seats go to students and career-changers, and faculty belong on the program rather than in the audience.',
+-    }),
+-    Object.freeze({
+-      eyebrow: 'Business',
+-      title: 'Two-person shops and the Fortune 50',
+-      body:
+-        'In the same hallway, on purpose. The startup learns what enterprise procurement actually needs, and the enterprise finds out what is possible this quarter instead of next year.',
+-    }),
+-  ]),
+-  stats: Object.freeze([]),
+-  cta: null,
+-});
+-
+-const MAX_COLUMNS = 6;
+-const MAX_STATS = 6;
+-const MAX_CTA_HREF_LENGTH = 2_048;
+-const MISSING = Symbol('missing-commitment-property');
+-const INVISIBLE_OR_CONTROL =
+-  /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u;
+-const NUMERIC_CLAIM = /\p{Number}/u;
+-
+-function isArray(value: unknown): value is unknown[] {
+-  try {
+-    return Array.isArray(value);
+-  } catch {
+-    return false;
+-  }
+-}
+-
+-function isPlainRecord(value: unknown): value is Record<PropertyKey, unknown> {
+-  try {
+-    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+-      return false;
+-    }
+-    const prototype = Object.getPrototypeOf(value);
+-    return prototype === null || prototype === Object.prototype;
+-  } catch {
+-    return false;
+-  }
+-}
+-
+-/** Read only own data properties; organizer-supplied accessors never run. */
+-function ownValue(value: unknown, key: PropertyKey): unknown | typeof MISSING {
+-  if (!isPlainRecord(value) && !isArray(value)) return MISSING;
+-  try {
+-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+-    return descriptor && Object.hasOwn(descriptor, 'value')
+-      ? descriptor.value
+-      : MISSING;
+-  } catch {
+-    return MISSING;
+-  }
+-}
+-
+-function nonEmptyString(value: unknown): string | null {
+-  if (typeof value !== 'string') return null;
+-  const trimmed = value.trim();
+-  return trimmed.length > 0 ? trimmed : null;
+-}
+-
+-function safeVisibleSource(value: unknown): string | null {
+-  const source = nonEmptyString(value);
+-  if (!source || INVISIBLE_OR_CONTROL.test(source)) return null;
+-  return source;
+-}
+-
+-function boundedItems(value: unknown, maximum: number): unknown[] | null {
+-  if (!isArray(value)) return null;
+-  const length = ownValue(value, 'length');
+-  if (
+-    typeof length !== 'number' ||
+-    !Number.isSafeInteger(length) ||
+-    length < 0 ||
+-    length > maximum
+-  ) {
+-    return null;
+-  }
+-
+-  const items: unknown[] = [];
+-  for (let index = 0; index < length; index += 1) {
+-    items.push(ownValue(value, String(index)));
+-  }
+-  return items;
+-}
+-
+-function parseColumn(value: unknown): CommitmentColumn | null {
+-  if (!isPlainRecord(value)) return null;
+-  const eyebrow = nonEmptyString(ownValue(value, 'eyebrow'));
+-  const title = nonEmptyString(ownValue(value, 'title'));
+-  const body = nonEmptyString(ownValue(value, 'body'));
+-  return eyebrow && title && body ? { eyebrow, title, body } : null;
+-}
+-
+-function parseColumns(value: unknown): CommitmentColumn[] | null {
+-  const items = boundedItems(value, MAX_COLUMNS);
+-  if (!items) return null;
+-  const columns = items
+-    .map(parseColumn)
+-    .filter((column): column is CommitmentColumn => column !== null);
+-  return columns.length > 0 ? columns : null;
+-}
+-
+-function parseStat(value: unknown): CommitmentStat | null {
+-  if (!isPlainRecord(value)) return null;
+-  const statValue = nonEmptyString(ownValue(value, 'value'));
+-  const label = nonEmptyString(ownValue(value, 'label'));
+-  const source = safeVisibleSource(ownValue(value, 'source'));
+-  if (
+-    !statValue ||
+-    !label ||
+-    ((NUMERIC_CLAIM.test(statValue) || NUMERIC_CLAIM.test(label)) && !source)
+-  ) {
+-    return null;
+-  }
+-  return { value: statValue, label, source };
+-}
+-
+-function parseStats(value: unknown): CommitmentStat[] {
+-  const items = boundedItems(value, MAX_STATS);
+-  if (!items) return [];
+-  return items
+-    .map(parseStat)
+-    .filter((stat): stat is CommitmentStat => stat !== null);
+-}
+-
+-function safeSameSitePath(value: unknown): string | null {
+-  if (typeof value !== 'string' || value.length > MAX_CTA_HREF_LENGTH) {
+-    return null;
+-  }
+-  const href = value.trim();
+-  if (
+-    !href ||
+-    !href.startsWith('/') ||
+-    href.startsWith('//') ||
+-    /[\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\\]/u.test(
+-      href,
+-    )
+-  ) {
+-    return null;
+-  }
+-
+-  try {
+-    const base = new URL('https://conferenceos.invalid');
+-    return new URL(href, base).origin === base.origin ? href : null;
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-function parseCta(value: unknown): CommitmentCta | null {
+-  if (!isPlainRecord(value)) return null;
+-  const label = nonEmptyString(ownValue(value, 'label'));
+-  const href = safeSameSitePath(ownValue(value, 'href'));
+-  return label && href ? { label, href } : null;
+-}
+-
+-function freshDefaults(): CommitmentConfig {
+-  return {
+-    eyebrow: DEFAULT_COMMITMENT.eyebrow,
+-    title: DEFAULT_COMMITMENT.title,
+-    intro: DEFAULT_COMMITMENT.intro,
+-    columns: DEFAULT_COMMITMENT.columns.map((column) => ({ ...column })),
+-    stats: [],
+-    cta: null,
+-  };
+-}
+-
+-export function parseCommitmentConfig(config: unknown): CommitmentConfig {
+-  try {
+-    if (!isPlainRecord(config)) return freshDefaults();
+-    const defaults = freshDefaults();
+-    return {
+-      eyebrow:
+-        nonEmptyString(ownValue(config, 'eyebrow')) ?? defaults.eyebrow,
+-      title: nonEmptyString(ownValue(config, 'title')) ?? defaults.title,
+-      intro: nonEmptyString(ownValue(config, 'intro')) ?? defaults.intro,
+-      columns: parseColumns(ownValue(config, 'columns')) ?? defaults.columns,
+-      stats: parseStats(ownValue(config, 'stats')),
+-      cta: parseCta(ownValue(config, 'cta')),
+-    };
+-  } catch {
+-    return freshDefaults();
+-  }
+-}
++export {
++  parseCommitmentConfig,
++  type CommitmentColumn,
++  type CommitmentConfig,
++  type CommitmentCta,
++  type CommitmentStat,
++} from '@/components/homepage/commitment-config';
+ 
+ function CommitmentSection({ config }: { config: CommitmentConfig }) {
+   const headingId = useId();
+diff --git a/src/components/homepage/manifesto-config.ts b/src/components/homepage/manifesto-config.ts
+new file mode 100644
+index 000000000..3f4089335
+--- /dev/null
++++ b/src/components/homepage/manifesto-config.ts
+@@ -0,0 +1,84 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++interface ManifestoFigure {
++  imageUrl: string;
++  alt: string;
++}
++
++export interface ManifestoConfig {
++  eyebrow: string;
++  title: string;
++  question: string;
++  body: string[];
++  figure: ManifestoFigure | null;
++}
++
++const DEFAULT_MANIFESTO: Readonly<ManifestoConfig> = {
++  eyebrow: 'The 2027 theme',
++  title: 'Make AI Work for You',
++  question:
++    'Every talk has to answer one question. What do you do differently on Monday?',
++  body: [
++    'It is not a tagline, it is a mission. We help people become the one in the room who knows what to do — and we want everyone to leave able to do something they could not do when they walked in.',
++    'The future of AI is only bright if the people using it understand it. That means teaching users and leaders to make AI work for them, rather than the other way around. We want the AI future to look more like the Jetsons than the Terminator.',
++    'And the question is the acceptance filter, not a slogan: every submission to the call for speakers is judged against it, and a session that only describes what a model can do gets declined — however good the demo is.',
++  ],
++  figure: null,
++};
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function nonEmptyString(value: unknown): string | null {
++  if (typeof value !== 'string') return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function parseBody(value: unknown): string[] | null {
++  if (!Array.isArray(value) || value.length < 1 || value.length > 4) {
++    return null;
++  }
++  const paragraphs = value.map(nonEmptyString);
++  return paragraphs.every((paragraph): paragraph is string => paragraph !== null)
++    ? paragraphs
++    : null;
++}
++
++function parseFigure(value: unknown): ManifestoFigure | null {
++  if (!isRecord(value)) return null;
++  const imageUrl = nonEmptyString(value.imageUrl);
++  const alt = nonEmptyString(value.alt);
++  return imageUrl && alt ? { imageUrl, alt } : null;
++}
++
++function freshManifestoDefaults(): ManifestoConfig {
++  return {
++    eyebrow: DEFAULT_MANIFESTO.eyebrow,
++    title: DEFAULT_MANIFESTO.title,
++    question: DEFAULT_MANIFESTO.question,
++    body: [...DEFAULT_MANIFESTO.body],
++    figure: null,
++  };
++}
++
++export function parseManifestoConfig(config: unknown): ManifestoConfig {
++  try {
++    const input = isRecord(config) ? config : {};
++    const defaults = freshManifestoDefaults();
++    return {
++      eyebrow: nonEmptyString(input.eyebrow) ?? defaults.eyebrow,
++      title: nonEmptyString(input.title) ?? defaults.title,
++      question: nonEmptyString(input.question) ?? defaults.question,
++      body: parseBody(input.body) ?? defaults.body,
++      figure: parseFigure(input.figure),
++    };
++  } catch {
++    return freshManifestoDefaults();
++  }
++}
+diff --git a/src/components/homepage/manifesto.tsx b/src/components/homepage/manifesto.tsx
+index abbb3a547..a642bffc0 100644
+--- a/src/components/homepage/manifesto.tsx
++++ b/src/components/homepage/manifesto.tsx
+@@ -5,86 +5,16 @@
+  */
+ 
+ import { useId, type ReactNode } from 'react';
++import {
++  parseManifestoConfig,
++  type ManifestoConfig,
++} from '@/components/homepage/manifesto-config';
+ import type { HomeRenderContext } from '@/components/homepage-renderers';
+ 
+-interface ManifestoFigure {
+-  imageUrl: string;
+-  alt: string;
+-}
+-
+-export interface ManifestoConfig {
+-  eyebrow: string;
+-  title: string;
+-  question: string;
+-  body: string[];
+-  figure: ManifestoFigure | null;
+-}
+-
+-const DEFAULT_MANIFESTO: Readonly<ManifestoConfig> = {
+-  eyebrow: 'The 2027 theme',
+-  title: 'Make AI Work for You',
+-  question:
+-    'Every talk has to answer one question. What do you do differently on Monday?',
+-  body: [
+-    'It is not a tagline, it is a mission. We help people become the one in the room who knows what to do — and we want everyone to leave able to do something they could not do when they walked in.',
+-    'The future of AI is only bright if the people using it understand it. That means teaching users and leaders to make AI work for them, rather than the other way around. We want the AI future to look more like the Jetsons than the Terminator.',
+-    'And the question is the acceptance filter, not a slogan: every submission to the call for speakers is judged against it, and a session that only describes what a model can do gets declined — however good the demo is.',
+-  ],
+-  figure: null,
+-};
+-
+-function isRecord(value: unknown): value is Record<string, unknown> {
+-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+-}
+-
+-function nonEmptyString(value: unknown): string | null {
+-  if (typeof value !== 'string') return null;
+-  const trimmed = value.trim();
+-  return trimmed.length > 0 ? trimmed : null;
+-}
+-
+-function parseBody(value: unknown): string[] | null {
+-  if (!Array.isArray(value) || value.length < 1 || value.length > 4) {
+-    return null;
+-  }
+-  const paragraphs = value.map(nonEmptyString);
+-  return paragraphs.every((paragraph): paragraph is string => paragraph !== null)
+-    ? paragraphs
+-    : null;
+-}
+-
+-function parseFigure(value: unknown): ManifestoFigure | null {
+-  if (!isRecord(value)) return null;
+-  const imageUrl = nonEmptyString(value.imageUrl);
+-  const alt = nonEmptyString(value.alt);
+-  return imageUrl && alt ? { imageUrl, alt } : null;
+-}
+-
+-function freshManifestoDefaults(): ManifestoConfig {
+-  return {
+-    eyebrow: DEFAULT_MANIFESTO.eyebrow,
+-    title: DEFAULT_MANIFESTO.title,
+-    question: DEFAULT_MANIFESTO.question,
+-    body: [...DEFAULT_MANIFESTO.body],
+-    figure: null,
+-  };
+-}
+-
+-export function parseManifestoConfig(config: unknown): ManifestoConfig {
+-  try {
+-    const input = isRecord(config) ? config : {};
+-    const defaults = freshManifestoDefaults();
+-    return {
+-      eyebrow: nonEmptyString(input.eyebrow) ?? defaults.eyebrow,
+-      title: nonEmptyString(input.title) ?? defaults.title,
+-      question: nonEmptyString(input.question) ?? defaults.question,
+-      body: parseBody(input.body) ?? defaults.body,
+-      figure: parseFigure(input.figure),
+-    };
+-  } catch {
+-    return freshManifestoDefaults();
+-  }
+-}
++export {
++  parseManifestoConfig,
++  type ManifestoConfig,
++} from '@/components/homepage/manifesto-config';
+ 
+ function ManifestoSection({ config }: { config: ManifestoConfig }) {
+   const headingId = useId();
+diff --git a/src/components/homepage/place-config.ts b/src/components/homepage/place-config.ts
+new file mode 100644
+index 000000000..514996115
+--- /dev/null
++++ b/src/components/homepage/place-config.ts
+@@ -0,0 +1,216 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import {
++  DEFAULT_HTTP_URL_MAX_LENGTH,
++  normalizeOptionalHttpUrl,
++} from '@/lib/url-validation';
++
++export interface PlaceGraphic {
++  src: string;
++  alt: string;
++  caption: string | null;
++}
++
++export interface PlaceFact {
++  value: string;
++  label: string;
++  sourceLabel: string;
++  sourceHref: string;
++}
++
++export interface PlaceOrganization {
++  name: string;
++  sourceLabel: string;
++  sourceHref: string;
++}
++
++export interface PlaceSector {
++  label: string;
++  organizations: PlaceOrganization[];
++}
++
++export interface PlaceConfig {
++  eyebrow: string | null;
++  title: string;
++  intro: string | null;
++  graphic: PlaceGraphic | null;
++  facts: PlaceFact[];
++  sectors: PlaceSector[];
++}
++
++const MAX_FACTS = 8;
++const MAX_SECTORS = 8;
++const MAX_ORGANIZATIONS_PER_SECTOR = 12;
++const INVALID_PROPERTY = Symbol('invalid-place-config-property');
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  try {
++    return value !== null && typeof value === 'object' && !Array.isArray(value);
++  } catch {
++    return false;
++  }
++}
++
++/** Read own data properties without invoking organizer-supplied accessors. */
++function ownValue(value: unknown, key: string): unknown {
++  if (!isRecord(value) && !isArray(value)) return INVALID_PROPERTY;
++  try {
++    const descriptor = Object.getOwnPropertyDescriptor(value, key);
++    return descriptor && Object.hasOwn(descriptor, 'value')
++      ? descriptor.value
++      : INVALID_PROPERTY;
++  } catch {
++    return INVALID_PROPERTY;
++  }
++}
++
++function isArray(value: unknown): value is unknown[] {
++  try {
++    return Array.isArray(value);
++  } catch {
++    return false;
++  }
++}
++
++function boundedArray(value: unknown, maximum: number): unknown[] | null {
++  if (!isArray(value)) return null;
++  const length = ownValue(value, 'length');
++  if (
++    typeof length !== 'number' ||
++    !Number.isSafeInteger(length) ||
++    length < 0 ||
++    length > maximum
++  ) {
++    return null;
++  }
++
++  const items: unknown[] = [];
++  for (let index = 0; index < length; index += 1) {
++    items.push(ownValue(value, String(index)));
++  }
++  return items;
++}
++
++function nonEmptyString(value: unknown): string | null {
++  if (typeof value !== 'string') return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function publicHttpsUrl(value: unknown): string | null {
++  try {
++    return normalizeOptionalHttpUrl(value, {
++      label: 'Source URL',
++      maxLength: DEFAULT_HTTP_URL_MAX_LENGTH,
++      kind: 'image',
++    });
++  } catch {
++    return null;
++  }
++}
++
++function graphicSource(value: unknown): string | null {
++  if (typeof value !== 'string' || value.length > DEFAULT_HTTP_URL_MAX_LENGTH) {
++    return null;
++  }
++  const trimmed = value.trim();
++  if (!trimmed || /[\s\u0000-\u001f\u007f-\u009f\\]/u.test(trimmed)) {
++    return null;
++  }
++  if (trimmed.startsWith('/')) {
++    return trimmed.startsWith('//') ? null : trimmed;
++  }
++  return publicHttpsUrl(trimmed);
++}
++
++function parseGraphic(value: unknown): PlaceGraphic | null {
++  if (!isRecord(value)) return null;
++  const src = graphicSource(ownValue(value, 'src'));
++  const alt = nonEmptyString(ownValue(value, 'alt'));
++  if (!src || !alt) return null;
++  return {
++    src,
++    alt,
++    caption: nonEmptyString(ownValue(value, 'caption')),
++  };
++}
++
++function parseFact(value: unknown): PlaceFact | null {
++  if (!isRecord(value)) return null;
++  const factValue = nonEmptyString(ownValue(value, 'value'));
++  const label = nonEmptyString(ownValue(value, 'label'));
++  const sourceLabel = nonEmptyString(ownValue(value, 'sourceLabel'));
++  const sourceHref = publicHttpsUrl(ownValue(value, 'sourceHref'));
++  if (!factValue || !label || !sourceLabel || !sourceHref) return null;
++  return { value: factValue, label, sourceLabel, sourceHref };
++}
++
++function parseFacts(value: unknown): PlaceFact[] {
++  const items = boundedArray(value, MAX_FACTS);
++  if (!items) return [];
++  return items
++    .map(parseFact)
++    .filter((fact): fact is PlaceFact => fact !== null);
++}
++
++function parseOrganization(value: unknown): PlaceOrganization | null {
++  if (!isRecord(value)) return null;
++  const name = nonEmptyString(ownValue(value, 'name'));
++  const sourceLabel = nonEmptyString(ownValue(value, 'sourceLabel'));
++  const sourceHref = publicHttpsUrl(ownValue(value, 'sourceHref'));
++  if (!name || !sourceLabel || !sourceHref) return null;
++  return { name, sourceLabel, sourceHref };
++}
++
++function parseSector(value: unknown): PlaceSector | null {
++  if (!isRecord(value)) return null;
++  const label = nonEmptyString(ownValue(value, 'label'));
++  const organizationItems = boundedArray(
++    ownValue(value, 'organizations'),
++    MAX_ORGANIZATIONS_PER_SECTOR,
++  );
++  if (!label || !organizationItems) return null;
++  const organizations = organizationItems
++    .map(parseOrganization)
++    .filter(
++      (organization): organization is PlaceOrganization =>
++        organization !== null,
++    );
++  return organizations.length > 0 ? { label, organizations } : null;
++}
++
++function parseSectors(value: unknown): PlaceSector[] {
++  const items = boundedArray(value, MAX_SECTORS);
++  if (!items) return [];
++  return items
++    .map(parseSector)
++    .filter((sector): sector is PlaceSector => sector !== null);
++}
++
++export function parsePlaceConfig(config: unknown): PlaceConfig | null {
++  try {
++    if (!isRecord(config)) return null;
++    const title = nonEmptyString(ownValue(config, 'title'));
++    if (!title) return null;
++
++    const graphic = parseGraphic(ownValue(config, 'graphic'));
++    const facts = parseFacts(ownValue(config, 'facts'));
++    const sectors = parseSectors(ownValue(config, 'sectors'));
++    if (!graphic && facts.length === 0 && sectors.length === 0) return null;
++
++    return {
++      eyebrow: nonEmptyString(ownValue(config, 'eyebrow')),
++      title,
++      intro: nonEmptyString(ownValue(config, 'intro')),
++      graphic,
++      facts,
++      sectors,
++    };
++  } catch {
++    return null;
++  }
++}
+diff --git a/src/components/homepage/place.tsx b/src/components/homepage/place.tsx
+index 58c02d8e8..34eaacd2a 100644
+--- a/src/components/homepage/place.tsx
++++ b/src/components/homepage/place.tsx
+@@ -5,220 +5,19 @@
+  */
+ 
+ import { useId, type ReactNode } from 'react';
+-import type { HomeRenderContext } from '@/components/homepage-renderers';
+ import {
+-  DEFAULT_HTTP_URL_MAX_LENGTH,
+-  normalizeOptionalHttpUrl,
+-} from '@/lib/url-validation';
+-
+-export interface PlaceGraphic {
+-  src: string;
+-  alt: string;
+-  caption: string | null;
+-}
+-
+-export interface PlaceFact {
+-  value: string;
+-  label: string;
+-  sourceLabel: string;
+-  sourceHref: string;
+-}
+-
+-export interface PlaceOrganization {
+-  name: string;
+-  sourceLabel: string;
+-  sourceHref: string;
+-}
+-
+-export interface PlaceSector {
+-  label: string;
+-  organizations: PlaceOrganization[];
+-}
+-
+-export interface PlaceConfig {
+-  eyebrow: string | null;
+-  title: string;
+-  intro: string | null;
+-  graphic: PlaceGraphic | null;
+-  facts: PlaceFact[];
+-  sectors: PlaceSector[];
+-}
+-
+-const MAX_FACTS = 8;
+-const MAX_SECTORS = 8;
+-const MAX_ORGANIZATIONS_PER_SECTOR = 12;
+-const INVALID_PROPERTY = Symbol('invalid-place-config-property');
+-
+-function isRecord(value: unknown): value is Record<string, unknown> {
+-  try {
+-    return value !== null && typeof value === 'object' && !Array.isArray(value);
+-  } catch {
+-    return false;
+-  }
+-}
+-
+-/** Read own data properties without invoking organizer-supplied accessors. */
+-function ownValue(value: unknown, key: string): unknown {
+-  if (!isRecord(value) && !isArray(value)) return INVALID_PROPERTY;
+-  try {
+-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+-    return descriptor && Object.hasOwn(descriptor, 'value')
+-      ? descriptor.value
+-      : INVALID_PROPERTY;
+-  } catch {
+-    return INVALID_PROPERTY;
+-  }
+-}
+-
+-function isArray(value: unknown): value is unknown[] {
+-  try {
+-    return Array.isArray(value);
+-  } catch {
+-    return false;
+-  }
+-}
+-
+-function boundedArray(value: unknown, maximum: number): unknown[] | null {
+-  if (!isArray(value)) return null;
+-  const length = ownValue(value, 'length');
+-  if (
+-    typeof length !== 'number' ||
+-    !Number.isSafeInteger(length) ||
+-    length < 0 ||
+-    length > maximum
+-  ) {
+-    return null;
+-  }
+-
+-  const items: unknown[] = [];
+-  for (let index = 0; index < length; index += 1) {
+-    items.push(ownValue(value, String(index)));
+-  }
+-  return items;
+-}
+-
+-function nonEmptyString(value: unknown): string | null {
+-  if (typeof value !== 'string') return null;
+-  const trimmed = value.trim();
+-  return trimmed.length > 0 ? trimmed : null;
+-}
+-
+-function publicHttpsUrl(value: unknown): string | null {
+-  try {
+-    return normalizeOptionalHttpUrl(value, {
+-      label: 'Source URL',
+-      maxLength: DEFAULT_HTTP_URL_MAX_LENGTH,
+-      kind: 'image',
+-    });
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-function graphicSource(value: unknown): string | null {
+-  if (typeof value !== 'string' || value.length > DEFAULT_HTTP_URL_MAX_LENGTH) {
+-    return null;
+-  }
+-  const trimmed = value.trim();
+-  if (
+-    !trimmed ||
+-    /[\s\u0000-\u001f\u007f-\u009f\\]/u.test(trimmed)
+-  ) {
+-    return null;
+-  }
+-  if (trimmed.startsWith('/')) {
+-    return trimmed.startsWith('//') ? null : trimmed;
+-  }
+-  return publicHttpsUrl(trimmed);
+-}
+-
+-function parseGraphic(value: unknown): PlaceGraphic | null {
+-  if (!isRecord(value)) return null;
+-  const src = graphicSource(ownValue(value, 'src'));
+-  const alt = nonEmptyString(ownValue(value, 'alt'));
+-  if (!src || !alt) return null;
+-  return {
+-    src,
+-    alt,
+-    caption: nonEmptyString(ownValue(value, 'caption')),
+-  };
+-}
+-
+-function parseFact(value: unknown): PlaceFact | null {
+-  if (!isRecord(value)) return null;
+-  const factValue = nonEmptyString(ownValue(value, 'value'));
+-  const label = nonEmptyString(ownValue(value, 'label'));
+-  const sourceLabel = nonEmptyString(ownValue(value, 'sourceLabel'));
+-  const sourceHref = publicHttpsUrl(ownValue(value, 'sourceHref'));
+-  if (!factValue || !label || !sourceLabel || !sourceHref) return null;
+-  return { value: factValue, label, sourceLabel, sourceHref };
+-}
+-
+-function parseFacts(value: unknown): PlaceFact[] {
+-  const items = boundedArray(value, MAX_FACTS);
+-  if (!items) return [];
+-  return items
+-    .map(parseFact)
+-    .filter((fact): fact is PlaceFact => fact !== null);
+-}
+-
+-function parseOrganization(value: unknown): PlaceOrganization | null {
+-  if (!isRecord(value)) return null;
+-  const name = nonEmptyString(ownValue(value, 'name'));
+-  const sourceLabel = nonEmptyString(ownValue(value, 'sourceLabel'));
+-  const sourceHref = publicHttpsUrl(ownValue(value, 'sourceHref'));
+-  if (!name || !sourceLabel || !sourceHref) return null;
+-  return { name, sourceLabel, sourceHref };
+-}
+-
+-function parseSector(value: unknown): PlaceSector | null {
+-  if (!isRecord(value)) return null;
+-  const label = nonEmptyString(ownValue(value, 'label'));
+-  const organizationItems = boundedArray(
+-    ownValue(value, 'organizations'),
+-    MAX_ORGANIZATIONS_PER_SECTOR,
+-  );
+-  if (!label || !organizationItems) return null;
+-  const organizations = organizationItems
+-    .map(parseOrganization)
+-    .filter(
+-      (organization): organization is PlaceOrganization =>
+-        organization !== null,
+-    );
+-  return organizations.length > 0 ? { label, organizations } : null;
+-}
+-
+-function parseSectors(value: unknown): PlaceSector[] {
+-  const items = boundedArray(value, MAX_SECTORS);
+-  if (!items) return [];
+-  return items
+-    .map(parseSector)
+-    .filter((sector): sector is PlaceSector => sector !== null);
+-}
+-
+-export function parsePlaceConfig(config: unknown): PlaceConfig | null {
+-  try {
+-    if (!isRecord(config)) return null;
+-    const title = nonEmptyString(ownValue(config, 'title'));
+-    if (!title) return null;
+-
+-    const graphic = parseGraphic(ownValue(config, 'graphic'));
+-    const facts = parseFacts(ownValue(config, 'facts'));
+-    const sectors = parseSectors(ownValue(config, 'sectors'));
+-    if (!graphic && facts.length === 0 && sectors.length === 0) return null;
+-
+-    return {
+-      eyebrow: nonEmptyString(ownValue(config, 'eyebrow')),
+-      title,
+-      intro: nonEmptyString(ownValue(config, 'intro')),
+-      graphic,
+-      facts,
+-      sectors,
+-    };
+-  } catch {
+-    return null;
+-  }
+-}
++  parsePlaceConfig,
++  type PlaceConfig,
++} from '@/components/homepage/place-config';
++import type { HomeRenderContext } from '@/components/homepage-renderers';
++export {
++  parsePlaceConfig,
++  type PlaceConfig,
++  type PlaceFact,
++  type PlaceGraphic,
++  type PlaceOrganization,
++  type PlaceSector,
++} from '@/components/homepage/place-config';
+ 
+ function SourceLink({ href, label }: { href: string; label: string }) {
+   return (
+diff --git a/src/components/homepage/program-days-config.ts b/src/components/homepage/program-days-config.ts
+new file mode 100644
+index 000000000..0357d74a6
+--- /dev/null
++++ b/src/components/homepage/program-days-config.ts
+@@ -0,0 +1,41 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++export interface ProgramDaysConfig {
++  eyebrow: string;
++  title: string;
++}
++
++const DEFAULT_CONFIG: Readonly<ProgramDaysConfig> = Object.freeze({
++  eyebrow: 'What the event looks like',
++  title: 'Four days in Raleigh, and a head start in March.',
++});
++
++function ownNonEmptyString(
++  config: unknown,
++  key: keyof ProgramDaysConfig,
++): string | null {
++  if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
++
++  try {
++    if (!Object.prototype.hasOwnProperty.call(config, key)) return null;
++    const value = Reflect.get(config, key);
++    if (typeof value !== 'string') return null;
++    const trimmed = value.trim();
++    return trimmed.length > 0 ? trimmed : null;
++  } catch {
++    return null;
++  }
++}
++
++export function parseProgramDaysConfig(
++  config: Record<string, unknown>,
++): ProgramDaysConfig {
++  return {
++    eyebrow: ownNonEmptyString(config, 'eyebrow') ?? DEFAULT_CONFIG.eyebrow,
++    title: ownNonEmptyString(config, 'title') ?? DEFAULT_CONFIG.title,
++  };
++}
+diff --git a/src/components/homepage/program-days.tsx b/src/components/homepage/program-days.tsx
+index 36811d78c..92cb5c0b7 100644
+--- a/src/components/homepage/program-days.tsx
++++ b/src/components/homepage/program-days.tsx
+@@ -5,6 +5,10 @@
+  */
+ 
+ import { useId, type ReactNode } from 'react';
++import {
++  parseProgramDaysConfig,
++  type ProgramDaysConfig,
++} from '@/components/homepage/program-days-config';
+ import type { HomeRenderContext } from '@/components/homepage-renderers';
+ import type { SectionDataLoader } from '@/lib/homepage-section-data';
+ import { createLogger } from '@/lib/logger';
+@@ -13,10 +17,10 @@ const log = createLogger('homepage-program-days');
+ 
+ const DEFAULT_EVENT_TIMEZONE = 'America/New_York';
+ 
+-export interface ProgramDaysConfig {
+-  eyebrow: string;
+-  title: string;
+-}
++export {
++  parseProgramDaysConfig,
++  type ProgramDaysConfig,
++} from '@/components/homepage/program-days-config';
+ 
+ export interface ProgramDayRow {
+   id: string;
+@@ -40,37 +44,6 @@ declare module '@/lib/homepage-section-data' {
+   }
+ }
+ 
+-const DEFAULT_CONFIG: Readonly<ProgramDaysConfig> = Object.freeze({
+-  eyebrow: 'What the event looks like',
+-  title: 'Four days in Raleigh, and a head start in March.',
+-});
+-
+-function ownNonEmptyString(
+-  config: unknown,
+-  key: keyof ProgramDaysConfig,
+-): string | null {
+-  if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
+-
+-  try {
+-    if (!Object.prototype.hasOwnProperty.call(config, key)) return null;
+-    const value = Reflect.get(config, key);
+-    if (typeof value !== 'string') return null;
+-    const trimmed = value.trim();
+-    return trimmed.length > 0 ? trimmed : null;
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-export function parseProgramDaysConfig(
+-  config: Record<string, unknown>,
+-): ProgramDaysConfig {
+-  return {
+-    eyebrow: ownNonEmptyString(config, 'eyebrow') ?? DEFAULT_CONFIG.eyebrow,
+-    title: ownNonEmptyString(config, 'title') ?? DEFAULT_CONFIG.title,
+-  };
+-}
+-
+ function resolveEventTimezone(value: unknown): string {
+   if (typeof value === 'string') {
+     const candidate = value.trim();
+diff --git a/src/components/homepage/session-library-config.ts b/src/components/homepage/session-library-config.ts
+index 0b261c006..56b8305af 100644
+--- a/src/components/homepage/session-library-config.ts
++++ b/src/components/homepage/session-library-config.ts
+@@ -13,12 +13,11 @@ const MAX_EVENT_SLUG_LENGTH = 200;
+ const SAFE_ID = /^[A-Za-z0-9_-]+$/u;
+ const SAFE_EVENT_SLUG = /^[a-z0-9_-]+$/u;
+ 
+-export const MAX_SESSION_LIBRARY_LIMIT = 100;
+-
+-export interface SessionLibraryConfig {
+-  eventSlug: string;
+-  limit: number;
+-}
++export {
++  MAX_SESSION_LIBRARY_LIMIT,
++  parseSessionLibraryConfig,
++  type SessionLibraryConfig,
++} from '@/components/homepage/session-library-parser';
+ 
+ export type SessionLibraryEventResolver = (
+   eventSlug: string,
+@@ -62,29 +61,6 @@ function readExactId(value: unknown): string | null {
+   return id && SAFE_ID.test(id) ? id : null;
+ }
+ 
+-/** Read the intentionally small portable config without inventing defaults. */
+-export function parseSessionLibraryConfig(
+-  config: unknown,
+-): SessionLibraryConfig | null {
+-  try {
+-    if (!isRecord(config)) return null;
+-    const eventSlug = normalizeEventSlug(readOwnDataProperty(config, 'eventSlug'));
+-    const limit = readOwnDataProperty(config, 'limit');
+-    if (
+-      !eventSlug ||
+-      typeof limit !== 'number' ||
+-      !Number.isInteger(limit) ||
+-      limit < 1 ||
+-      limit > MAX_SESSION_LIBRARY_LIMIT
+-    ) {
+-      return null;
+-    }
+-    return Object.freeze({ eventSlug, limit });
+-  } catch {
+-    return null;
+-  }
+-}
+-
+ /**
+  * Establish the deployment's exact organization boundary before resolving a
+  * portable event slug. Event has no organization foreign key because each
+diff --git a/src/components/homepage/session-library-parser.ts b/src/components/homepage/session-library-parser.ts
+new file mode 100644
+index 000000000..837974bfd
+--- /dev/null
++++ b/src/components/homepage/session-library-parser.ts
+@@ -0,0 +1,72 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++const MAX_EVENT_SLUG_LENGTH = 200;
++const SAFE_EVENT_SLUG = /^[a-z0-9_-]+$/u;
++
++export const MAX_SESSION_LIBRARY_LIMIT = 100;
++
++export interface SessionLibraryConfig {
++  eventSlug: string;
++  limit: number;
++}
++
++const MISSING = Symbol('missing-own-data-property');
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function nonEmptyBoundedString(value: unknown, maxLength: number): string | null {
++  if (typeof value !== 'string') return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 && trimmed.length <= maxLength ? trimmed : null;
++}
++
++function readOwnDataProperty(
++  value: object,
++  key: PropertyKey,
++): unknown | typeof MISSING {
++  try {
++    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
++    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
++      return MISSING;
++    }
++    return descriptor.value;
++  } catch {
++    return MISSING;
++  }
++}
++
++function normalizeEventSlug(value: unknown): string | null {
++  const slug = nonEmptyBoundedString(value, MAX_EVENT_SLUG_LENGTH)?.toLowerCase();
++  return slug && SAFE_EVENT_SLUG.test(slug) ? slug : null;
++}
++
++/** Read the intentionally small portable config without inventing defaults. */
++export function parseSessionLibraryConfig(
++  config: unknown,
++): SessionLibraryConfig | null {
++  try {
++    if (!isRecord(config)) return null;
++    const eventSlug = normalizeEventSlug(
++      readOwnDataProperty(config, 'eventSlug'),
++    );
++    const limit = readOwnDataProperty(config, 'limit');
++    if (
++      !eventSlug ||
++      typeof limit !== 'number' ||
++      !Number.isInteger(limit) ||
++      limit < 1 ||
++      limit > MAX_SESSION_LIBRARY_LIMIT
++    ) {
++      return null;
++    }
++    return Object.freeze({ eventSlug, limit });
++  } catch {
++    return null;
++  }
++}
+diff --git a/src/components/homepage/tickets-config.ts b/src/components/homepage/tickets-config.ts
+new file mode 100644
+index 000000000..6542e3c11
+--- /dev/null
++++ b/src/components/homepage/tickets-config.ts
+@@ -0,0 +1,42 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++export interface TicketsConfig {
++  publishFloorPrice: boolean;
++  publishOnSaleDate: boolean;
++}
++
++const MISSING = Symbol('missing-own-property');
++
++function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
++  try {
++    return value !== null && typeof value === 'object' && !Array.isArray(value);
++  } catch {
++    return false;
++  }
++}
++
++function readOwn(value: object, key: PropertyKey): unknown | typeof MISSING {
++  try {
++    if (!Object.prototype.hasOwnProperty.call(value, key)) return MISSING;
++    return Reflect.get(value, key);
++  } catch {
++    return MISSING;
++  }
++}
++
++function readOwnTrue(value: unknown, key: keyof TicketsConfig): boolean {
++  if (!isRecord(value)) return false;
++  return readOwn(value, key) === true;
++}
++
++/** Empty, false, malformed, and inherited values never opt a tenant in. */
++export function parseTicketsConfig(config: unknown): TicketsConfig | null {
++  const publishFloorPrice = readOwnTrue(config, 'publishFloorPrice');
++  const publishOnSaleDate = readOwnTrue(config, 'publishOnSaleDate');
++  if (!publishFloorPrice && !publishOnSaleDate) return null;
++  return { publishFloorPrice, publishOnSaleDate };
++}
+diff --git a/src/components/homepage/tickets.tsx b/src/components/homepage/tickets.tsx
+index 894b5bb23..6d6093113 100644
+--- a/src/components/homepage/tickets.tsx
++++ b/src/components/homepage/tickets.tsx
+@@ -5,6 +5,10 @@
+  */
+ 
+ import { useId, type ReactNode } from "react";
++import {
++  parseTicketsConfig,
++  type TicketsConfig,
++} from "@/components/homepage/tickets-config";
+ import type { HomeRenderContext } from "@/components/homepage-renderers";
+ import { getTicketInventoryCounts } from "@/app/(public)/events/[eventSlug]/register/inventory";
+ import { hasExternalTicketConfigured } from "@/lib/external-ticket";
+@@ -29,10 +33,10 @@ const MISSING = Symbol("missing-own-property");
+ const MAX_TICKET_PUBLICATION_ROWS = 500;
+ const MAX_TICKET_TYPE_NAME_LENGTH = 300;
+ 
+-export interface TicketsConfig {
+-  publishFloorPrice: boolean;
+-  publishOnSaleDate: boolean;
+-}
++export {
++  parseTicketsConfig,
++  type TicketsConfig,
++} from "@/components/homepage/tickets-config";
+ 
+ export interface HomepageTicketRemainingCount {
+   ticketTypeId: string;
+@@ -85,19 +89,6 @@ function readOwn(value: object, key: PropertyKey): unknown | typeof MISSING {
+   }
+ }
+ 
+-function readOwnTrue(value: unknown, key: keyof TicketsConfig): boolean {
+-  if (!isRecord(value)) return false;
+-  return readOwn(value, key) === true;
+-}
+-
+-/** Empty, false, malformed, and inherited values never opt a tenant in. */
+-export function parseTicketsConfig(config: unknown): TicketsConfig | null {
+-  const publishFloorPrice = readOwnTrue(config, "publishFloorPrice");
+-  const publishOnSaleDate = readOwnTrue(config, "publishOnSaleDate");
+-  if (!publishFloorPrice && !publishOnSaleDate) return null;
+-  return { publishFloorPrice, publishOnSaleDate };
+-}
+-
+ function requestedPublications(
+   configs: readonly Record<string, unknown>[] | undefined,
+ ): TicketsConfig | null {
+diff --git a/src/components/homepage/tracks-config.ts b/src/components/homepage/tracks-config.ts
+new file mode 100644
+index 000000000..d0c345a55
+--- /dev/null
++++ b/src/components/homepage/tracks-config.ts
+@@ -0,0 +1,67 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++export interface TracksConfig {
++  eyebrow: string;
++  title: string;
++  intro: string | null;
++  outroEyebrow: string | null;
++  outroTitle: string | null;
++  outroBody: string | null;
++}
++
++const DEFAULT_TRACKS_CONFIG = {
++  eyebrow: 'Conference day · Tuesday 20 April',
++  title: 'Ten tracks, so you never have to sit through the wrong one.',
++  intro:
++    'Twenty-five minute talks on a thirty-minute grid. More speakers, tighter talks, and a track for the job you actually do.',
++  outroEyebrow: 'Whoever you are',
++  outroTitle: 'Ten tracks, so nobody has to sit at the kids’ table.',
++  outroBody:
++    'A CFO, a state legislator, an NC State senior and a veteran retraining for a new career are in the same building on purpose. That only works if each of them can find a room where the level is right — technical depth for the people who want it, plain language for the people who need it, and no one made to feel tested. If you leave without the thing you came for, we got it wrong.',
++} as const satisfies Readonly<TracksConfig>;
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function nonEmptyString(value: unknown): string | null {
++  if (typeof value !== 'string') return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function optionalCopy(value: unknown, fallback: string): string | null {
++  if (value === null) return null;
++  return nonEmptyString(value) ?? fallback;
++}
++
++function freshTracksDefaults(): TracksConfig {
++  return { ...DEFAULT_TRACKS_CONFIG };
++}
++
++export function parseTracksConfig(config: unknown): TracksConfig {
++  try {
++    const input = isRecord(config) ? config : {};
++    const defaults = freshTracksDefaults();
++    return {
++      eyebrow: nonEmptyString(input.eyebrow) ?? defaults.eyebrow,
++      title: nonEmptyString(input.title) ?? defaults.title,
++      intro: optionalCopy(input.intro, DEFAULT_TRACKS_CONFIG.intro),
++      outroEyebrow: optionalCopy(
++        input.outroEyebrow,
++        DEFAULT_TRACKS_CONFIG.outroEyebrow,
++      ),
++      outroTitle: optionalCopy(
++        input.outroTitle,
++        DEFAULT_TRACKS_CONFIG.outroTitle,
++      ),
++      outroBody: optionalCopy(input.outroBody, DEFAULT_TRACKS_CONFIG.outroBody),
++    };
++  } catch {
++    return freshTracksDefaults();
++  }
++}
+diff --git a/src/components/homepage/tracks.tsx b/src/components/homepage/tracks.tsx
+index 37d259365..414d80a78 100644
+--- a/src/components/homepage/tracks.tsx
++++ b/src/components/homepage/tracks.tsx
+@@ -18,6 +18,10 @@ import {
+   type LucideIcon,
+ } from 'lucide-react';
+ import { useId, type ReactNode } from 'react';
++import {
++  parseTracksConfig,
++  type TracksConfig,
++} from '@/components/homepage/tracks-config';
+ import type { HomeRenderContext } from '@/components/homepage-renderers';
+ import { prisma } from '@/lib/db';
+ import type {
+@@ -39,25 +43,10 @@ declare module '@/lib/homepage-section-data' {
+   }
+ }
+ 
+-export interface TracksConfig {
+-  eyebrow: string;
+-  title: string;
+-  intro: string | null;
+-  outroEyebrow: string | null;
+-  outroTitle: string | null;
+-  outroBody: string | null;
+-}
+-
+-const DEFAULT_TRACKS_CONFIG = {
+-  eyebrow: 'Conference day · Tuesday 20 April',
+-  title: 'Ten tracks, so you never have to sit through the wrong one.',
+-  intro:
+-    'Twenty-five minute talks on a thirty-minute grid. More speakers, tighter talks, and a track for the job you actually do.',
+-  outroEyebrow: 'Whoever you are',
+-  outroTitle: 'Ten tracks, so nobody has to sit at the kids’ table.',
+-  outroBody:
+-    'A CFO, a state legislator, an NC State senior and a veteran retraining for a new career are in the same building on purpose. That only works if each of them can find a room where the level is right — technical depth for the people who want it, plain language for the people who need it, and no one made to feel tested. If you leave without the thing you came for, we got it wrong.',
+-} as const satisfies Readonly<TracksConfig>;
++export {
++  parseTracksConfig,
++  type TracksConfig,
++} from '@/components/homepage/tracks-config';
+ 
+ const TRACK_ICON_COMPONENTS = {
+   enterprise: Building2,
+@@ -84,41 +73,6 @@ function nonEmptyString(value: unknown): string | null {
+   return trimmed.length > 0 ? trimmed : null;
+ }
+ 
+-function optionalCopy(value: unknown, fallback: string): string | null {
+-  if (value === null) return null;
+-  return nonEmptyString(value) ?? fallback;
+-}
+-
+-function freshTracksDefaults(): TracksConfig {
+-  return { ...DEFAULT_TRACKS_CONFIG };
+-}
+-
+-export function parseTracksConfig(config: unknown): TracksConfig {
+-  try {
+-    const input = isRecord(config) ? config : {};
+-    const defaults = freshTracksDefaults();
+-    return {
+-      eyebrow: nonEmptyString(input.eyebrow) ?? defaults.eyebrow,
+-      title: nonEmptyString(input.title) ?? defaults.title,
+-      intro: optionalCopy(input.intro, DEFAULT_TRACKS_CONFIG.intro),
+-      outroEyebrow: optionalCopy(
+-        input.outroEyebrow,
+-        DEFAULT_TRACKS_CONFIG.outroEyebrow,
+-      ),
+-      outroTitle: optionalCopy(
+-        input.outroTitle,
+-        DEFAULT_TRACKS_CONFIG.outroTitle,
+-      ),
+-      outroBody: optionalCopy(
+-        input.outroBody,
+-        DEFAULT_TRACKS_CONFIG.outroBody,
+-      ),
+-    };
+-  } catch {
+-    return freshTracksDefaults();
+-  }
+-}
+-
+ export const loadTracksData: SectionDataLoader = async ({
+   featuredEventId,
+ }) => {
+diff --git a/src/lib/homepage-config-schema.ts b/src/lib/homepage-config-schema.ts
+new file mode 100644
+index 000000000..dcfd476ba
+--- /dev/null
++++ b/src/lib/homepage-config-schema.ts
+@@ -0,0 +1,278 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { types as nodeTypes } from 'node:util';
++
++import { parseAudienceBandConfig } from '@/components/homepage/audience-band-config';
++import { parseCommitmentConfig } from '@/components/homepage/commitment-config';
++import { parseManifestoConfig } from '@/components/homepage/manifesto-config';
++import { parsePlaceConfig } from '@/components/homepage/place-config';
++import { parseProgramDaysConfig } from '@/components/homepage/program-days-config';
++import { parseSessionLibraryConfig } from '@/components/homepage/session-library-parser';
++import { parseTicketsConfig } from '@/components/homepage/tickets-config';
++import { parseTracksConfig } from '@/components/homepage/tracks-config';
++import { parseHeroPhotoSlides } from '@/lib/homepage-hero-slides';
++import { parseSpeakersConfig } from '@/lib/homepage-speakers';
++import type { HomepageSectionType } from '@/lib/homepage-sections';
++
++export const MAX_HOMEPAGE_CONFIG_BYTES = 32_768;
++export const MAX_HOMEPAGE_CONFIG_DEPTH = 8;
++export const MAX_HOMEPAGE_CONFIG_NODES = 4_096;
++
++const INVALID_JSON = Symbol('invalid-homepage-config-json');
++const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
++
++type ConfigObject = Record<string, unknown>;
++type RendererConfigParser = (config: ConfigObject) => object | null;
++
++export interface HomepageConfigSchema {
++  /** Human-readable JSON shape shown by future editor/seed consumers. */
++  readonly acceptedShape: string;
++  /** The renderer's exact parser, never a parallel loose schema. */
++  readonly parser: RendererConfigParser;
++}
++
++export type NormalizedHomepageSectionConfig = Readonly<ConfigObject>;
++
++function schema(
++  acceptedShape: string,
++  parser: RendererConfigParser,
++): HomepageConfigSchema {
++  return Object.freeze({ acceptedShape, parser });
++}
++
++const CONFIG_SCHEMAS = {
++  HERO: schema(
++    '{ slides?: Array<{ imageUrl: string; alt: string }> (max 8) }',
++    (config) => ({ slides: parseHeroPhotoSlides(config) }),
++  ),
++  AUDIENCE_BAND: schema(
++    '{ anchor: string; tiles: Array<{ value: string; label: string; source: string } | { metric: "FEATURED_EVENT_TRACK_COUNT"; label: string; source: string }> (max 12 usable) }',
++    parseAudienceBandConfig,
++  ),
++  SPEAKERS: schema(
++    '{ style?: "grid" | "flip" (unknown or malformed defaults to "grid") }',
++    parseSpeakersConfig,
++  ),
++  MANIFESTO: schema(
++    '{ eyebrow?: string; title?: string; question?: string; body?: string[1..4]; figure?: { imageUrl: string; alt: string } }',
++    parseManifestoConfig,
++  ),
++  PLACE: schema(
++    '{ eyebrow?: string; title: string; intro?: string; graphic?: { src: safe-url-or-site-path; alt: string; caption?: string }; facts?: Array<{ value: string; label: string; sourceLabel: string; sourceHref: public-https-url }> (max 8); sectors?: Array<{ label: string; organizations: Array<{ name: string; sourceLabel: string; sourceHref: public-https-url }> (max 12) }> (max 8) }',
++    parsePlaceConfig,
++  ),
++  COMMITMENT: schema(
++    '{ eyebrow?: string; title?: string; intro?: string; columns?: Array<{ eyebrow: string; title: string; body: string }> (1..6); stats?: Array<{ value: string; label: string; source?: visible string (required for numeric claims) }> (0..6); cta?: { label: string; href: safe-same-site-relative-path } }',
++    parseCommitmentConfig,
++  ),
++  TRACKS: schema(
++    '{ eyebrow?: string; title?: string; intro?: string|null; outroEyebrow?: string|null; outroTitle?: string|null; outroBody?: string|null }',
++    parseTracksConfig,
++  ),
++  PROGRAM_DAYS: schema(
++    '{ eyebrow?: string; title?: string }',
++    parseProgramDaysConfig,
++  ),
++  TICKETS: schema(
++    '{ publishFloorPrice?: true; publishOnSaleDate?: true } (at least one exact own true)',
++    parseTicketsConfig,
++  ),
++  SESSION_LIBRARY: schema(
++    '{ eventSlug: /^[a-z0-9_-]{1,200}$/ (trimmed and lowercased); limit: integer 1..100 }',
++    parseSessionLibraryConfig,
++  ),
++} as const satisfies Partial<Record<HomepageSectionType, HomepageConfigSchema>>;
++
++export type ConfigEditableHomepageSectionType = keyof typeof CONFIG_SCHEMAS;
++
++export const HOMEPAGE_CONFIG_SCHEMAS: Readonly<typeof CONFIG_SCHEMAS> =
++  Object.freeze(CONFIG_SCHEMAS);
++
++export const REGISTERED_HOMEPAGE_CONFIG_TYPES = Object.freeze(
++  Object.keys(CONFIG_SCHEMAS) as ConfigEditableHomepageSectionType[],
++);
++
++function isProxy(value: object): boolean {
++  try {
++    return nodeTypes.isProxy(value);
++  } catch {
++    return true;
++  }
++}
++
++function isPlainJsonObject(value: object): boolean {
++  if (isProxy(value)) return false;
++  try {
++    const prototype = Object.getPrototypeOf(value);
++    return prototype === null || prototype === Object.prototype;
++  } catch {
++    return false;
++  }
++}
++
++function cloneJsonValue(
++  value: unknown,
++  depth: number,
++  stack: WeakSet<object>,
++  budget: { nodes: number },
++): unknown | typeof INVALID_JSON {
++  budget.nodes += 1;
++  if (budget.nodes > MAX_HOMEPAGE_CONFIG_NODES) return INVALID_JSON;
++
++  if (
++    value === null ||
++    typeof value === 'string' ||
++    typeof value === 'boolean'
++  ) {
++    return value;
++  }
++  if (typeof value === 'number') {
++    return Number.isFinite(value) ? value : INVALID_JSON;
++  }
++  if (typeof value !== 'object') return INVALID_JSON;
++  if (
++    depth > MAX_HOMEPAGE_CONFIG_DEPTH ||
++    isProxy(value) ||
++    stack.has(value)
++  ) {
++    return INVALID_JSON;
++  }
++
++  stack.add(value);
++  try {
++    if (Array.isArray(value)) {
++      if (Object.getPrototypeOf(value) !== Array.prototype) return INVALID_JSON;
++      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
++      const length = lengthDescriptor?.value;
++      if (
++        typeof length !== 'number' ||
++        !Number.isSafeInteger(length) ||
++        length < 0 ||
++        length + budget.nodes > MAX_HOMEPAGE_CONFIG_NODES
++      ) {
++        return INVALID_JSON;
++      }
++
++      const ownKeys = Reflect.ownKeys(value);
++      if (
++        ownKeys.length !== length + 1 ||
++        ownKeys.some((key) => typeof key !== 'string')
++      ) {
++        return INVALID_JSON;
++      }
++
++      const result: unknown[] = [];
++      for (let index = 0; index < length; index += 1) {
++        const descriptor = Object.getOwnPropertyDescriptor(
++          value,
++          String(index),
++        );
++        if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
++          return INVALID_JSON;
++        }
++        const cloned = cloneJsonValue(
++          descriptor.value,
++          depth + 1,
++          stack,
++          budget,
++        );
++        if (cloned === INVALID_JSON) return INVALID_JSON;
++        result.push(cloned);
++      }
++      return result;
++    }
++
++    if (!isPlainJsonObject(value)) return INVALID_JSON;
++    const result = Object.create(null) as ConfigObject;
++    for (const key of Reflect.ownKeys(value)) {
++      if (typeof key !== 'string' || DANGEROUS_KEYS.has(key)) {
++        return INVALID_JSON;
++      }
++      const descriptor = Object.getOwnPropertyDescriptor(value, key);
++      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
++        return INVALID_JSON;
++      }
++      const cloned = cloneJsonValue(descriptor.value, depth + 1, stack, budget);
++      if (cloned === INVALID_JSON) return INVALID_JSON;
++      result[key] = cloned;
++    }
++    return result;
++  } catch {
++    return INVALID_JSON;
++  } finally {
++    stack.delete(value);
++  }
++}
++
++function safeJsonObject(value: unknown): ConfigObject | null {
++  const cloned = cloneJsonValue(value, 0, new WeakSet(), { nodes: 0 });
++  if (
++    cloned === INVALID_JSON ||
++    cloned === null ||
++    typeof cloned !== 'object' ||
++    Array.isArray(cloned)
++  ) {
++    return null;
++  }
++
++  try {
++    const serialized = JSON.stringify(cloned);
++    if (
++      new TextEncoder().encode(serialized).byteLength >
++      MAX_HOMEPAGE_CONFIG_BYTES
++    ) {
++      return null;
++    }
++  } catch {
++    return null;
++  }
++  return cloned as ConfigObject;
++}
++
++function shallowFrozenNullPrototype(
++  parsed: object,
++): NormalizedHomepageSectionConfig | null {
++  // Re-run the hostile/JSON boundary over parser output so future parsers
++  // cannot expand this registry's trust surface by returning unsafe values.
++  const safe = safeJsonObject(parsed);
++  if (!safe) return null;
++  const normalized = Object.create(null) as ConfigObject;
++  for (const [key, value] of Object.entries(safe)) normalized[key] = value;
++  return Object.freeze(normalized);
++}
++
++export function getHomepageSectionConfigSchema(
++  type: unknown,
++): HomepageConfigSchema | null {
++  if (typeof type !== 'string' || !Object.hasOwn(CONFIG_SCHEMAS, type)) {
++    return null;
++  }
++  return CONFIG_SCHEMAS[type as ConfigEditableHomepageSectionType];
++}
++
++/**
++ * Validate and normalize renderer config for future organizer and seed inputs.
++ * Known display-only types deliberately return null until their renderer owns
++ * a parser and explicitly joins this registry.
++ */
++export function parseHomepageSectionConfig(
++  type: unknown,
++  config: unknown,
++): NormalizedHomepageSectionConfig | null {
++  const definition = getHomepageSectionConfigSchema(type);
++  if (!definition) return null;
++
++  const safeInput = safeJsonObject(config);
++  if (!safeInput) return null;
++
++  try {
++    const parsed = definition.parser(safeInput);
++    return parsed ? shallowFrozenNullPrototype(parsed) : null;
++  } catch {
++    return null;
++  }
++}

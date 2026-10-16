@@ -1,0 +1,194 @@
+diff --git a/docs/13-adoption.md b/docs/13-adoption.md
+index 58cc2ee5..77929995 100644
+--- a/docs/13-adoption.md
++++ b/docs/13-adoption.md
+@@ -157,6 +157,31 @@ so "it looked green" stops being available as an answer.
+    issue per runtime (a real but Tier A task) proves the loop end-to-end.
+ 3. Seed `memory/`: adoption report becomes the repo's first DECISIONS entries.
+ 
++
++
++## Dedicated reviewer identity (G14 setup — once per org)
++
++Solo loops cannot satisfy GitHub branch-protection "required review" when the
++builder and reviewer share one account (L-015 / L-021 / issue #67). Setup once:
++
++1. Create a **machine user** or **GitHub App** with `pull-requests: write` on
++   the target repo (no admin). Name it something like `gibson-reviewer`.
++2. Store its PAT (or App installation token) as **`GH_REVIEWER_TOKEN`** in the
++   *reviewer* shell only — never as the builder's `GH_TOKEN`.
++3. Post formal reviews with:
++
++   ```bash
++   GH_REVIEWER_TOKEN=… ./scripts/formal-review.sh \
++     --pr 42 --repo owner/name --event approve --body-file gibson/second-opinion.md
++   ```
++
++4. Or set `GIBSON_FORMAL_REVIEW=1` and pass `--pr` / `--repo` to
++   `second-opinion.sh` so a `VERDICT: approve` becomes a formal review under the
++   reviewer identity.
++
++Tier C still stops for Mark (G12). Formal review unblocks Tier A/B mergeability;
++it does not replace human gates.
++
+ ## Definition of adopted
+ 
+ A Tier A issue can go plan→issue→build→test→review→eval→merge→deploy→verified with
+diff --git a/scripts/formal-review.sh b/scripts/formal-review.sh
+new file mode 100755
+index 00000000..e7aa22bc
+--- /dev/null
++++ b/scripts/formal-review.sh
+@@ -0,0 +1,109 @@
++#!/usr/bin/env bash
++# formal-review.sh — post a GitHub formal PR review as the dedicated reviewer
++# identity (L-015 / L-021 / issue #67)
++set -euo pipefail
++
++usage() {
++  cat <<'HELP'
++formal-review.sh — post gh pr review under the dedicated reviewer identity (#67)
++
++WHAT IT DOES
++  Posts a formal GitHub pull-request review (APPROVE / REQUEST_CHANGES / COMMENT)
++  using GH_REVIEWER_TOKEN (or GIBSON_REVIEWER_TOKEN), never the builder's token.
++  When the reviewer token is unset, exits 2 with setup instructions — does not
++  silently fall back to the builder identity (that is the L-015 bug).
++
++WHY
++  Solo-loop builder and reviewer shared one GitHub account, so gh pr review
++  --approve was rejected and branch protection needed admin merges (L-021).
++
++RISKS
++  - Posts a real review on the PR (undo: dismiss review in GitHub UI).
++  - Never uses GH_TOKEN / default gh auth for the review API call.
++  - Tier C still requires a human (docs/14 G12) — this script does not merge.
++
++USAGE
++  formal-review.sh --pr N --repo owner/name --event approve|request-changes|comment \
++                   [--body TEXT | --body-file PATH] [--dry-run]
++  formal-review.sh --help
++
++ENV
++  GH_REVIEWER_TOKEN or GIBSON_REVIEWER_TOKEN  required PAT/App token for the
++                                              reviewer bot/account (not builder)
++
++EXIT
++  0  review posted (or dry-run success)
++  1  API / validation failure
++  2  usage or missing reviewer token
++HELP
++}
++
++die() { echo "formal-review.sh: ERROR: $*" >&2; exit 1; }
++die_usage() { echo "formal-review.sh: $*" >&2; exit 2; }
++info() { echo "formal-review.sh: $*"; }
++
++PR="" REPO="" EVENT="" BODY="" BODY_FILE="" DRY=0
++
++while [[ $# -gt 0 ]]; do
++  case "$1" in
++    -h|--help) usage; exit 0 ;;
++    --pr) PR="${2:-}"; shift 2 ;;
++    --repo) REPO="${2:-}"; shift 2 ;;
++    --event) EVENT="${2:-}"; shift 2 ;;
++    --body) BODY="${2:-}"; shift 2 ;;
++    --body-file) BODY_FILE="${2:-}"; shift 2 ;;
++    --dry-run) DRY=1; shift ;;
++    *) die_usage "unknown argument: $1" ;;
++  esac
++done
++
++[[ -n "$PR" && "$PR" =~ ^[0-9]+$ ]] || die_usage "--pr N required"
++[[ -n "$REPO" && "$REPO" == */* ]] || die_usage "--repo owner/name required"
++[[ -n "$EVENT" ]] || die_usage "--event approve|request-changes|comment required"
++
++case "$EVENT" in
++  approve|APPROVE) EVENT=APPROVE ;;
++  request-changes|REQUEST_CHANGES|changes-requested) EVENT=REQUEST_CHANGES ;;
++  comment|COMMENT) EVENT=COMMENT ;;
++  *) die_usage "--event must be approve|request-changes|comment" ;;
++esac
++
++if [[ -n "$BODY_FILE" ]]; then
++  [[ -f "$BODY_FILE" ]] || die "body file missing: $BODY_FILE"
++  BODY=$(cat "$BODY_FILE")
++fi
++[[ -n "$BODY" ]] || BODY="Gibson formal review ($EVENT) via formal-review.sh (#67)."
++
++TOKEN="${GH_REVIEWER_TOKEN:-${GIBSON_REVIEWER_TOKEN:-}}"
++if [[ -z "$TOKEN" ]]; then
++  die_usage "GH_REVIEWER_TOKEN (or GIBSON_REVIEWER_TOKEN) is not set.
++  Create a machine user or GitHub App with pull-requests: write on the target
++  repo, store the token as GH_REVIEWER_TOKEN in the reviewer shell only — never
++  reuse the builder's GH_TOKEN (L-015). See docs/13-adoption.md § dedicated reviewer."
++fi
++
++# Refuse to use the ambient GH_TOKEN by unsetting it for the child process.
++if [[ "$DRY" -eq 1 ]]; then
++  info "dry-run: would post $EVENT on $REPO#$PR as reviewer identity (token set, not printed)"
++  info "body bytes: ${#BODY}"
++  exit 0
++fi
++
++command -v gh >/dev/null || die "gh required"
++
++# Explicit token only — clear GH_TOKEN so gh cannot fall back to builder auth.
++export GH_TOKEN="$TOKEN"
++unset GITHUB_TOKEN 2>/dev/null || true
++
++# Prove identity is not empty (does not print the token).
++WHO=$(gh api user -q .login 2>/dev/null || true)
++[[ -n "$WHO" ]] || die "reviewer token cannot resolve gh api user"
++
++info "posting $EVENT as @$WHO on $REPO#$PR"
++case "$EVENT" in
++  APPROVE) gh pr review "$PR" --repo "$REPO" --approve --body "$BODY" ;;
++  REQUEST_CHANGES) gh pr review "$PR" --repo "$REPO" --request-changes --body "$BODY" ;;
++  COMMENT) gh pr review "$PR" --repo "$REPO" --comment --body "$BODY" ;;
++esac
++
++info "OK — formal $EVENT from @$WHO on $REPO#$PR"
+diff --git a/scripts/second-opinion.sh b/scripts/second-opinion.sh
+index aa095278..9682f310 100755
+--- a/scripts/second-opinion.sh
++++ b/scripts/second-opinion.sh
+@@ -55,6 +55,8 @@ EOF
+ 
+ REPO=""
+ REVIEWERS="codex,claude"
++PR_NUMBER=""
++REPO_SLUG=""
+ AUTHOR=""
+ BASE="main"
+ BRANCH="HEAD"
+@@ -69,6 +71,8 @@ while [[ $# -gt 0 ]]; do
+     -h|--help) usage; exit 0 ;;
+     --repo) REPO="$2"; shift 2 ;;
+     --reviewers) REVIEWERS="$2"; shift 2 ;;
++    --pr) PR_NUMBER="$2"; shift 2 ;;
++    --github-repo) REPO_SLUG="$2"; shift 2 ;;
+     --author) AUTHOR="$2"; shift 2 ;;
+     --base) BASE="$2"; shift 2 ;;
+     --branch) BRANCH="$2"; shift 2 ;;
+@@ -276,3 +280,20 @@ cat "$OUT"
+ [[ ! -s "$LOG" ]] || info "reviewer stderr in $LOG"
+ [[ "$reviewed" -gt 0 ]] || die "no reviewer ran — install a second vendor's CLI, pass --reviewers, or use --solo-platform with a vendor:model reviewer (#69)"
+ info "wrote $OUT"
++
++# Optional formal GitHub review (#67). When GIBSON_FORMAL_REVIEW=1 and a
++# reviewer token is configured, map the first VERDICT line to a formal review
++# under the dedicated identity. Builder GH_TOKEN is never used.
++if [[ "${GIBSON_FORMAL_REVIEW:-0}" == "1" && -n "${PR_NUMBER:-}" && -n "${REPO_SLUG:-${GITHUB_REPOSITORY:-}}" ]]; then
++  _fr_event=""
++  if grep -qiE 'VERDICT:[[:space:]]*approve' "$OUT" 2>/dev/null; then
++    _fr_event=approve
++  elif grep -qiE 'VERDICT:[[:space:]]*(changes-requested|request.changes)' "$OUT" 2>/dev/null; then
++    _fr_event=request-changes
++  fi
++  if [[ -n "$_fr_event" && -f "$SCRIPT_DIR/formal-review.sh" ]]; then
++    _fr_repo="${REPO_SLUG:-$GITHUB_REPOSITORY}"
++    "$SCRIPT_DIR/formal-review.sh" --pr "$PR_NUMBER" --repo "$_fr_repo"       --event "$_fr_event" --body-file "$OUT" ||       info "formal-review.sh failed — second-opinion.md still written (Law 8)"
++  fi
++fi
++

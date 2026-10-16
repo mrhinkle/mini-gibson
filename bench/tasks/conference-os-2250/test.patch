@@ -1,0 +1,2689 @@
+diff --git a/tests/unit/all-things-ai-homepage-manifest.test.ts b/tests/unit/all-things-ai-homepage-manifest.test.ts
+deleted file mode 100644
+index 214c1c99e..000000000
+--- a/tests/unit/all-things-ai-homepage-manifest.test.ts
++++ /dev/null
+@@ -1,542 +0,0 @@
+-/**
+- * Copyright (c) 2026 Mark R. Hinkle
+- * SPDX-License-Identifier: AGPL-3.0-or-later
+- */
+-
+-import { createHash } from "node:crypto";
+-import { readFileSync } from "node:fs";
+-import path from "node:path";
+-import { describe, expect, it } from "vitest";
+-
+-import {
+-  MAX_HOMEPAGE_SECTION_KEY_LENGTH,
+-  MIN_HOMEPAGE_SECTION_KEY_LENGTH,
+-  run,
+-  type HomepageSeedDatabase,
+-  type HomepageSeedReceipt,
+-} from "../../scripts/seed-homepage-sections";
+-import { parseHomepageSectionConfig } from "@/lib/homepage-config-schema";
+-import {
+-  HOMEPAGE_SECTION_TYPES,
+-  isHomepageSectionType,
+-  type HomepageSectionType,
+-} from "@/lib/homepage-section-types";
+-
+-const MANIFEST_PATH = path.resolve(
+-  process.cwd(),
+-  "config/homepage/all-things-ai.json",
+-);
+-const MANIFEST_BYTES = readFileSync(MANIFEST_PATH);
+-const SAFE_DATABASE_URL =
+-  "postgresql://manifest-test:manifest-test@localhost:5432/manifest_test";
+-const ORGANIZATION = { id: "fixture-organization", name: "All Things AI" };
+-
+-interface ManifestSection {
+-  key: string;
+-  type: HomepageSectionType;
+-  isVisible: boolean;
+-  config: Record<string, unknown>;
+-}
+-
+-interface Manifest {
+-  version: 1;
+-  sections: ManifestSection[];
+-}
+-
+-interface StoredSection extends ManifestSection {
+-  orderIndex: number;
+-}
+-
+-interface CreatedSection extends StoredSection {
+-  organizationId: string;
+-}
+-
+-interface MutableManifestSection {
+-  key: unknown;
+-  type: unknown;
+-  isVisible: unknown;
+-  config: unknown;
+-  id?: unknown;
+-}
+-
+-interface MutableManifest {
+-  version: number;
+-  sections: MutableManifestSection[];
+-}
+-
+-/**
+- * Owner-approved row identity for the All Things AI root homepage: the
+- * 2027 comp approved 2026-09-05 (order, type, visibility). Content lives in
+- * the manifest and is pinned by APPROVED_MANIFEST_SHA256 below — the same
+- * value the production apply workflow (#1947) requires as its dispatch
+- * input — so a content change is a deliberate, reviewed edit to this pin.
+- *
+- * Display-only types (PHOTO_COLLAGE, TESTIMONIALS, EVENTS_DIRECTORY,
+- * SPONSOR_MARQUEE, SPONSORSHIP, NEWSLETTER, CONTACT) have no config schema
+- * and can only be seeded hidden; TICKETS / SESSION_LIBRARY stay hidden until
+- * their data exists. They are flipped visible after adoption, not here.
+- *
+- * The `home-*` rows are the events.allthingsai.org root (#1983): the homepage
+- * surface split renders them on `/` only, and the featured event page keeps
+- * the rows above.
+- */
+-interface ExpectedSection {
+-  readonly key: string;
+-  readonly type: HomepageSectionType;
+-  readonly isVisible: boolean;
+-}
+-
+-const EXPECTED_SECTIONS: readonly ExpectedSection[] = [
+-  { key: "hero", type: "HERO", isVisible: true },
+-  { key: "audience", type: "AUDIENCE_BAND", isVisible: true },
+-  { key: "collage", type: "PHOTO_COLLAGE", isVisible: false },
+-  { key: "testimonials", type: "TESTIMONIALS", isVisible: false },
+-  { key: "speakers", type: "SPEAKERS", isVisible: true },
+-  { key: "story", type: "MANIFESTO", isVisible: true },
+-  { key: "place", type: "PLACE", isVisible: true },
+-  { key: "theme", type: "MANIFESTO", isVisible: true },
+-  { key: "days", type: "PROGRAM_DAYS", isVisible: true },
+-  { key: "tracks", type: "TRACKS", isVisible: true },
+-  { key: "events", type: "EVENTS_DIRECTORY", isVisible: false },
+-  { key: "tickets", type: "TICKETS", isVisible: false },
+-  { key: "sponsors", type: "SPONSOR_MARQUEE", isVisible: false },
+-  { key: "sponsorship", type: "SPONSORSHIP", isVisible: false },
+-  { key: "commitment", type: "COMMITMENT", isVisible: true },
+-  { key: "watch", type: "SESSION_LIBRARY", isVisible: false },
+-  { key: "join", type: "NEWSLETTER", isVisible: false },
+-  { key: "contact", type: "CONTACT", isVisible: false },
+-  { key: "home-hero", type: "HOME_HERO", isVisible: true },
+-  { key: "home-speakers", type: "SPEAKERS", isVisible: true },
+-  { key: "home-track-record", type: "TRACK_RECORD", isVisible: true },
+-  { key: "home-proof", type: "AUDIENCE_BAND", isVisible: true },
+-  { key: "home-events", type: "EVENTS_DIRECTORY", isVisible: false },
+-  { key: "home-join", type: "NEWSLETTER", isVisible: false },
+-];
+-
+-const ROW_COUNT = EXPECTED_SECTIONS.length;
+-
+-/** SHA-256 of config/homepage/all-things-ai.json as approved. Update deliberately. */
+-const APPROVED_MANIFEST_SHA256 =
+-  "43968ce1b85a54f98d1e4d07eeb08b982cd1d6b798209ca7ac444982b153b9fa";
+-
+-/**
+- * Config keys that name tenant-internal rows. A manifest is portable content;
+- * it must never carry database identity, which the seed assigns at apply time.
+- * Checked on KEYS at every depth — a value-substring scan trips on ordinary
+- * copy ("expectation" contains "cta") and on fields the schemas require
+- * (AUDIENCE_BAND tiles need `source`, PLACE facts need an https `sourceHref`).
+- */
+-const RESTRICTED_CONFIG_KEY = /^(id|organizationId|eventId|sectionId)$/u;
+-
+-function collectKeys(value: unknown, into: string[] = []): string[] {
+-  if (Array.isArray(value)) {
+-    for (const item of value) collectKeys(item, into);
+-  } else if (value !== null && typeof value === "object") {
+-    for (const [key, child] of Object.entries(value)) {
+-      into.push(key);
+-      collectKeys(child, into);
+-    }
+-  }
+-  return into;
+-}
+-
+-function isPlainOwnDataRecord(
+-  value: unknown,
+-): value is Record<string, unknown> {
+-  if (value === null || typeof value !== "object" || Array.isArray(value))
+-    return false;
+-  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+-  return Reflect.ownKeys(value).every((key) => {
+-    if (typeof key !== "string") return false;
+-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+-    return (
+-      descriptor?.enumerable === true && Object.hasOwn(descriptor, "value")
+-    );
+-  });
+-}
+-
+-function cloneJson<T>(value: T): T {
+-  return JSON.parse(JSON.stringify(value)) as T;
+-}
+-
+-function validateManifestContract(value: unknown): asserts value is Manifest {
+-  if (!isPlainOwnDataRecord(value)) throw new Error("invalid envelope");
+-  if (Reflect.ownKeys(value).sort().join(",") !== "sections,version") {
+-    throw new Error("invalid envelope keys");
+-  }
+-  if (value.version !== 1 || !Array.isArray(value.sections)) {
+-    throw new Error("invalid envelope");
+-  }
+-  if (value.sections.length !== EXPECTED_SECTIONS.length) {
+-    throw new Error("invalid section count");
+-  }
+-
+-  const seen = new Set<string>();
+-  for (const [index, candidate] of value.sections.entries()) {
+-    if (!isPlainOwnDataRecord(candidate)) throw new Error("invalid section");
+-    if (
+-      Reflect.ownKeys(candidate).sort().join(",") !==
+-      "config,isVisible,key,type"
+-    ) {
+-      throw new Error("invalid section keys");
+-    }
+-
+-    const expected = EXPECTED_SECTIONS[index]!;
+-    if (
+-      candidate.key !== expected.key ||
+-      candidate.type !== expected.type ||
+-      candidate.isVisible !== expected.isVisible
+-    ) {
+-      throw new Error("invalid section order or identity");
+-    }
+-    if (
+-      typeof candidate.key !== "string" ||
+-      candidate.key.length < MIN_HOMEPAGE_SECTION_KEY_LENGTH ||
+-      candidate.key.length > MAX_HOMEPAGE_SECTION_KEY_LENGTH ||
+-      seen.has(candidate.key) ||
+-      !isHomepageSectionType(candidate.type) ||
+-      !HOMEPAGE_SECTION_TYPES.includes(candidate.type)
+-    ) {
+-      throw new Error("invalid section identity");
+-    }
+-    if (!isPlainOwnDataRecord(candidate.config))
+-      throw new Error("invalid config");
+-    const restrictedKeys = collectKeys(candidate.config).filter((key) =>
+-      RESTRICTED_CONFIG_KEY.test(key),
+-    );
+-    if (restrictedKeys.length > 0) {
+-      throw new Error("restricted tenant identity in config");
+-    }
+-
+-    if (candidate.isVisible) {
+-      const normalized = parseHomepageSectionConfig(
+-        candidate.type,
+-        candidate.config,
+-      );
+-      if (!normalized) throw new Error("visible config does not parse");
+-      // The organizer save action's round-trip gate: normalizing the
+-      // normalized output must be a fixed point, or the row would drift on
+-      // its first admin save.
+-      const again = parseHomepageSectionConfig(candidate.type, normalized);
+-      if (JSON.stringify(again) !== JSON.stringify(normalized)) {
+-        throw new Error("visible config is not idempotent");
+-      }
+-      // The event page keeps its flip tiles; the root shows the wall of years.
+-      const speakerStyle = candidate.key.startsWith("home-") ? "wall" : "flip";
+-      if (candidate.type === "SPEAKERS" && normalized.style !== speakerStyle) {
+-        throw new Error(`speakers must use the ${speakerStyle} style here`);
+-      }
+-    } else if (Reflect.ownKeys(candidate.config).length !== 0) {
+-      throw new Error("hidden config must stay inert");
+-    }
+-    seen.add(candidate.key);
+-  }
+-}
+-
+-function parseManifest(bytes: Uint8Array = MANIFEST_BYTES): Manifest {
+-  const value: unknown = JSON.parse(Buffer.from(bytes).toString("utf8"));
+-  validateManifestContract(value);
+-  return value;
+-}
+-
+-function createDatabaseHarness(initialRows: readonly StoredSection[] = []) {
+-  const committed: StoredSection[] = cloneJson([...initialRows]);
+-  const created: CreatedSection[] = [];
+-  const eventReads: string[] = [];
+-
+-  function readClient(rows: StoredSection[]) {
+-    return {
+-      organization: {
+-        async findMany() {
+-          return [{ ...ORGANIZATION }];
+-        },
+-      },
+-      event: {
+-        async findUnique(args: { where: { slug: string } }) {
+-          eventReads.push(args.where.slug);
+-          return null;
+-        },
+-      },
+-      homepageSection: {
+-        async findMany(args: {
+-          where: { organizationId: string; key: { in: string[] } };
+-        }) {
+-          const keys = new Set(args.where.key.in);
+-          return cloneJson(rows.filter((row) => keys.has(row.key)));
+-        },
+-      },
+-    };
+-  }
+-
+-  const outer = readClient(committed);
+-  const database = {
+-    ...outer,
+-    async $transaction<T>(callback: (tx: never) => Promise<T>): Promise<T> {
+-      const working = cloneJson(committed);
+-      const transaction = readClient(working);
+-      const tx = {
+-        ...transaction,
+-        homepageSection: {
+-          ...transaction.homepageSection,
+-          async create(args: { data: CreatedSection }) {
+-            const data = cloneJson(args.data);
+-            created.push(data);
+-            const { organizationId: _organizationId, ...row } = data;
+-            working.push(row);
+-            return { id: `created-${working.length}` };
+-          },
+-        },
+-      };
+-      const result = await callback(tx as never);
+-      committed.splice(0, committed.length, ...working);
+-      return result;
+-    },
+-    async $disconnect() {},
+-  } as unknown as HomepageSeedDatabase;
+-
+-  return { database, committed, created, eventReads };
+-}
+-
+-async function execute(
+-  harness: ReturnType<typeof createDatabaseHarness>,
+-  apply: boolean,
+-) {
+-  const output: string[] = [];
+-  const code = await run({
+-    argv: ["all-things-ai", MANIFEST_PATH, ...(apply ? ["--apply"] : [])],
+-    env: { DATABASE_URL: SAFE_DATABASE_URL },
+-    manifestBytes: MANIFEST_BYTES,
+-    createDatabase: () => harness.database,
+-    writeReceipt: (json) => {
+-      output.push(json);
+-    },
+-    writeFallbackReceipt: () => {
+-      throw new Error("unexpected fallback receipt");
+-    },
+-  });
+-  return {
+-    code,
+-    receipt: JSON.parse(output[0]!) as HomepageSeedReceipt,
+-  };
+-}
+-
+-/** Mutants start from the REAL approved manifest so each change is the only defect. */
+-function mutate(change: (manifest: MutableManifest) => void) {
+-  const value = cloneJson(parseManifest()) as unknown as MutableManifest;
+-  change(value);
+-  return value;
+-}
+-
+-const HIDDEN_COLLAGE = 2;
+-const SPEAKERS = 4;
+-const HIDDEN_TICKETS = 11;
+-const HIDDEN_SPONSORSHIP = 13;
+-const HOME_SPEAKERS = 19;
+-const HIDDEN_HOME_EVENTS = 22;
+-const LAST = ROW_COUNT - 1;
+-
+-const MANIFEST_MUTANTS: Array<[string, (manifest: MutableManifest) => void]> = [
+-  [
+-    "visible inert row",
+-    (manifest) => {
+-      manifest.sections[HIDDEN_COLLAGE]!.isVisible = true;
+-    },
+-  ],
+-  [
+-    "nonempty inert row",
+-    (manifest) => {
+-      manifest.sections[HIDDEN_TICKETS]!.config = { invented: true };
+-    },
+-  ],
+-  [
+-    "hidden row flipped visible with content",
+-    (manifest) => {
+-      manifest.sections[HIDDEN_SPONSORSHIP]!.isVisible = true;
+-    },
+-  ],
+-  [
+-    "duplicate key",
+-    (manifest) => {
+-      manifest.sections[LAST]!.key = "hero";
+-    },
+-  ],
+-  [
+-    "reordered row",
+-    (manifest) => {
+-      [manifest.sections[0], manifest.sections[1]] = [
+-        manifest.sections[1]!,
+-        manifest.sections[0]!,
+-      ];
+-    },
+-  ],
+-  [
+-    "dropped row",
+-    (manifest) => {
+-      manifest.sections.pop();
+-    },
+-  ],
+-  [
+-    "unknown type",
+-    (manifest) => {
+-      manifest.sections[LAST]!.type = "UNKNOWN";
+-    },
+-  ],
+-  [
+-    "database id field on a section",
+-    (manifest) => {
+-      manifest.sections[0]!.id = "internal-id";
+-    },
+-  ],
+-  [
+-    "tenant identity inside a visible config",
+-    (manifest) => {
+-      (manifest.sections[0]!.config as Record<string, unknown>).organizationId =
+-        "org_internal";
+-    },
+-  ],
+-  [
+-    "tenant identity nested inside config content",
+-    (manifest) => {
+-      const config = manifest.sections[0]!.config as { slides: unknown[] };
+-      (config.slides[0] as Record<string, unknown>).eventId = "evt_internal";
+-    },
+-  ],
+-  [
+-    "visible config the parser rejects (nested past the depth budget)",
+-    (manifest) => {
+-      let deep: Record<string, unknown> = { leaf: true };
+-      for (let level = 0; level < 10; level += 1) deep = { deeper: deep };
+-      manifest.sections[0]!.config = {
+-        ...(manifest.sections[0]!.config as Record<string, unknown>),
+-        deep,
+-      };
+-    },
+-  ],
+-  [
+-    "speaker default regression",
+-    (manifest) => {
+-      manifest.sections[SPEAKERS]!.config = { style: "grid" };
+-    },
+-  ],
+-  [
+-    "root speakers without the wall",
+-    (manifest) => {
+-      manifest.sections[HOME_SPEAKERS]!.config = { style: "flip" };
+-    },
+-  ],
+-  [
+-    "display-only root row flipped visible",
+-    (manifest) => {
+-      manifest.sections[HIDDEN_HOME_EVENTS]!.isVisible = true;
+-    },
+-  ],
+-];
+-
+-describe("All Things AI homepage manifest (#1851)", () => {
+-  it("is the exact owner-approved versioned twenty-four-row contract at the pinned content SHA", () => {
+-    const manifest = parseManifest();
+-
+-    expect(manifest.version).toBe(1);
+-    expect(createHash("sha256").update(MANIFEST_BYTES).digest("hex")).toBe(
+-      APPROVED_MANIFEST_SHA256,
+-    );
+-    expect(
+-      manifest.sections.map((section, orderIndex) => ({
+-        key: section.key,
+-        type: section.type,
+-        orderIndex,
+-        isVisible: section.isVisible,
+-      })),
+-    ).toEqual(
+-      EXPECTED_SECTIONS.map((section, orderIndex) => ({
+-        key: section.key,
+-        type: section.type,
+-        orderIndex,
+-        isVisible: section.isVisible,
+-      })),
+-    );
+-  });
+-
+-  it("plans all twenty-four creates in the default dry run without writing", async () => {
+-    const harness = createDatabaseHarness();
+-    const result = await execute(harness, false);
+-
+-    expect(result.code).toBe(0);
+-    expect(result.receipt).toMatchObject({
+-      mode: "dry-run",
+-      applyRequested: false,
+-      mutationPerformed: false,
+-      state: "planned",
+-      creates: EXPECTED_SECTIONS.map((section) => section.key),
+-      noOps: [],
+-      conflicts: [],
+-      counts: { creates: ROW_COUNT, noOps: 0, conflicts: 0 },
+-    });
+-    expect(harness.created).toEqual([]);
+-    expect(harness.committed).toEqual([]);
+-  });
+-
+-  it("applies all twenty-four rows through the real seed engine and keeps hidden rows inert", async () => {
+-    const manifest = parseManifest();
+-    const harness = createDatabaseHarness();
+-    const result = await execute(harness, true);
+-
+-    expect(result.code).toBe(0);
+-    expect(result.receipt).toMatchObject({
+-      version: 1,
+-      manifestSha256: createHash("sha256").update(MANIFEST_BYTES).digest("hex"),
+-      target: "nonproduction",
+-      mode: "apply",
+-      applyRequested: true,
+-      mutationPerformed: true,
+-      state: "applied",
+-      creates: EXPECTED_SECTIONS.map((section) => section.key),
+-      noOps: [],
+-      conflicts: [],
+-      counts: { creates: ROW_COUNT, noOps: 0, conflicts: 0 },
+-    });
+-    expect(harness.created).toHaveLength(ROW_COUNT);
+-    expect(harness.eventReads).toEqual([]);
+-
+-    for (const [orderIndex, created] of harness.created.entries()) {
+-      const source = manifest.sections[orderIndex]!;
+-      const expectedConfig = source.isVisible
+-        ? cloneJson(parseHomepageSectionConfig(source.type, source.config))
+-        : {};
+-      expect(created).toEqual({
+-        organizationId: ORGANIZATION.id,
+-        ...source,
+-        orderIndex,
+-        config: expectedConfig,
+-      });
+-      if (!source.isVisible)
+-        expect(Reflect.ownKeys(created.config)).toEqual([]);
+-    }
+-  });
+-
+-  it("plans twenty-four no-ops on the second run without mutating rows", async () => {
+-    const harness = createDatabaseHarness();
+-    expect((await execute(harness, true)).code).toBe(0);
+-    const before = cloneJson(harness.committed);
+-    const second = await execute(harness, false);
+-
+-    expect(second.code).toBe(0);
+-    expect(second.receipt).toMatchObject({
+-      mode: "dry-run",
+-      applyRequested: false,
+-      mutationPerformed: false,
+-      state: "planned",
+-      creates: [],
+-      noOps: EXPECTED_SECTIONS.map((section) => section.key),
+-      conflicts: [],
+-      counts: { creates: 0, noOps: ROW_COUNT, conflicts: 0 },
+-    });
+-    expect(harness.committed).toEqual(before);
+-    expect(harness.created).toHaveLength(ROW_COUNT);
+-  });
+-
+-  it.each(MANIFEST_MUTANTS)("rejects the %s mutation", (_name, change) => {
+-    const mutated = mutate(change);
+-    expect(() => validateManifestContract(mutated)).toThrow();
+-  });
+-});
+diff --git a/tests/unit/is-main-module.test.ts b/tests/unit/is-main-module.test.ts
+index 6a375df5c..4f6d873b5 100644
+--- a/tests/unit/is-main-module.test.ts
++++ b/tests/unit/is-main-module.test.ts
+@@ -5,9 +5,8 @@
+ 
+ /**
+  * Sensors for #1514 and #1515: symlink-safe isMainModule, adopted by the
+- * five pathToFileURL(path.resolve(process.argv[1])) CLI guards, the two
+- * ATA importers extracted from PR #1512, and the three remaining idiom
+- * families in #1515 (resolve===fileURLToPath, file://${argv[1]}, and
++ * CLI guards that still import ./lib/is-main.mjs, and the three remaining
++ * idiom families in #1515 (resolve===fileURLToPath, file://${argv[1]}, and
+  * argv[1] endsWith/includes basename).
+  *
+  * Discriminator is output, never exit status — the broken idiom exits 0
+@@ -31,8 +30,6 @@ const ADOPTED = [
+   "scripts/promote-install.mjs",
+   "scripts/rehearse-install-upgrade.mjs",
+   "scripts/neon-rehearsal-rollback.mjs",
+-  "scripts/import-ata-2025.mjs",
+-  "scripts/import-ata-2026-sessions.mjs",
+   "scripts/agent-mutation-proof-execute.mjs",
+   // #1515 family B
+   "scripts/detect-e2e-paths.mjs",
+@@ -49,7 +46,6 @@ const ADOPTED = [
+   "scripts/agent-dispatch-packet.mjs",
+   "scripts/audit-merges.mjs",
+   "scripts/check-dco.mjs",
+-  "scripts/ata-preview-rule.mjs",
+   "scripts/generate-status.mjs",
+   "scripts/clerk-import-boundary.mjs",
+   "scripts/migration-lint.mjs",
+diff --git a/tests/unit/seed-fixture-guards.test.ts b/tests/unit/seed-fixture-guards.test.ts
+index 3959a0f29..3481db7ab 100644
+--- a/tests/unit/seed-fixture-guards.test.ts
++++ b/tests/unit/seed-fixture-guards.test.ts
+@@ -12,47 +12,33 @@
+  *       company that is not on the list (NVIDIA, HER Collective, …)
+  *       is refused on invented-fixture paths;
+  *   (c) invented-fixture bios do not name real employers;
+- *   (d) every seed/import speakerCompany/company write is dominated by
+- *       one of the two asserts (fixture allowlist OR real-archive
+- *       provenance) — identifier match, no AST-position exemption
++ *   (d) every remaining seed speakerCompany/company write is dominated by
++ *       one of the two asserts (fixture allowlist OR provenance) —
++ *       identifier match, no AST-position exemption
+  *       (call presence only; archive writes are proven by the
+  *       output-level recording test);
+  *   (e) a demoMode paid group purchase is refused before Stripe;
+- *   (f) manifest-listed real-content files contain real companies and
+- *       must not carry fixture branding (#1469);
+- *   (g) a real-archive company write is allowed only when the value
++ *   (f) manifest-listed Example Conf sample files name the fictional
++ *       sample employers and do not name known real employers;
++ *   (g) a provenance company write is allowed only when the value
+  *       actually occurs in the listed source JSON — a listed path is
+- *       not enough (#1469).
++ *       not enough.
+  *
+- * Mutation-test expectation: restoring `price: 19900` on the non-demo ATA
+- * tickets in prisma/seed.ts, `speakerCompany: 'Anthropic'`, dropping the
++ * Mutation-test expectation: restoring `price: 19900` on a non-demo
++ * ticket in prisma/seed.ts, `speakerCompany: 'Anthropic'`, dropping the
+  * assert before a write, or letting NVIDIA through the allowlist, must
+- * turn the matching case red. Re-fictionalizing speakers-2026.json,
+- * calling the real-archive assert with an unlisted sourcePath, deriving
+- * `Seed Speaker Co (…)` while the JSON stays pristine, or removing the
+- * archive assert from seedAllThingsAi2026Archive, must also go red.
++ * turn the matching case red. Calling the provenance assert with an
++ * unlisted sourcePath, deriving `Seed Speaker Co (…)` while the JSON
++ * stays pristine, omitting seedBatch, or removing the archive assert
++ * from seedExampleArchive2026, must also go red.
+  */
+ 
+-import { spawnSync } from "node:child_process";
+ import fs from "node:fs";
+-import os from "node:os";
+ import path from "node:path";
+-import { pathToFileURL } from "node:url";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+-const prismaClientMocks = vi.hoisted(() => ({
+-  createPrismaClient: vi.fn(() => {
+-    throw new Error(
+-      "createPrismaClient must not run on import of ATA importers"
+-    );
+-  }),
+-}));
+-
+-vi.mock("../../scripts/lib/prisma-client.mjs", () => ({
+-  createPrismaClient: prismaClientMocks.createPrismaClient,
+-}));
+ import {
+-  seedAllThingsAi2026Archive,
++  seedExampleArchive2026,
+   type SeedBatchWriteClient,
+ } from "../../prisma/seed";
+ import {
+@@ -74,6 +60,10 @@ import {
+ 
+ const ROOT = path.resolve(__dirname, "../..");
+ 
++const EXAMPLE_ARCHIVE_BIO =
++  "Fixture host at Northstar Cognition Labs. Avery opens the Example Conf archive with a short tour of the sample schedule.";
++const ARCHIVE_SEED_BATCH = "seed:20261011T120000Z:fixture";
++
+ function readRepoFile(...parts: string[]): string {
+   return fs.readFileSync(path.join(ROOT, ...parts), "utf8");
+ }
+@@ -135,15 +125,15 @@ const SHARED_REAL_ARCHIVE_CASES: Array<{
+ }> = [
+   {
+     id: "listed-path-value-in-speakers-file",
+-    value: "Mistral AI",
++    value: "Northstar Cognition Labs",
+     sourcePath: "prisma/seed-data/speakers-2026.json",
+-    returns: "Mistral AI",
++    returns: "Northstar Cognition Labs",
+   },
+   {
+     id: "listed-path-value-in-sessions-file",
+-    value: "Netskope",
++    value: "Cascade Compute",
+     sourcePath: "prisma/seed-data/sessions-2026.json",
+-    returns: "Netskope",
++    returns: "Cascade Compute",
+   },
+   {
+     id: "recurrence-derived-seed-speaker-co-json-pristine",
+@@ -237,36 +227,33 @@ const SHARED_REAL_ARCHIVE_CASES: Array<{
+   },
+   {
+     id: "bio-in-file",
+-    value: "IBM",
++    value: "Northstar Cognition Labs",
+     sourcePath: "prisma/seed-data/sessions-2026.json",
+-    bio: "BJ Hargrave is a Senior Technical Staff Member and open source developer at IBM Research. He has 25+ years of experience as a software architect and developer working in open source and open technology. He has multiple patents covering JVM performance improvements and OSGi technology.",
+-    returns: "IBM",
++    bio: EXAMPLE_ARCHIVE_BIO,
++    returns: "Northstar Cognition Labs",
+   },
+   {
+     id: "bio-not-in-file",
+-    value: "IBM",
++    value: "Northstar Cognition Labs",
+     sourcePath: "prisma/seed-data/sessions-2026.json",
+     bio: "Invented fixture bio that does not occur in the archive JSON.",
+     throws: /does not occur/,
+   },
+   {
+     id: "padded-company-not-byte-for-byte",
+-    value: " IBM ",
++    value: " Northstar Cognition Labs ",
+     sourcePath: "prisma/seed-data/sessions-2026.json",
+     throws: /does not occur/,
+   },
+   {
+     id: "padded-bio-not-byte-for-byte",
+-    value: "IBM",
++    value: "Northstar Cognition Labs",
+     sourcePath: "prisma/seed-data/sessions-2026.json",
+-    bio: " BJ Hargrave is a Senior Technical Staff Member and open source developer at IBM Research. He has 25+ years of experience as a software architect and developer working in open source and open technology. He has multiple patents covering JVM performance improvements and OSGi technology. ",
++    bio: ` ${EXAMPLE_ARCHIVE_BIO} `,
+     throws: /does not occur/,
+   },
+ ];
+ 
+-const IBM_ARCHIVE_BIO =
+-  "BJ Hargrave is a Senior Technical Staff Member and open source developer at IBM Research. He has 25+ years of experience as a software architect and developer working in open source and open technology. He has multiple patents covering JVM performance improvements and OSGi technology.";
+-
+ /**
+  * Object whose string coercion returns whitespace the first time and
+  * `later` on every subsequent call. Used to prove the provenance asserts
+@@ -298,10 +285,6 @@ const SEED_IMPORT_WRITERS = [
+   "scripts/seed-ai-space-jam.ts",
+   "scripts/seed-orbital-summit-2026.ts",
+   "scripts/seed-demo-virtual-replays.ts",
+-  "scripts/import-ata-2026-sessions.mjs",
+-  "scripts/import-ata-2025.mjs",
+-  "scripts/import-all-things-ai-2027-event.mjs",
+-  "scripts/import-all-things-ai-2027-tickets.mjs",
+ ] as const;
+ 
+ describe("seed-fixture-guards predicates (#1425)", () => {
+@@ -468,18 +451,18 @@ describe("seed-fixture-guards assert helpers (#1425)", () => {
+     err.mockRestore();
+   });
+ 
+-  it("assertRealArchiveCompanyAllowed accepts a real employer when sourcePath is manifest-listed", () => {
+-    expect(() =>
+-      assertRealArchiveCompanyAllowed("Mistral AI", {
++  it("assertRealArchiveCompanyAllowed accepts a sample employer that occurs byte-for-byte in the listed file", () => {
++    expect(
++      assertRealArchiveCompanyAllowed("Northstar Cognition Labs", {
+         sourcePath: "prisma/seed-data/speakers-2026.json",
+-        label: "Aaron Delp",
++        label: "Avery Quinn",
+       })
+-    ).not.toThrow();
+-    expect(() =>
+-      assertRealArchiveCompanyAllowed("Netskope", {
++    ).toBe("Northstar Cognition Labs");
++    expect(
++      assertRealArchiveCompanyAllowed("Cascade Compute", {
+         sourcePath: "prisma/seed-data/sessions-2026.json",
+       })
+-    ).not.toThrow();
++    ).toBe("Cascade Compute");
+     expect(
+       isListedRealContentSourcePath("prisma/seed-data/speakers-2026.json")
+     ).toBe(true);
+@@ -528,20 +511,27 @@ describe("seed-fixture-guards assert helpers (#1425)", () => {
+ 
+   it("assertRealArchiveCompanyAllowed refuses a whitespace-padded value that is not byte-for-byte in the file", () => {
+     expect(() =>
+-      assertRealArchiveCompanyAllowed(" IBM ", {
++      assertRealArchiveCompanyAllowed(" Northstar Cognition Labs ", {
+         sourcePath: "prisma/seed-data/sessions-2026.json",
+       })
+     ).toThrow(/does not occur/);
++    expect(
++      assertRealArchiveCompanyAllowed("Northstar Cognition Labs", {
++        sourcePath: "prisma/seed-data/sessions-2026.json",
++      })
++    ).toBe("Northstar Cognition Labs");
+     expect(() =>
+       assertRealArchiveCompanyAllowed("IBM", {
+         sourcePath: "prisma/seed-data/sessions-2026.json",
+       })
+-    ).not.toThrow();
++    ).toThrow(/does not occur/);
+   });
+ 
+   it("assertRealArchiveCompanyAllowed returns the exact verified persist value (null for whitespace-only)", () => {
+     const sourcePath = "prisma/seed-data/sessions-2026.json";
+-    expect(assertRealArchiveCompanyAllowed("IBM", { sourcePath })).toBe("IBM");
++    expect(
++      assertRealArchiveCompanyAllowed("Cascade Compute", { sourcePath })
++    ).toBe("Cascade Compute");
+     expect(assertRealArchiveCompanyAllowed(null, { sourcePath })).toBeNull();
+     expect(assertRealArchiveCompanyAllowed("", { sourcePath })).toBeNull();
+     expect(assertRealArchiveCompanyAllowed(" ", { sourcePath })).toBeNull();
+@@ -552,8 +542,8 @@ describe("seed-fixture-guards assert helpers (#1425)", () => {
+   it("assertRealArchiveTextAllowed returns the exact verified persist value for bio and description", () => {
+     const sourcePath = "prisma/seed-data/sessions-2026.json";
+     expect(
+-      assertRealArchiveTextAllowed(IBM_ARCHIVE_BIO, { sourcePath, kind: "bio" })
+-    ).toBe(IBM_ARCHIVE_BIO);
++      assertRealArchiveTextAllowed(EXAMPLE_ARCHIVE_BIO, { sourcePath, kind: "bio" })
++    ).toBe(EXAMPLE_ARCHIVE_BIO);
+     expect(
+       assertRealArchiveTextAllowed(" ", { sourcePath, kind: "bio" })
+     ).toBeNull();
+@@ -606,17 +596,20 @@ describe("seed-fixture-guards assert helpers (#1425)", () => {
+     expect(mjsBio).toBeNull();
+     expect(mjsBio).not.toBe(fictionalBio);
+ 
+-    const tsCompanyWithBio = assertRealArchiveCompanyAllowed("IBM", {
++    const tsCompanyWithBio = assertRealArchiveCompanyAllowed("Cascade Compute", {
+       sourcePath,
+       bio: statefulWhitespaceThen(fictionalBio) as unknown as string,
+     });
+-    expect(tsCompanyWithBio).toBe("IBM");
++    expect(tsCompanyWithBio).toBe("Cascade Compute");
+ 
+-    const mjsCompanyWithBio = mjs.assertRealArchiveCompanyAllowed("IBM", {
+-      sourcePath,
+-      bio: statefulWhitespaceThen(fictionalBio),
+-    });
+-    expect(mjsCompanyWithBio).toBe("IBM");
++    const mjsCompanyWithBio = mjs.assertRealArchiveCompanyAllowed(
++      "Cascade Compute",
++      {
++        sourcePath,
++        bio: statefulWhitespaceThen(fictionalBio),
++      }
++    );
++    expect(mjsCompanyWithBio).toBe("Cascade Compute");
+   });
+ 
+   it("assertRealArchiveCompanyAllowed refuses absolute, prefixed, and differently-normalized listed paths", () => {
+@@ -749,96 +742,74 @@ describe("seed surface sensor (#1425)", () => {
+     expect(src).toMatch(/eventDemoMode\s*=\s*false/);
+   });
+ 
+-  it("archive speakers-2026.json holds real sourced employers, not fixture branding (#1469)", () => {
+-    // Renamed deliberately: the previous name asserted the #1449 regression
+-    // was correct. A test whose name states the opposite of what it asserts is
+-    // worse than a renamed one, so this trips the test-integrity sensor on
+-    // purpose and the PR body carries `- Test-integrity: intentional #1469`.
++  it("archive speakers-2026.json is the fictional Example Conf sample (#1469)", () => {
+     const speakers = JSON.parse(
+       readRepoFile("prisma", "seed-data", "speakers-2026.json")
+-    ) as Array<{ company: string; slug: string; bio?: string }>;
+-    expect(speakers.length).toBeGreaterThan(0);
+-    const raw = readRepoFile("prisma", "seed-data", "speakers-2026.json");
+-    expect(raw).not.toMatch(/Seed Speaker Co/);
+-    expect(raw).not.toMatch(/Seed Fixture Co/);
++    ) as Array<{
++      company: string;
++      slug: string;
++      bio?: string;
++      website?: string;
++    }>;
++    expect(speakers.map((s) => s.slug).sort()).toEqual([
++      "avery-quinn",
++      "jordan-hale",
++    ]);
++    expect(speakers.map((s) => s.company).sort()).toEqual([
++      "Cascade Compute",
++      "Northstar Cognition Labs",
++    ]);
+     for (const s of speakers) {
+-      expect(
+-        s.company.startsWith("Seed Speaker Co ("),
+-        `speakers-2026.json ${s.slug} still uses fixture-branded company "${s.company}"`
+-      ).toBe(false);
+-      if (s.bio) {
+-        expect(
+-          /Seed Speaker Co/.test(s.bio),
+-          `speakers-2026.json ${s.slug} bio carries fixture branding`
+-        ).toBe(false);
+-        expect(
+-          /Seed Fixture Co/.test(s.bio),
+-          `speakers-2026.json ${s.slug} bio carries fixture branding`
+-        ).toBe(false);
+-      }
++      expect(isRealCompanyName(s.company), s.slug).toBe(false);
++      expect(isAllowedSeedCompanyName(s.company), s.slug).toBe(true);
++      expect(s.website, s.slug).toBe("https://example.org");
++      expect(typeof s.bio === "string" && s.bio.length > 0, s.slug).toBe(true);
++      expect(seedTextContainsRealCompany(s.bio ?? ""), s.slug).toBe(false);
++      expect(s.bio ?? "", s.slug).not.toMatch(/Seed Speaker Co|Seed Fixture Co/);
+     }
+-    expect(speakers.some((s) => isRealCompanyName(s.company))).toBe(true);
+-    expect(speakers.some((s) => s.company === "Mistral AI")).toBe(true);
+-    expect(speakers.some((s) => typeof s.bio === "string" && s.bio.length > 0)).toBe(
+-      true
+-    );
+   });
+ 
+-  it("archive sessions-2026.json holds real speaker companies and bios (#1469)", () => {
+-    // Renamed for the same reason as the speakers test above.
++  it("archive sessions-2026.json is the fictional Example Conf sample (#1469)", () => {
+     const sessions = JSON.parse(
+       readRepoFile("prisma", "seed-data", "sessions-2026.json")
+     ) as Array<{
++      slug: string;
+       title: string;
+       description?: string;
+-      speakers: Array<{ company?: string; speakerSlug?: string; bio?: string }>;
++      speakers: Array<{ company?: string; bio?: string }>;
+     }>;
+-    expect(sessions.length).toBeGreaterThan(0);
+-    const raw = readRepoFile("prisma", "seed-data", "sessions-2026.json");
+-    expect(raw).not.toMatch(/Seed Speaker Co/);
+-    expect(raw).not.toMatch(/Seed Fixture Co/);
+-    let companies = 0;
+-    let realCompanies = 0;
+-    let bios = 0;
+-    let descriptions = 0;
++    expect(sessions.map((sx) => sx.slug).sort()).toEqual([
++      "opening-the-example-conf-archive",
++      "shipping-the-demo",
++    ]);
++    const companies: string[] = [];
+     for (const sx of sessions) {
+-      if (sx.description) {
+-        descriptions += 1;
+-        expect(
+-          /Seed Speaker Co/.test(sx.description),
+-          `sessions-2026.json "${sx.title}" description carries fixture branding`
+-        ).toBe(false);
+-        expect(
+-          /Seed Fixture Co/.test(sx.description),
+-          `sessions-2026.json "${sx.title}" description carries fixture branding`
+-        ).toBe(false);
+-      }
+-      for (const sp of sx.speakers ?? []) {
++      expect(
++        typeof sx.description === "string" && sx.description.length > 0,
++        sx.slug
++      ).toBe(true);
++      expect(sx.description ?? "", sx.slug).not.toMatch(
++        /Seed Speaker Co|Seed Fixture Co/
++      );
++      expect(seedTextContainsRealCompany(sx.description ?? ""), sx.slug).toBe(
++        false
++      );
++      for (const sp of sx.speakers) {
+         if (sp.company) {
+-          companies += 1;
+-          expect(
+-            sp.company.startsWith("Seed Speaker Co ("),
+-            `sessions-2026.json "${sx.title}" still uses fixture-branded company "${sp.company}"`
+-          ).toBe(false);
+-          if (isRealCompanyName(sp.company)) realCompanies += 1;
++          companies.push(sp.company);
++          expect(isRealCompanyName(sp.company), sx.slug).toBe(false);
++          expect(isAllowedSeedCompanyName(sp.company), sx.slug).toBe(true);
+         }
+         if (sp.bio) {
+-          bios += 1;
+-          expect(
+-            /Seed Speaker Co/.test(sp.bio),
+-            `sessions-2026.json "${sx.title}" bio carries fixture branding`
+-          ).toBe(false);
+-          expect(
+-            /Seed Fixture Co/.test(sp.bio),
+-            `sessions-2026.json "${sx.title}" bio carries fixture branding`
+-          ).toBe(false);
++          expect(sp.bio, sx.slug).not.toMatch(/Seed Speaker Co|Seed Fixture Co/);
++          expect(seedTextContainsRealCompany(sp.bio), sx.slug).toBe(false);
+         }
+       }
+     }
+-    expect(companies).toBeGreaterThan(50);
+-    expect(realCompanies).toBeGreaterThan(0);
+-    expect(bios).toBeGreaterThan(50);
+-    expect(descriptions).toBeGreaterThan(50);
++    expect(companies.sort()).toEqual([
++      "Cascade Compute",
++      "Northstar Cognition Labs",
++    ]);
+   });
+ 
+   it("fixture branding appearing in a manifest-listed file fails", () => {
+@@ -846,19 +817,31 @@ describe("seed surface sensor (#1425)", () => {
+       "src/lib/seed-real-content-manifest.json"
+     );
+     const listed = listRealContentSourcePaths();
+-    expect(listed).toContain("prisma/seed-data/speakers-2026.json");
+-    expect(listed).toContain("prisma/seed-data/sessions-2026.json");
+-    expect(listed).toContain("prisma/seed-data/ata-2025-import.json");
++    expect(listed).toEqual([
++      "prisma/seed-data/speakers-2026.json",
++      "prisma/seed-data/sessions-2026.json",
++      "prisma/seed-data/past-events.json",
++    ]);
++    const removed = [
++      "prisma/seed-data/ata-2025-import.json",
++      "prisma/seed-data/talk-speakers-2025.json",
++      "prisma/seed-data/wp-schedule-2025.json",
++    ];
++    for (const rel of removed) {
++      expect(listed, rel).not.toContain(rel);
++      expect(fs.existsSync(path.join(ROOT, rel)), rel).toBe(false);
++    }
+     for (const rel of listed) {
++      expect(fs.existsSync(path.join(ROOT, rel)), `${rel} exists`).toBe(true);
+       const raw = readRepoFile(...rel.split("/"));
+-      expect(
+-        /Seed Speaker Co/.test(raw),
+-        `${rel} carries fixture branding "Seed Speaker Co"`
+-      ).toBe(false);
+-      expect(
+-        /Seed Fixture Co/.test(raw),
+-        `${rel} carries fixture branding "Seed Fixture Co"`
+-      ).toBe(false);
++      expect(raw, rel).not.toMatch(/Seed Speaker Co/);
++      expect(raw, rel).not.toMatch(/Seed Fixture Co/);
++      for (const value of jsonStringValues(JSON.parse(raw) as unknown)) {
++        expect(
++          seedTextContainsRealCompany(value),
++          `${rel} names a known real employer in ${JSON.stringify(value)}`
++        ).toBe(false);
++      }
+     }
+   });
+ 
+@@ -892,96 +875,103 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+     ) as unknown;
+     const sourceStrings = jsonStringValues(source);
+     const { writes, client } = recordingSeedClient();
+-    const result = await seedAllThingsAi2026Archive(client);
++    const result = await seedExampleArchive2026(client, {
++      seedBatch: ARCHIVE_SEED_BATCH,
++    });
++    expect(result.speakerCount).toBe(2);
++    expect(result.archiveCount).toBe(2);
++    const eventWrites = writes.filter((w) => w.model === "event");
++    expect(eventWrites).toHaveLength(1);
++    expect(eventWrites[0].data.slug).toBe("example-conf-2026");
++    expect(eventWrites[0].data.name).toBe("Example Conf 2026");
++    expect(eventWrites[0].data.seedBatch).toBe(ARCHIVE_SEED_BATCH);
+     const sessionWrites = writes.filter(
+       (w) =>
+         w.model === "session" && w.data.eventId === result.archiveEvent.id
+     );
+-    expect(sessionWrites.length).toBeGreaterThan(50);
+-    expect(
+-      sessionWrites.some(
+-        (w) =>
+-          typeof w.data.speakerCompany === "string" &&
+-          (w.data.speakerCompany as string).length > 0
+-      )
+-    ).toBe(true);
+-    expect(
+-      sessionWrites.some(
+-        (w) =>
+-          typeof w.data.speakerBio === "string" &&
+-          (w.data.speakerBio as string).length > 0
+-      )
+-    ).toBe(true);
+-    expect(
+-      sessionWrites.some(
+-        (w) =>
+-          typeof w.data.description === "string" &&
+-          (w.data.description as string).length > 0
+-      )
+-    ).toBe(true);
+-
++    expect(sessionWrites).toHaveLength(2);
++    const companies = sessionWrites
++      .map((w) => w.data.speakerCompany)
++      .sort();
++    expect(companies).toEqual(["Cascade Compute", "Northstar Cognition Labs"]);
+     for (const row of sessionWrites) {
++      expect(row.data.seedBatch).toBe(ARCHIVE_SEED_BATCH);
+       const company = row.data.speakerCompany;
+-      if (typeof company === "string" && company.trim()) {
+-        expect(
+-          sourceStrings.has(company),
+-          `persisted speakerCompany ${JSON.stringify(company)} is not in prisma/seed-data/sessions-2026.json`
+-        ).toBe(true);
+-      }
++      expect(typeof company).toBe("string");
++      expect(
++        sourceStrings.has(company as string),
++        `persisted speakerCompany ${JSON.stringify(company)} is not in prisma/seed-data/sessions-2026.json`
++      ).toBe(true);
+       const bio = row.data.speakerBio;
+-      if (typeof bio === "string" && bio.trim()) {
+-        expect(
+-          sourceStrings.has(bio),
+-          `persisted speakerBio is not in prisma/seed-data/sessions-2026.json`
+-        ).toBe(true);
+-      }
++      expect(typeof bio).toBe("string");
++      expect(
++        sourceStrings.has(bio as string),
++        "persisted speakerBio is not in prisma/seed-data/sessions-2026.json"
++      ).toBe(true);
+       const description = row.data.description;
+-      if (typeof description === "string" && description.trim()) {
+-        expect(
+-          sourceStrings.has(description),
+-          `persisted description is not in prisma/seed-data/sessions-2026.json`
+-        ).toBe(true);
+-      }
++      expect(typeof description).toBe("string");
++      expect(
++        sourceStrings.has(description as string),
++        "persisted description is not in prisma/seed-data/sessions-2026.json"
++      ).toBe(true);
+     }
+   });
+ 
++  it("omitting seedBatch throws before any write", async () => {
++    const omitted = recordingSeedClient();
++    await expect(
++      seedExampleArchive2026(
++        omitted.client,
++        undefined as unknown as { seedBatch: string }
++      )
++    ).rejects.toThrow(/requires the current seedBatch/);
++    expect(omitted.writes).toHaveLength(0);
++
++    const empty = recordingSeedClient();
++    await expect(
++      seedExampleArchive2026(empty.client, { seedBatch: "" })
++    ).rejects.toThrow(/requires the current seedBatch/);
++    expect(empty.writes).toHaveLength(0);
++  });
++
+   it("a padded archive company is refused and is not persisted on the recorded write", async () => {
+     const { writes, client } = recordingSeedClient();
+     await expect(
+-      seedAllThingsAi2026Archive(client, {
++      seedExampleArchive2026(client, {
++        seedBatch: ARCHIVE_SEED_BATCH,
+         speakers: [
+           {
+-            slug: "bj-hargrave",
+-            name: "BJ Hargrave",
+-            title: "Senior Technical Staff Member",
+-            company: " IBM ",
+-            bio: IBM_ARCHIVE_BIO,
+-            image: "/speakers/bj.png",
++            slug: "avery-quinn",
++            name: "Avery Quinn",
++            title: "Fixture host",
++            company: " Northstar Cognition Labs ",
++            bio: EXAMPLE_ARCHIVE_BIO,
++            image: "https://example.org/speakers/avery-quinn.jpg",
+           },
+         ],
+         sessions: [
+           {
+-            slug: "building-agents-with-granite",
+-            title: "Building Agents with Granite",
++            slug: "opening-the-example-conf-archive",
++            title: "Opening the Example Conf archive",
+             speakers: [
+               {
+-                name: "BJ Hargrave",
+-                title: "Senior Technical Staff Member",
+-                company: " IBM ",
+-                speakerSlug: "bj-hargrave",
+-                bio: IBM_ARCHIVE_BIO,
++                name: "Avery Quinn",
++                title: "Fixture host",
++                company: " Northstar Cognition Labs ",
++                speakerSlug: "avery-quinn",
++                bio: EXAMPLE_ARCHIVE_BIO,
+               },
+             ],
+-            day: "monday",
++            day: "Day 1",
+             date: "March 18, 2026",
+-            time: "12:00 PM – 1:00 PM EDT",
+-            duration: "1 hour",
+-            track: "Workshop",
+-            room: "Grand Ballroom 1",
+-            type: "workshop",
++            time: "9:00 AM – 10:00 AM EDT",
++            duration: "60 min",
++            track: "Example Track",
++            room: "Main Hall",
++            type: "keynote",
+             description:
+-              "In this workshop, we will explore writing AI agents using IBM Granite AI models. We will touch on what are AI agents and explore some different designs for agent development. These designs are informed by the experiences of IBMers in developing agents. Our first agent will be a basic Function Calling Agent where we will build the agent from scratch to learn how agents work. We will then explore other agent designs such as Plan-and-Solve, Route-and-Solve, ToolRAG, and ReAct. The workshop agents will use LangGraph with LangChain in their implementations and use IBM Granite as the language model. This event is conducted in partnership with IBM, All Things Open, and The AIE Network.",
+-            tags: ["workshop", "agents", "granite", "ibm", "langgraph"],
++              "A sample keynote that opens the Example Conf archive. No live recording is attached.",
++            tags: ["sample"],
+             slideCount: 0,
+           },
+         ],
+@@ -990,9 +980,11 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+     const sessionWrites = writes.filter((w) => w.model === "session");
+     expect(sessionWrites).toHaveLength(0);
+     expect(
+-      writes.some((w) => w.data.speakerCompany === " IBM ")
++      writes.some((w) => w.data.speakerCompany === " Northstar Cognition Labs ")
++    ).toBe(false);
++    expect(
++      writes.some((w) => w.data.speakerCompany === "Northstar Cognition Labs")
+     ).toBe(false);
+-    expect(writes.some((w) => w.data.speakerCompany === "IBM")).toBe(false);
+   });
+ 
+   it("records the guard return for whitespace-only / NBSP / U+FEFF company, bio, and description", async () => {
+@@ -1019,7 +1011,8 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+       expect(expectedDescription, sample.id).toBeNull();
+ 
+       const { writes, client } = recordingSeedClient();
+-      await seedAllThingsAi2026Archive(client, {
++      await seedExampleArchive2026(client, {
++        seedBatch: ARCHIVE_SEED_BATCH,
+         speakers: [
+           {
+             slug: `ws-${sample.id}`,
+@@ -1027,7 +1020,7 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+             title: "Engineer",
+             company: sample.company,
+             bio: sample.bio,
+-            image: "/speakers/ws.png",
++            image: "https://example.org/speakers/ws.png",
+           },
+         ],
+         sessions: [
+@@ -1043,15 +1036,15 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+                 bio: sample.bio,
+               },
+             ],
+-            day: "monday",
++            day: "Day 1",
+             date: "March 18, 2026",
+-            time: "12:00 PM – 1:00 PM EDT",
+-            duration: "1 hour",
+-            track: "Workshop",
+-            room: "Grand Ballroom 1",
+-            type: "workshop",
++            time: "9:00 AM – 10:00 AM EDT",
++            duration: "60 min",
++            track: "Example Track",
++            room: "Main Hall",
++            type: "keynote",
+             description: sample.description,
+-            tags: ["archive"],
++            tags: ["sample"],
+             slideCount: 0,
+           },
+         ],
+@@ -1065,13 +1058,15 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+       expect(sessionWrites[0].data.description, sample.id).toBe(
+         expectedDescription
+       );
++      expect(sessionWrites[0].data.seedBatch, sample.id).toBe(ARCHIVE_SEED_BATCH);
+     }
+   });
+ 
+   it("refuses derived Seed Speaker Co fixtures while the JSON stays pristine", async () => {
+-    const { client } = recordingSeedClient();
++    const { writes, client } = recordingSeedClient();
+     await expect(
+-      seedAllThingsAi2026Archive(client, {
++      seedExampleArchive2026(client, {
++        seedBatch: ARCHIVE_SEED_BATCH,
+         speakers: [
+           {
+             slug: "ada-lovelace",
+@@ -1079,7 +1074,7 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+             title: "Analyst",
+             company: "Seed Speaker Co (ada-lovelace)",
+             bio: "Fixture archive speaker bio.",
+-            image: "/speakers/ada.png",
++            image: "https://example.org/speakers/ada.png",
+           },
+         ],
+         sessions: [
+@@ -1095,20 +1090,21 @@ describe("archive write output matches listed source JSON (#1469)", () => {
+                 bio: "Fixture archive speaker bio.",
+               },
+             ],
+-            day: "monday",
++            day: "Day 1",
+             date: "March 18, 2026",
+-            time: "12:00 PM – 1:00 PM EDT",
+-            duration: "1 hour",
+-            track: "Workshop",
+-            room: "Grand Ballroom 1",
++            time: "9:00 AM – 10:00 AM EDT",
++            duration: "60 min",
++            track: "Example Track",
++            room: "Main Hall",
+             type: "keynote",
+             description: "Archive talk.",
+-            tags: ["archive"],
++            tags: ["sample"],
+             slideCount: 0,
+           },
+         ],
+       })
+     ).rejects.toThrow(/does not occur/);
++    expect(writes.filter((w) => w.model === "session")).toHaveLength(0);
+   });
+ });
+ 
+@@ -1144,16 +1140,41 @@ describe("seed/import write paths are dominated by the guard (#1425)", () => {
+     }
+   });
+ 
+-  it("mjs writers import scripts/lib/seed-fixture-guards.mjs (not a name-only grep of the TS module)", () => {
+-    const mjsWriters = SEED_IMPORT_WRITERS.filter((rel) =>
+-      rel.endsWith(".mjs")
+-    );
+-    expect(mjsWriters.length).toBeGreaterThan(0);
+-    for (const rel of mjsWriters) {
+-      const src = readRepoFile(rel);
++  it("every scripts .mjs that writes speakerCompany or ticketType.create imports the mjs guard", () => {
++    let examined = 0;
++    const found: string[] = [];
++    const walk = (dir: string) => {
++      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
++        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
++        const abs = path.join(dir, entry.name);
++        if (entry.isDirectory()) {
++          walk(abs);
++          continue;
++        }
++        if (!entry.name.endsWith(".mjs") || entry.name.endsWith(".test.mjs")) {
++          continue;
++        }
++        examined += 1;
++        const rel = path.relative(ROOT, abs).split(path.sep).join("/");
++        const src = readRepoFile(...rel.split("/"));
++        if (/\bspeakerCompany\b/.test(src) || /ticketType\.create/.test(src)) {
++          found.push(rel);
++        }
++      }
++    };
++    walk(path.join(ROOT, "scripts"));
++    expect(examined, "the scan must open scripts .mjs files").toBeGreaterThan(0);
++    for (const rel of found) {
++      expect(
++        (SEED_IMPORT_WRITERS as readonly string[]).includes(rel),
++        `${rel} writes speakerCompany or ticketType.create but is not in SEED_IMPORT_WRITERS`
++      ).toBe(true);
++      const src = readRepoFile(...rel.split("/"));
+       expect(
+         src.includes('from "./lib/seed-fixture-guards.mjs"') ||
+-          src.includes("from './lib/seed-fixture-guards.mjs'"),
++          src.includes("from './lib/seed-fixture-guards.mjs'") ||
++          src.includes('from "../lib/seed-fixture-guards.mjs"') ||
++          src.includes("from '../lib/seed-fixture-guards.mjs'"),
+         `${rel} must import the node-runnable seed-fixture-guards.mjs`
+       ).toBe(true);
+     }
+@@ -1250,44 +1271,6 @@ describe("seed/import write paths are dominated by the guard (#1425)", () => {
+     }
+   });
+ 
+-  it("createMany speaker rows in import-ata-2026-sessions.mjs are dominated by assertSeedSpeakerRecordsAllowed", () => {
+-    // #1469: name kept (test-integrity). The 2026 importer is real archive,
+-    // so domination is the provenance assert — not the fixture allowlist.
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    expect(src).toContain("sessionSpeaker.createMany");
+-    expect(src).toContain(
+-      "speakerCompany: assertRealArchiveCompanyAllowed("
+-    );
+-    expect(src).toContain(
+-      'sourcePath: "prisma/seed-data/sessions-2026.json"'
+-    );
+-    expect(src).not.toContain("assertSeedSpeakerCompanyAllowed");
+-    expect(src).not.toContain("assertSeedSpeakerRecordsAllowed");
+-    const createManyAt = src.indexOf("sessionSpeaker.createMany");
+-    const assertAt = src.indexOf(
+-      "speakerCompany: assertRealArchiveCompanyAllowed("
+-    );
+-    expect(assertAt).toBeGreaterThan(-1);
+-    expect(assertAt).toBeLessThan(createManyAt);
+-  });
+-
+-  it("aliased-client writer import-all-things-ai-2027-event.mjs guards target.session writes", () => {
+-    const src = readRepoFile(
+-      "scripts",
+-      "import-all-things-ai-2027-event.mjs"
+-    );
+-    expect(src).toMatch(/target\.session\.(create|update)/);
+-    expect(src).toContain(
+-      "assertSeedSpeakerCompanyAllowed(s.speakerCompany"
+-    );
+-    const writeAt = src.search(/target\.session\.(create|update)/);
+-    const assertAt = src.indexOf(
+-      "assertSeedSpeakerCompanyAllowed(s.speakerCompany"
+-    );
+-    expect(assertAt).toBeGreaterThan(-1);
+-    expect(assertAt).toBeLessThan(writeAt);
+-  });
+-
+   it("ticket writers call assertSeedTicketTypeAllowed before ticketType.create", () => {
+     const ticketWriters = SEED_IMPORT_WRITERS.filter((rel) => {
+       const src = readRepoFile(rel);
+@@ -1310,29 +1293,14 @@ describe("seed/import write paths are dominated by the guard (#1425)", () => {
+     }
+   });
+ 
+-  it("breaking the 2026 importer guard (removing the assert) is what this test would catch", () => {
+-    // Non-vacuous: this file currently has the provenance call. Delete it and this goes red.
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    const without = src.replace(
+-      /speakerCompany:\s*assertRealArchiveCompanyAllowed\([\s\S]*?\}\),\n/,
+-      ""
+-    );
+-    expect(without).not.toContain(
+-      "speakerCompany: assertRealArchiveCompanyAllowed("
+-    );
+-    expect(src).toContain(
+-      "speakerCompany: assertRealArchiveCompanyAllowed("
+-    );
+-  });
+-
+   it("the .mjs twin agrees with the TS real-archive provenance assert", async () => {
+     const mjs = await import("../../scripts/lib/seed-fixture-guards.mjs");
+     expect(mjs.REAL_CONTENT_MANIFEST_REL).toBe(REAL_CONTENT_MANIFEST_REL);
+-    expect(() =>
+-      mjs.assertRealArchiveCompanyAllowed("Mistral AI", {
++    expect(
++      mjs.assertRealArchiveCompanyAllowed("Northstar Cognition Labs", {
+         sourcePath: "prisma/seed-data/speakers-2026.json",
+       })
+-    ).not.toThrow();
++    ).toBe("Northstar Cognition Labs");
+     expect(() =>
+       mjs.assertRealArchiveCompanyAllowed("Mistral AI", {
+         sourcePath: "prisma/seed-data/unlisted.json",
+@@ -1377,7 +1345,7 @@ describe("seed/import write paths are dominated by the guard (#1425)", () => {
+       kind: "bio" | "description";
+       returns: string | null;
+     }> = [
+-      { value: IBM_ARCHIVE_BIO, kind: "bio", returns: IBM_ARCHIVE_BIO },
++      { value: EXAMPLE_ARCHIVE_BIO, kind: "bio", returns: EXAMPLE_ARCHIVE_BIO },
+       { value: " ", kind: "bio", returns: null },
+       { value: "\u00A0", kind: "description", returns: null },
+       { value: "\uFEFF", kind: "bio", returns: null },
+@@ -1410,282 +1378,6 @@ describe("seed/import write paths are dominated by the guard (#1425)", () => {
+   });
+ });
+ 
+-describe("ATA live-source identity fields are provenance-dominated (#1475)", () => {
+-  // Coupled to importer SOURCE TEXT, not the guard library. Deleting a
+-  // wrapper from the importer makes these red; calling the guard from a
+-  // rebuilt desired shape in a test would not.
+-
+-  it("2026 per-speaker name is assigned from assertRealArchiveTextAllowed before createMany (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    expect(src).not.toContain("assertSeedSpeakerCompanyAllowed");
+-    expect(src).not.toContain("assertSeedSpeakerRecordsAllowed");
+-    const nameAssertAt = src.indexOf("name: assertRealArchiveTextAllowed(");
+-    const createManyAt = src.indexOf("sessionSpeaker.createMany");
+-    expect(nameAssertAt).toBeGreaterThan(-1);
+-    expect(createManyAt).toBeGreaterThan(-1);
+-    expect(nameAssertAt).toBeLessThan(createManyAt);
+-  });
+-
+-  it("2026 session title, speakerTitle, and per-speaker title are provenance-dominated before createMany (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    const createManyAt = src.indexOf("sessionSpeaker.createMany");
+-    expect(createManyAt).toBeGreaterThan(-1);
+-
+-    const sessionTitleAt = src.indexOf(
+-      "title: assertRealArchiveTextAllowed(sx.title"
+-    );
+-    expect(sessionTitleAt).toBeGreaterThan(-1);
+-    expect(sessionTitleAt).toBeLessThan(createManyAt);
+-
+-    const speakerTitleAt = src.indexOf(
+-      "speakerTitle: assertRealArchiveTextAllowed("
+-    );
+-    expect(speakerTitleAt).toBeGreaterThan(-1);
+-    expect(speakerTitleAt).toBeLessThan(createManyAt);
+-
+-    const speakerRowTitleAt = src.indexOf(
+-      "title: assertRealArchiveTextAllowed(sp.title"
+-    );
+-    expect(speakerRowTitleAt).toBeGreaterThan(-1);
+-    expect(speakerRowTitleAt).toBeLessThan(createManyAt);
+-  });
+-
+-  it("2026 speakerName join is built from guarded per-speaker names, never passed to a guard (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    expect(src).toContain(
+-      "guardedSpeakers.map((sp) => sp.name).join(' & ')"
+-    );
+-    expect(src).not.toContain(
+-      "speakers.map((sp) => sp.name).join(' & ')"
+-    );
+-    expect(src).not.toContain(
+-      "assertRealArchiveTextAllowed(speakerNameJoined"
+-    );
+-    expect(src).toContain("speakerName: speakerNameJoined");
+-  });
+-
+-  it("2025 desired title/speakerName/speakerTitle are provenance-dominated before session.update (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const updateAt = src.indexOf("prisma.session.update");
+-    expect(updateAt).toBeGreaterThan(-1);
+-
+-    const titleAt = src.indexOf("title: assertRealArchiveTextAllowed(s.title");
+-    expect(titleAt).toBeGreaterThan(-1);
+-    expect(titleAt).toBeLessThan(updateAt);
+-
+-    const speakerNameAt = src.indexOf(
+-      "speakerName: assertRealArchiveTextAllowed(primary?.name"
+-    );
+-    expect(speakerNameAt).toBeGreaterThan(-1);
+-    expect(speakerNameAt).toBeLessThan(updateAt);
+-
+-    const speakerTitleAt = src.indexOf(
+-      "speakerTitle: assertRealArchiveTextAllowed(primary?.title"
+-    );
+-    expect(speakerTitleAt).toBeGreaterThan(-1);
+-    expect(speakerTitleAt).toBeLessThan(updateAt);
+-
+-    // Primary-only speakerName — a join would change published identity
+-    // on the five multi-speaker 2025 sessions.
+-    expect(src).not.toContain("speakerNameJoined");
+-  });
+-
+-  it("2025 per-speaker name and title are provenance-dominated before createMany (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const createManyAt = src.indexOf("sessionSpeaker.createMany");
+-    expect(createManyAt).toBeGreaterThan(-1);
+-
+-    const nameAt = src.indexOf("name: assertRealArchiveTextAllowed(sp.name");
+-    expect(nameAt).toBeGreaterThan(-1);
+-    expect(nameAt).toBeLessThan(createManyAt);
+-
+-    const titleAt = src.indexOf("title: assertRealArchiveTextAllowed(sp.title");
+-    expect(titleAt).toBeGreaterThan(-1);
+-    expect(titleAt).toBeLessThan(createManyAt);
+-  });
+-
+-  it("2025 per-speaker asserts run before dry-run continue and deleteMany (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const needles = [
+-      "name: assertRealArchiveTextAllowed(sp.name",
+-      "title: assertRealArchiveTextAllowed(sp.title",
+-      "company: assertRealArchiveCompanyAllowed(sp.company",
+-      "bio: assertRealArchiveTextAllowed(sp.bio",
+-    ];
+-    const deleteManyAt = src.indexOf("sessionSpeaker.deleteMany(");
+-    const dryRunAt = src.indexOf(
+-      "[dry-run] would ${existing ? 'update' : 'create'}"
+-    );
+-    const updateAt = src.indexOf("prisma.session.update");
+-    const createAt = src.indexOf("prisma.session.create");
+-    expect(deleteManyAt).toBeGreaterThan(-1);
+-    expect(dryRunAt).toBeGreaterThan(-1);
+-    expect(updateAt).toBeGreaterThan(-1);
+-    expect(createAt).toBeGreaterThan(-1);
+-    // Program-loop remainder only: importSponsors below uses
+-    // assertRealArchiveCompanyAllowed(sp.name, which must not
+-    // make this negative assertion vacuously red.
+-    const afterDeleteMany = src.slice(
+-      deleteManyAt,
+-      src.indexOf("async function importSponsors")
+-    );
+-
+-    for (const n of needles) {
+-      const needleIndex = src.indexOf(n);
+-      expect(needleIndex).toBeGreaterThan(-1);
+-      expect(src.indexOf(n)).toBe(src.lastIndexOf(n));
+-      expect(needleIndex).toBeLessThan(deleteManyAt);
+-      expect(needleIndex).toBeLessThan(dryRunAt);
+-      expect(needleIndex).toBeLessThan(updateAt);
+-      expect(needleIndex).toBeLessThan(createAt);
+-    }
+-
+-    expect(afterDeleteMany).not.toContain("assertRealArchiveTextAllowed(sp.");
+-    expect(afterDeleteMany).not.toContain(
+-      "assertRealArchiveCompanyAllowed(sp."
+-    );
+-
+-    for (const raw of [
+-      "name: sp.name",
+-      "title: sp.title",
+-      "company: sp.company",
+-      "bio: sp.bio",
+-    ]) {
+-      expect(src).not.toContain(raw);
+-    }
+-  });
+-
+-  it("2025 sponsor companyName is provenance-asserted before findFirst (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const sponsorAssertAt = src.indexOf(
+-      "const companyName = assertRealArchiveCompanyAllowed("
+-    );
+-    const findFirstAt = src.indexOf("prisma.sponsor.findFirst");
+-    expect(sponsorAssertAt).toBeGreaterThan(-1);
+-    expect(findFirstAt).toBeGreaterThan(-1);
+-    expect(sponsorAssertAt).toBeLessThan(findFirstAt);
+-    expect(src).toContain("where: { companyName }");
+-    expect(src).not.toContain("where: { companyName: sp.name }");
+-  });
+-
+-  it("2025 sponsor roster is provenance-asserted before the demo-unlink deletion (#1475)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const deleteAt = src.indexOf("prisma.eventSponsor.delete");
+-    const companyAt = src.indexOf(
+-      "const companyName = assertRealArchiveCompanyAllowed("
+-    );
+-    const requiredAt = src.indexOf("assertRequiredArchiveValue(companyName");
+-
+-    expect(deleteAt).toBeGreaterThan(-1);
+-    expect(companyAt).toBeGreaterThan(-1);
+-    expect(requiredAt).toBeGreaterThan(-1);
+-    expect(src.indexOf("prisma.eventSponsor.delete")).toBe(
+-      src.lastIndexOf("prisma.eventSponsor.delete")
+-    );
+-    expect(
+-      src.indexOf("const companyName = assertRealArchiveCompanyAllowed(")
+-    ).toBe(
+-      src.lastIndexOf("const companyName = assertRealArchiveCompanyAllowed(")
+-    );
+-    expect(src.indexOf("assertRequiredArchiveValue(companyName")).toBe(
+-      src.lastIndexOf("assertRequiredArchiveValue(companyName")
+-    );
+-
+-    expect(companyAt).toBeLessThan(deleteAt);
+-    expect(requiredAt).toBeLessThan(deleteAt);
+-  });
+-
+-  it("2025 required-column helper runs on the common path before the session and sponsor writes (#1475)", () => {
+-    // Pins validation ahead of the session/sponsor writes and the dry-run exit.
+-    // Whole-set pre-pass (#1509) additionally validates every session before
+-    // ensureRoom/ensureTrack; these needles still pin the per-record asserts
+-    // ahead of the session writes themselves.
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const nameNeedle = "assertRequiredArchiveValue(row.name";
+-    const titleNeedle = "assertRequiredArchiveValue(desired.title";
+-    const companyNeedle = "assertRequiredArchiveValue(companyName";
+-    const deleteManyAt = src.indexOf("sessionSpeaker.deleteMany(");
+-    const dryRunAt = src.indexOf(
+-      "[dry-run] would ${existing ? 'update' : 'create'}"
+-    );
+-    const updateAt = src.indexOf("prisma.session.update");
+-    const createAt = src.indexOf("prisma.session.create");
+-    const findFirstAt = src.indexOf("prisma.sponsor.findFirst");
+-    const sponsorDryRunAt = src.indexOf(
+-      '[dry-run] would create sponsor "${companyName}"'
+-    );
+-
+-    expect(deleteManyAt).toBeGreaterThan(-1);
+-    expect(dryRunAt).toBeGreaterThan(-1);
+-    expect(updateAt).toBeGreaterThan(-1);
+-    expect(createAt).toBeGreaterThan(-1);
+-    expect(findFirstAt).toBeGreaterThan(-1);
+-    expect(sponsorDryRunAt).toBeGreaterThan(-1);
+-
+-    const nameAt = src.indexOf(nameNeedle);
+-    const titleAt = src.indexOf(titleNeedle);
+-    const companyAt = src.indexOf(companyNeedle);
+-    expect(nameAt).toBeGreaterThan(-1);
+-    expect(titleAt).toBeGreaterThan(-1);
+-    expect(companyAt).toBeGreaterThan(-1);
+-    expect(src.indexOf(nameNeedle)).toBe(src.lastIndexOf(nameNeedle));
+-    expect(src.indexOf(titleNeedle)).toBe(src.lastIndexOf(titleNeedle));
+-    expect(src.indexOf(companyNeedle)).toBe(src.lastIndexOf(companyNeedle));
+-
+-    expect(nameAt).toBeLessThan(deleteManyAt);
+-    expect(nameAt).toBeLessThan(dryRunAt);
+-    expect(nameAt).toBeLessThan(updateAt);
+-    expect(nameAt).toBeLessThan(createAt);
+-
+-    expect(titleAt).toBeLessThan(deleteManyAt);
+-    expect(titleAt).toBeLessThan(dryRunAt);
+-    expect(titleAt).toBeLessThan(updateAt);
+-    expect(titleAt).toBeLessThan(createAt);
+-
+-    expect(companyAt).toBeLessThan(findFirstAt);
+-    expect(companyAt).toBeLessThan(sponsorDryRunAt);
+-  });
+-
+-  it("2026 required-column helper runs on the common path before the session write (#1475)", () => {
+-    // Pins validation ahead of the session/sponsor writes and the dry-run exit.
+-    // Whole-set pre-pass (#1509) additionally validates every session before
+-    // Track create; these needles still pin the per-record asserts ahead of
+-    // the session writes themselves.
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    const nameNeedle = "assertRequiredArchiveValue(row.name";
+-    const titleNeedle = "assertRequiredArchiveValue(desired.title";
+-    const deleteManyAt = src.indexOf("sessionSpeaker.deleteMany(");
+-    const createBranchAt = src.indexOf("if (!existing)");
+-    const updateAt = src.indexOf("prisma.session.update");
+-    const createAt = src.indexOf("prisma.session.create");
+-
+-    expect(deleteManyAt).toBeGreaterThan(-1);
+-    expect(createBranchAt).toBeGreaterThan(-1);
+-    expect(updateAt).toBeGreaterThan(-1);
+-    expect(createAt).toBeGreaterThan(-1);
+-
+-    const nameAt = src.indexOf(nameNeedle);
+-    const titleAt = src.indexOf(titleNeedle);
+-    expect(nameAt).toBeGreaterThan(-1);
+-    expect(titleAt).toBeGreaterThan(-1);
+-    expect(src.indexOf(nameNeedle)).toBe(src.lastIndexOf(nameNeedle));
+-    expect(src.indexOf(titleNeedle)).toBe(src.lastIndexOf(titleNeedle));
+-    expect(src.indexOf("if (!existing)")).toBe(
+-      src.lastIndexOf("if (!existing)")
+-    );
+-
+-    expect(nameAt).toBeLessThan(deleteManyAt);
+-    expect(nameAt).toBeLessThan(createBranchAt);
+-    expect(nameAt).toBeLessThan(updateAt);
+-    expect(nameAt).toBeLessThan(createAt);
+-
+-    expect(titleAt).toBeLessThan(deleteManyAt);
+-    expect(titleAt).toBeLessThan(createBranchAt);
+-    expect(titleAt).toBeLessThan(updateAt);
+-    expect(titleAt).toBeLessThan(createAt);
+-  });
+-});
+-
+ describe("real-content source files are revalidated on every lookup (#1469)", () => {
+   const listedRel = "prisma/seed-data/speakers-2026.json";
+   const options = { sourcePath: listedRel, label: "cache revalidation" };
+@@ -1729,7 +1421,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+   it("refuses when a previously-read source file is later mutated", async () => {
+     for (const [label, assertFn] of await bothAsserts()) {
+       expect(
+-        () => assertFn("Mistral AI", options),
++        () => assertFn("Northstar Cognition Labs", options),
+         `${label} first read`
+       ).not.toThrow();
+       const spy = interceptListedRead((original) => {
+@@ -1742,7 +1434,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+       });
+       try {
+         expect(
+-          () => assertFn("Mistral AI", options),
++          () => assertFn("Northstar Cognition Labs", options),
+           `${label} mutated file`
+         ).toThrow(/does not occur/);
+       } finally {
+@@ -1754,7 +1446,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+   it("refuses when a previously-read source file is later missing", async () => {
+     for (const [label, assertFn] of await bothAsserts()) {
+       expect(
+-        () => assertFn("Mistral AI", options),
++        () => assertFn("Northstar Cognition Labs", options),
+         `${label} first read`
+       ).not.toThrow();
+       const spy = interceptListedRead((original) => {
+@@ -1771,7 +1463,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+       });
+       try {
+         expect(
+-          () => assertFn("Mistral AI", options),
++          () => assertFn("Northstar Cognition Labs", options),
+           `${label} missing file`
+         ).toThrow(/missing or unreadable/);
+       } finally {
+@@ -1783,7 +1475,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+   it("refuses when a previously-read source file is later unreadable", async () => {
+     for (const [label, assertFn] of await bothAsserts()) {
+       expect(
+-        () => assertFn("Mistral AI", options),
++        () => assertFn("Northstar Cognition Labs", options),
+         `${label} first read`
+       ).not.toThrow();
+       const spy = interceptListedRead((original) => {
+@@ -1800,7 +1492,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+       });
+       try {
+         expect(
+-          () => assertFn("Mistral AI", options),
++          () => assertFn("Northstar Cognition Labs", options),
+           `${label} unreadable file`
+         ).toThrow(/missing or unreadable/);
+       } finally {
+@@ -1812,7 +1504,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+   it("refuses when a previously-read source file is later truncated to invalid JSON", async () => {
+     for (const [label, assertFn] of await bothAsserts()) {
+       expect(
+-        () => assertFn("Mistral AI", options),
++        () => assertFn("Northstar Cognition Labs", options),
+         `${label} first read`
+       ).not.toThrow();
+       const spy = interceptListedRead((original) => {
+@@ -1825,7 +1517,7 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+       });
+       try {
+         expect(
+-          () => assertFn("Mistral AI", options),
++          () => assertFn("Northstar Cognition Labs", options),
+           `${label} truncated file`
+         ).toThrow(/not valid JSON/);
+       } finally {
+@@ -1834,898 +1526,3 @@ describe("real-content source files are revalidated on every lookup (#1469)", ()
+     }
+   });
+ });
+-
+-type ImporterCall = { model: string; method: string };
+-
+-function mutatingImporterCalls(calls: ImporterCall[]): ImporterCall[] {
+-  return calls.filter(
+-    (c) =>
+-      (c.model === "session" &&
+-        (c.method === "update" || c.method === "create")) ||
+-      (c.model === "sessionSpeaker" &&
+-        (c.method === "deleteMany" || c.method === "createMany"))
+-  );
+-}
+-
+-/**
+- * Shared fake client for the #1508 behavioural importer tests.
+- * Records `{ model, method }` in call order. Not recordingSeedClient().
+- */
+-function recordingImporterClient(options?: {
+-  existingSession?: Record<string, unknown> | null;
+-}): {
+-  calls: ImporterCall[];
+-  client: {
+-    session: {
+-      findUnique: (args?: unknown) => Promise<Record<string, unknown> | null>;
+-      update: (args: { where: { id: string } }) => Promise<{ id: string }>;
+-      create: (args?: unknown) => Promise<{ id: string }>;
+-    };
+-    sessionSpeaker: {
+-      deleteMany: (args?: unknown) => Promise<{ count: number }>;
+-      createMany: (args?: unknown) => Promise<{ count: number }>;
+-    };
+-  };
+-} {
+-  const calls: ImporterCall[] = [];
+-  const existing: Record<string, unknown> | null =
+-    options && "existingSession" in options
+-      ? (options.existingSession ?? null)
+-      : {
+-          id: "sess_existing",
+-          eventId: "evt_1",
+-          title: "existing-title",
+-          description: null,
+-          trackId: null,
+-          speakerName: "old-name",
+-          speakerTitle: "old-title",
+-          speakerCompany: "old-company",
+-          speakerBio: "old-bio",
+-          speakerPhoto: null,
+-          speakerLinkedin: null,
+-          startTime: new Date("2026-03-23T16:00:00.000Z"),
+-          endTime: new Date("2026-03-23T17:00:00.000Z"),
+-          sessionType: "TALK",
+-          tags: [],
+-          slideCount: 0,
+-          slidesBaseUrl: null,
+-          slidesUrl: null,
+-          recordingUrl: null,
+-          isPublished: true,
+-          speakers: [],
+-        };
+-  return {
+-    calls,
+-    client: {
+-      session: {
+-        findUnique: async () => {
+-          calls.push({ model: "session", method: "findUnique" });
+-          return existing;
+-        },
+-        update: async (args) => {
+-          calls.push({ model: "session", method: "update" });
+-          return { id: args.where.id };
+-        },
+-        create: async () => {
+-          calls.push({ model: "session", method: "create" });
+-          return { id: "sess_created" };
+-        },
+-      },
+-      sessionSpeaker: {
+-        deleteMany: async () => {
+-          calls.push({ model: "sessionSpeaker", method: "deleteMany" });
+-          return { count: 0 };
+-        },
+-        createMany: async () => {
+-          calls.push({ model: "sessionSpeaker", method: "createMany" });
+-          return { count: 0 };
+-        },
+-      },
+-    },
+-  };
+-}
+-
+-function ata2025Session(slug: string) {
+-  const data = JSON.parse(
+-    readRepoFile("prisma", "seed-data", "ata-2025-import.json")
+-  ) as { sessions: Array<{ slug: string; speakers: unknown[] }> };
+-  const session = data.sessions.find((s) => s.slug === slug);
+-  if (!session) throw new Error(`ata-2025 session not found: ${slug}`);
+-  return session;
+-}
+-
+-function ata2026Session(slug: string) {
+-  const data = JSON.parse(
+-    readRepoFile("prisma", "seed-data", "sessions-2026.json")
+-  ) as Array<{ slug: string; speakers: unknown[] }>;
+-  const session = data.find((s) => s.slug === slug);
+-  if (!session) throw new Error(`ata-2026 session not found: ${slug}`);
+-  return session;
+-}
+-
+-describe("ATA importer guard-ordering is behavioural (#1508)", () => {
+-  const refusedSpeakerName = "Not An Archive Speaker";
+-
+-  afterEach(() => {
+-    prismaClientMocks.createPrismaClient.mockClear();
+-    process.exitCode = undefined;
+-  });
+-
+-  it("importing import-ata-2025.mjs does not construct a Prisma client and does not run main (#1508)", async () => {
+-    const logs: string[] = [];
+-    const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
+-      logs.push(args.map(String).join(" "));
+-    });
+-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+-    prismaClientMocks.createPrismaClient.mockClear();
+-    try {
+-      const href = pathToFileURL(
+-        path.join(ROOT, "scripts", "import-ata-2025.mjs")
+-      ).href;
+-      await import(`${href}?side-effect=${Date.now()}`);
+-      expect(prismaClientMocks.createPrismaClient).not.toHaveBeenCalled();
+-      expect(
+-        logs.some((line) => line.includes("Importing into")),
+-        "main() logged its CLI banner on import"
+-      ).toBe(false);
+-      expect(errSpy).not.toHaveBeenCalled();
+-    } finally {
+-      logSpy.mockRestore();
+-      errSpy.mockRestore();
+-    }
+-  });
+-
+-  it("importing import-ata-2026-sessions.mjs does not construct a Prisma client and does not run main (#1508)", async () => {
+-    const logs: string[] = [];
+-    const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
+-      logs.push(args.map(String).join(" "));
+-    });
+-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+-    prismaClientMocks.createPrismaClient.mockClear();
+-    try {
+-      const href = pathToFileURL(
+-        path.join(ROOT, "scripts", "import-ata-2026-sessions.mjs")
+-      ).href;
+-      await import(`${href}?side-effect=${Date.now()}`);
+-      expect(prismaClientMocks.createPrismaClient).not.toHaveBeenCalled();
+-      expect(
+-        logs.some((line) => line.includes("Importing All Things AI 2026")),
+-        "main() logged its CLI banner on import"
+-      ).toBe(false);
+-      expect(errSpy).not.toHaveBeenCalled();
+-    } finally {
+-      logSpy.mockRestore();
+-      errSpy.mockRestore();
+-    }
+-  });
+-
+-  it(
+-    "symlinked-parent invocation of import-ata-2025.mjs evaluates the entry-point guard true and runs createPrismaClient (#1508)",
+-    (ctx) => {
+-      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ata-symlink-"));
+-      try {
+-        try {
+-          fs.symlinkSync(fs.realpathSync(ROOT), path.join(tmp, "repo"));
+-        } catch (err) {
+-          const code = (err as NodeJS.ErrnoException).code;
+-          if (code === "EPERM" || code === "EACCES") {
+-            ctx.skip();
+-            return;
+-          }
+-          throw err;
+-        }
+-        // Spawn the unresolved symlink path. Realpathing this before spawn
+-        // would hide the defect this test exists to catch.
+-        const scriptPath = path.join(
+-          tmp,
+-          "repo",
+-          "scripts",
+-          "import-ata-2025.mjs"
+-        );
+-        expect(fs.existsSync(scriptPath)).toBe(true);
+-        const env = { ...process.env };
+-        delete env.DATABASE_URL;
+-        const res = spawnSync(process.execPath, [scriptPath, "--dry-run"], {
+-          encoding: "utf8",
+-          timeout: 60_000,
+-          env,
+-        });
+-        expect(res.error).toBeUndefined();
+-        expect(res.status).toBe(1);
+-        expect(res.stderr).toContain("DATABASE_URL is not set");
+-        expect(res.stderr).not.toContain("❌ Import failed:");
+-      } finally {
+-        fs.rmSync(tmp, { recursive: true, force: true });
+-      }
+-    },
+-    60_000
+-  );
+-
+-  it(
+-    "symlinked-parent invocation of import-ata-2026-sessions.mjs evaluates the entry-point guard true and runs createPrismaClient (#1508)",
+-    (ctx) => {
+-      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ata-symlink-"));
+-      try {
+-        try {
+-          fs.symlinkSync(fs.realpathSync(ROOT), path.join(tmp, "repo"));
+-        } catch (err) {
+-          const code = (err as NodeJS.ErrnoException).code;
+-          if (code === "EPERM" || code === "EACCES") {
+-            ctx.skip();
+-            return;
+-          }
+-          throw err;
+-        }
+-        const scriptPath = path.join(
+-          tmp,
+-          "repo",
+-          "scripts",
+-          "import-ata-2026-sessions.mjs"
+-        );
+-        expect(fs.existsSync(scriptPath)).toBe(true);
+-        const env = { ...process.env };
+-        delete env.DATABASE_URL;
+-        const res = spawnSync(process.execPath, [scriptPath, "--dry-run"], {
+-          encoding: "utf8",
+-          timeout: 60_000,
+-          env,
+-        });
+-        expect(res.error).toBeUndefined();
+-        expect(res.status).toBe(1);
+-        expect(res.stderr).toContain("DATABASE_URL is not set");
+-        expect(res.stderr).not.toContain("❌ Import failed:");
+-      } finally {
+-        fs.rmSync(tmp, { recursive: true, force: true });
+-      }
+-    },
+-    60_000
+-  );
+-
+-  it(
+-    "import-ata-2025.mjs can be imported when argv[1] does not exist on disk (#1508)",
+-    () => {
+-      // Node v22 `node -e` leaves process.argv as [execPath] only — argv[1]
+-      // is undefined, so the helper's `if (!argv1) return false` path runs
+-      // and the ENOENT catch is never reached. Assign a missing path so
+-      // this test actually exercises the fallback (and can go red if that
+-      // catch rethrows).
+-      const missingArgv1 = path.join(
+-        os.tmpdir(),
+-        "ata-enoent-missing-argv1.mjs"
+-      );
+-      expect(fs.existsSync(missingArgv1)).toBe(false);
+-      const href = pathToFileURL(
+-        path.join(ROOT, "scripts", "import-ata-2025.mjs")
+-      ).href;
+-      const env = { ...process.env };
+-      delete env.DATABASE_URL;
+-      const res = spawnSync(
+-        process.execPath,
+-        [
+-          "-e",
+-          `process.argv[1]=${JSON.stringify(missingArgv1)}; import(${JSON.stringify(href)}).then(()=>console.log('IMPORT_OK'))`,
+-        ],
+-        { encoding: "utf8", timeout: 60_000, env }
+-      );
+-      expect(res.error).toBeUndefined();
+-      expect(res.status).toBe(0);
+-      expect(res.stdout).toContain("IMPORT_OK");
+-    },
+-    60_000
+-  );
+-
+-  it(
+-    "import-ata-2026-sessions.mjs can be imported when argv[1] does not exist on disk (#1508)",
+-    () => {
+-      const missingArgv1 = path.join(
+-        os.tmpdir(),
+-        "ata-enoent-missing-argv1.mjs"
+-      );
+-      expect(fs.existsSync(missingArgv1)).toBe(false);
+-      const href = pathToFileURL(
+-        path.join(ROOT, "scripts", "import-ata-2026-sessions.mjs")
+-      ).href;
+-      const env = { ...process.env };
+-      delete env.DATABASE_URL;
+-      const res = spawnSync(
+-        process.execPath,
+-        [
+-          "-e",
+-          `process.argv[1]=${JSON.stringify(missingArgv1)}; import(${JSON.stringify(href)}).then(()=>console.log('IMPORT_OK'))`,
+-        ],
+-        { encoding: "utf8", timeout: 60_000, env }
+-      );
+-      expect(res.error).toBeUndefined();
+-      expect(res.status).toBe(0);
+-      expect(res.stdout).toContain("IMPORT_OK");
+-    },
+-    60_000
+-  );
+-
+-  it("2025 importSessionRecord happy path records session write then deleteMany then createMany (#1508)", async () => {
+-    const { importSessionRecord } = await import(
+-      "../../scripts/import-ata-2025.mjs"
+-    );
+-    const session = ata2025Session("desktop-productivity");
+-    expect(session.speakers.length).toBeGreaterThan(0);
+-    const event = { id: "evt_2025" };
+-    const { calls, client } = recordingImporterClient({
+-      existingSession: {
+-        id: "sess_2025",
+-        eventId: event.id,
+-        speakers: [],
+-        startTime: new Date("2025-03-17T13:00:00.000Z"),
+-        endTime: new Date("2025-03-17T20:30:00.000Z"),
+-      },
+-    });
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await importSessionRecord({
+-        prisma: client,
+-        session,
+-        event,
+-        isDryRun: false,
+-        trackIds: { Workshop: "trk_workshop" },
+-        roomIds: { "Fletcher Hall": "room_fletcher" },
+-        stats: { created: 0, updated: 0 },
+-      });
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    expect(
+-      calls.some(
+-        (c) => c.model === "sessionSpeaker" && c.method === "deleteMany"
+-      ),
+-      "happy path must record deleteMany or the rejection assertion is vacuous"
+-    ).toBe(true);
+-    expect(mutatingImporterCalls(calls)).toEqual([
+-      { model: "session", method: "update" },
+-      { model: "sessionSpeaker", method: "deleteMany" },
+-      { model: "sessionSpeaker", method: "createMany" },
+-    ]);
+-  });
+-
+-  it("2025 importSessionRecord provenance rejection on a delayed speaker name makes no mutating call (#1508)", async () => {
+-    const { importSessionRecord } = await import(
+-      "../../scripts/import-ata-2025.mjs"
+-    );
+-    const base = ata2025Session("desktop-productivity");
+-    expect(base.speakers.length).toBeGreaterThan(1);
+-    const session = {
+-      ...base,
+-      speakers: [
+-        base.speakers[0],
+-        {
+-          ...(base.speakers[1] as object),
+-          name: refusedSpeakerName,
+-        },
+-      ],
+-    };
+-    const event = { id: "evt_2025" };
+-    const { calls, client } = recordingImporterClient({
+-      existingSession: {
+-        id: "sess_2025",
+-        eventId: event.id,
+-        speakers: [],
+-        startTime: new Date("2025-03-17T13:00:00.000Z"),
+-        endTime: new Date("2025-03-17T20:30:00.000Z"),
+-      },
+-    });
+-    await expect(
+-      importSessionRecord({
+-        prisma: client,
+-        session,
+-        event,
+-        isDryRun: false,
+-        trackIds: { Workshop: "trk_workshop" },
+-        roomIds: { "Fletcher Hall": "room_fletcher" },
+-        stats: { created: 0, updated: 0 },
+-      })
+-    ).rejects.toThrow(/does not occur/);
+-    expect(mutatingImporterCalls(calls)).toEqual([]);
+-  });
+-
+-  it("2026 importSessionRecord happy path on existing session with speakersChanged records deleteMany (#1508)", async () => {
+-    const { importSessionRecord } = await import(
+-      "../../scripts/import-ata-2026-sessions.mjs"
+-    );
+-    const session = ata2026Session("building-agents-with-granite");
+-    expect(session.speakers.length).toBeGreaterThan(0);
+-    const event = { id: "evt_2026" };
+-    const { calls, client } = recordingImporterClient({
+-      existingSession: {
+-        id: "sess_2026",
+-        eventId: event.id,
+-        title: "stale-title",
+-        description: null,
+-        trackId: "trk_workshop",
+-        speakerName: "stale",
+-        speakerTitle: "stale",
+-        speakerCompany: "stale",
+-        speakerBio: "stale",
+-        speakerPhoto: null,
+-        speakerLinkedin: null,
+-        startTime: new Date("2026-03-23T16:00:00.000Z"),
+-        endTime: new Date("2026-03-23T17:00:00.000Z"),
+-        sessionType: "WORKSHOP",
+-        tags: [],
+-        slideCount: 0,
+-        slidesBaseUrl: null,
+-        slidesUrl: null,
+-        recordingUrl: null,
+-        isPublished: true,
+-        speakers: [],
+-      },
+-    });
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await importSessionRecord({
+-        prisma: client,
+-        session,
+-        event,
+-        isDryRun: false,
+-        trackIdByName: { Workshop: "trk_workshop" },
+-        stats: { created: 0, updated: 0, unchanged: 0 },
+-      });
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    expect(
+-      calls.some(
+-        (c) => c.model === "sessionSpeaker" && c.method === "deleteMany"
+-      ),
+-      "happy path must record deleteMany or the rejection assertion is vacuous"
+-    ).toBe(true);
+-    expect(mutatingImporterCalls(calls)).toEqual([
+-      { model: "session", method: "update" },
+-      { model: "sessionSpeaker", method: "deleteMany" },
+-      { model: "sessionSpeaker", method: "createMany" },
+-    ]);
+-  });
+-
+-  it("2026 importSessionRecord provenance rejection on a delayed speaker name makes no mutating call (#1508)", async () => {
+-    const { importSessionRecord } = await import(
+-      "../../scripts/import-ata-2026-sessions.mjs"
+-    );
+-    const base = ata2026Session("building-agents-with-granite");
+-    const session = {
+-      ...base,
+-      speakers: [
+-        base.speakers[0],
+-        { name: refusedSpeakerName },
+-      ],
+-    };
+-    const event = { id: "evt_2026" };
+-    const { calls, client } = recordingImporterClient({
+-      existingSession: {
+-        id: "sess_2026",
+-        eventId: event.id,
+-        title: "stale-title",
+-        description: null,
+-        trackId: "trk_workshop",
+-        speakerName: "stale",
+-        speakerTitle: "stale",
+-        speakerCompany: "stale",
+-        speakerBio: "stale",
+-        speakerPhoto: null,
+-        speakerLinkedin: null,
+-        startTime: new Date("2026-03-23T16:00:00.000Z"),
+-        endTime: new Date("2026-03-23T17:00:00.000Z"),
+-        sessionType: "WORKSHOP",
+-        tags: [],
+-        slideCount: 0,
+-        slidesBaseUrl: null,
+-        slidesUrl: null,
+-        recordingUrl: null,
+-        isPublished: true,
+-        speakers: [],
+-      },
+-    });
+-    await expect(
+-      importSessionRecord({
+-        prisma: client,
+-        session,
+-        event,
+-        isDryRun: false,
+-        trackIdByName: { Workshop: "trk_workshop" },
+-        stats: { created: 0, updated: 0, unchanged: 0 },
+-      })
+-    ).rejects.toThrow(/does not occur/);
+-    expect(mutatingImporterCalls(calls)).toEqual([]);
+-  });
+-
+-  it("2025 main loop calls importSessionRecord and deleteMany occurs once (#1508)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    expect(src).toContain("export async function importSessionRecord({");
+-    expect(src).toContain("await importSessionRecord({");
+-    expect(src).toContain("await importProgram(source)");
+-    const deleteManyAt = src.indexOf("sessionSpeaker.deleteMany(");
+-    expect(deleteManyAt).toBeGreaterThan(-1);
+-    expect(src.indexOf("sessionSpeaker.deleteMany(")).toBe(
+-      src.lastIndexOf("sessionSpeaker.deleteMany(")
+-    );
+-    expect(src.indexOf("export async function importSessionRecord")).toBeLessThan(
+-      deleteManyAt
+-    );
+-    expect(src.indexOf("await importSessionRecord({")).toBeGreaterThan(
+-      src.indexOf("export async function importSessionRecord")
+-    );
+-  });
+-
+-  it("2026 main loop calls importSessionRecord and deleteMany occurs once (#1508)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    expect(src).toContain("export async function importSessionRecord({");
+-    expect(src).toContain("await importSessionRecord({");
+-    expect(src).toContain("for (const sx of sourceSessions)");
+-    const deleteManyAt = src.indexOf("sessionSpeaker.deleteMany(");
+-    expect(deleteManyAt).toBeGreaterThan(-1);
+-    expect(src.indexOf("sessionSpeaker.deleteMany(")).toBe(
+-      src.lastIndexOf("sessionSpeaker.deleteMany(")
+-    );
+-    expect(src.indexOf("export async function importSessionRecord")).toBeLessThan(
+-      deleteManyAt
+-    );
+-    const loopAt = src.indexOf("for (const sx of sourceSessions)");
+-    expect(loopAt).toBeGreaterThan(-1);
+-    expect(src.indexOf("await importSessionRecord({")).toBeGreaterThan(loopAt);
+-  });
+-});
+-
+-type LookupImporterCall = { model: string; method: string };
+-
+-function persistedLookupCalls(calls: LookupImporterCall[]): LookupImporterCall[] {
+-  return calls.filter((c) =>
+-    ["create", "update", "createMany", "delete", "deleteMany"].includes(c.method)
+-  );
+-}
+-
+-/**
+- * Recording client covering Room/Track/Tier/Session writes so a #1509
+- * refusal can be shown to persist ZERO lookup rows.
+- */
+-function recordingLookupImporterClient(): {
+-  calls: LookupImporterCall[];
+-  client: Record<string, Record<string, (args?: unknown) => Promise<unknown>>>;
+-} {
+-  const calls: LookupImporterCall[] = [];
+-  const method = (model: string, name: string, result: unknown) => {
+-    return async () => {
+-      calls.push({ model, method: name });
+-      return result;
+-    };
+-  };
+-  return {
+-    calls,
+-    client: {
+-      event: {
+-        findUnique: method("event", "findUnique", null),
+-      },
+-      room: {
+-        findFirst: method("room", "findFirst", null),
+-        create: method("room", "create", { id: "room_created" }),
+-      },
+-      track: {
+-        findFirst: method("track", "findFirst", null),
+-        create: method("track", "create", { id: "track_created" }),
+-      },
+-      sponsorTier: {
+-        findFirst: method("sponsorTier", "findFirst", null),
+-        create: method("sponsorTier", "create", { id: "tier_created" }),
+-      },
+-      session: {
+-        findUnique: method("session", "findUnique", null),
+-        create: method("session", "create", { id: "sess_created" }),
+-        update: method("session", "update", { id: "sess_updated" }),
+-        count: method("session", "count", 0),
+-      },
+-      sessionSpeaker: {
+-        deleteMany: method("sessionSpeaker", "deleteMany", { count: 0 }),
+-        createMany: method("sessionSpeaker", "createMany", { count: 0 }),
+-      },
+-    },
+-  };
+-}
+-
+-describe("ATA importer whole-set validate before lookup-row create (#1509)", () => {
+-  const refusedSpeakerName = "Not An Archive Speaker";
+-  const event2025 = {
+-    id: "evt_2025",
+-    name: "All Things Open AI 2025",
+-    slug: "all-things-open-ai-2025",
+-    status: "COMPLETED",
+-    venueId: "venue_carolina",
+-  };
+-  const event2026 = {
+-    id: "evt_2026",
+-    name: "All Things AI 2026",
+-    slug: "all-things-ai-2026",
+-    status: "COMPLETED",
+-  };
+-
+-  afterEach(() => {
+-    prismaClientMocks.createPrismaClient.mockClear();
+-    process.exitCode = undefined;
+-  });
+-
+-  it("2025 importProgram source validates the whole session set before ensureRoom/ensureTrack (#1509)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2025.mjs");
+-    const prePassAt = src.indexOf("validateSessionRecord(s)");
+-    const roomAt = src.indexOf("await ensureRoom(");
+-    const trackAt = src.indexOf("await ensureTrack(");
+-    expect(prePassAt).toBeGreaterThan(-1);
+-    expect(roomAt).toBeGreaterThan(-1);
+-    expect(trackAt).toBeGreaterThan(-1);
+-    expect(prePassAt).toBeLessThan(roomAt);
+-    expect(prePassAt).toBeLessThan(trackAt);
+-    expect(src).toContain("for (const s of source.sessions) {\n    validateSessionRecord(s);");
+-  });
+-
+-  it("2026 importProgram source validates the whole session set before Track create (#1509)", () => {
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    const prePassAt = src.indexOf("validateSessionRecord(sx)");
+-    const trackCreateAt = src.indexOf("db.track.create");
+-    expect(prePassAt).toBeGreaterThan(-1);
+-    expect(trackCreateAt).toBeGreaterThan(-1);
+-    expect(prePassAt).toBeLessThan(trackCreateAt);
+-    expect(src).toContain(
+-      "for (const sx of sourceSessions) {\n    validateSessionRecord(sx);"
+-    );
+-  });
+-
+-  it("2025 importProgram valid set creates lookup rows after the pre-pass (#1509 non-vacuous)", async () => {
+-    const { importProgram } = await import(
+-      "../../scripts/import-ata-2025.mjs"
+-    );
+-    const valid = ata2025Session("desktop-productivity");
+-    const { calls, client } = recordingLookupImporterClient();
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await importProgram(
+-        { sessions: [valid] },
+-        { prisma: client, event: event2025, isDryRun: false }
+-      );
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    const persisted = persistedLookupCalls(calls);
+-    expect(
+-      persisted.some((c) => c.model === "room" && c.method === "create"),
+-      "valid set must create a Room or the refusal test is vacuous"
+-    ).toBe(true);
+-    expect(
+-      persisted.some((c) => c.model === "track" && c.method === "create"),
+-      "valid set must create a Track or the refusal test is vacuous"
+-    ).toBe(true);
+-  });
+-
+-  it("2026 importProgram valid set creates a Track after the pre-pass (#1509 non-vacuous)", async () => {
+-    const { importProgram } = await import(
+-      "../../scripts/import-ata-2026-sessions.mjs"
+-    );
+-    const valid = ata2026Session("building-agents-with-granite");
+-    const { calls, client } = recordingLookupImporterClient();
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await importProgram([valid], {
+-        prisma: client,
+-        event: event2026,
+-        isDryRun: false,
+-      });
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    const persisted = persistedLookupCalls(calls);
+-    expect(
+-      persisted.some((c) => c.model === "track" && c.method === "create"),
+-      "valid set must create a Track or the refusal test is vacuous"
+-    ).toBe(true);
+-  });
+-
+-  it("2025 importProgram refusal on one invalid record persists no Room/Track/Tier (#1509)", async () => {
+-    const { importProgram } = await import(
+-      "../../scripts/import-ata-2025.mjs"
+-    );
+-    const valid = ata2025Session("desktop-productivity");
+-    expect(valid.speakers.length).toBeGreaterThan(1);
+-    const invalid = {
+-      ...valid,
+-      slug: "orphan-probe-invalid",
+-      speakers: [
+-        valid.speakers[0],
+-        {
+-          ...(valid.speakers[1] as object),
+-          name: refusedSpeakerName,
+-        },
+-      ],
+-    };
+-    const { calls, client } = recordingLookupImporterClient();
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await expect(
+-        importProgram(
+-          { sessions: [valid, invalid] },
+-          { prisma: client, event: event2025, isDryRun: false }
+-        )
+-      ).rejects.toThrow(/does not occur/);
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    expect(persistedLookupCalls(calls)).toEqual([]);
+-    expect(calls.some((c) => c.model === "room")).toBe(false);
+-    expect(calls.some((c) => c.model === "track")).toBe(false);
+-    expect(calls.some((c) => c.model === "sponsorTier")).toBe(false);
+-  });
+-
+-  it("2026 importProgram refusal on one invalid record persists no Room/Track/Tier (#1509)", async () => {
+-    const { importProgram } = await import(
+-      "../../scripts/import-ata-2026-sessions.mjs"
+-    );
+-    const valid = ata2026Session("building-agents-with-granite");
+-    const invalid = {
+-      ...valid,
+-      slug: "orphan-probe-invalid",
+-      speakers: [
+-        valid.speakers[0],
+-        { name: refusedSpeakerName },
+-      ],
+-    };
+-    const { calls, client } = recordingLookupImporterClient();
+-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-    try {
+-      await expect(
+-        importProgram([valid, invalid], {
+-          prisma: client,
+-          event: event2026,
+-          isDryRun: false,
+-        })
+-      ).rejects.toThrow(/does not occur/);
+-    } finally {
+-      logSpy.mockRestore();
+-    }
+-    expect(persistedLookupCalls(calls)).toEqual([]);
+-    expect(calls.some((c) => c.model === "room")).toBe(false);
+-    expect(calls.some((c) => c.model === "track")).toBe(false);
+-    expect(calls.some((c) => c.model === "sponsorTier")).toBe(false);
+-  });
+-});
+-
+-describe("ATA live-source company attribution is fail-closed against the manifest (#1480)", () => {
+-  const FICTIONAL_LIVE_COMPANY = "Acme Fictional Holdings LLC";
+-
+-  afterEach(() => {
+-    prismaClientMocks.createPrismaClient.mockClear();
+-    process.exitCode = undefined;
+-  });
+-
+-  function liveSourceSessionWithCompany(company: string) {
+-    const base = ata2026Session("building-agents-with-granite");
+-    const primary = base.speakers[0] as Record<string, unknown>;
+-    return {
+-      ...base,
+-      speakers: [{ ...primary, company }],
+-    };
+-  }
+-
+-  function writeLiveAtaSource(sessions: unknown[]): { tmp: string; file: string } {
+-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ata-1480-"));
+-    const file = path.join(tmp, "sessions-data.ts");
+-    fs.writeFileSync(
+-      file,
+-      `export const ALL_SESSIONS_2026 = ${JSON.stringify(sessions)};\n`
+-    );
+-    return { tmp, file };
+-  }
+-
+-  it("the live ATA_SOURCE_PATH file is not a provenance source (#1480)", async () => {
+-    const {
+-      DEFAULT_SOURCE_PATH,
+-      ATA_2026_ARCHIVE_SOURCE_PATH,
+-    } = await import("../../scripts/import-ata-2026-sessions.mjs");
+-    const listed = listRealContentSourcePaths();
+-    expect(listed).toContain(ATA_2026_ARCHIVE_SOURCE_PATH);
+-    expect(listed).not.toContain(DEFAULT_SOURCE_PATH);
+-    expect(listed.some((p) => p.endsWith("sessions-data.ts"))).toBe(false);
+-    expect(isListedRealContentSourcePath(DEFAULT_SOURCE_PATH)).toBe(false);
+-    expect(() =>
+-      assertRealArchiveCompanyAllowed("IBM", {
+-        sourcePath: DEFAULT_SOURCE_PATH,
+-      })
+-    ).toThrow(/seed-real-content-manifest/);
+-    const src = readRepoFile("scripts", "import-ata-2026-sessions.mjs");
+-    expect(src).not.toMatch(/sourcePath:\s*DEFAULT_SOURCE_PATH/);
+-    expect(src).not.toMatch(/sourcePath:\s*SOURCE_PATH/);
+-    expect(src).not.toMatch(/sourcePath:\s*sourcePath\b/);
+-    expect(src.match(/sourcePath: ATA_2026_ARCHIVE_SOURCE_PATH/g)?.length).toBe(
+-      11
+-    );
+-  });
+-
+-  it(
+-    "a live-source record whose company is absent from the manifest is refused; nothing written (#1480)",
+-    async () => {
+-      const cacheRaw = readRepoFile("prisma", "seed-data", "sessions-2026.json");
+-      expect(cacheRaw).not.toContain(FICTIONAL_LIVE_COMPANY);
+-
+-      const { importSessionRecord, loadSourceSessions } = await import(
+-        "../../scripts/import-ata-2026-sessions.mjs"
+-      );
+-      const { tmp, file } = writeLiveAtaSource([
+-        liveSourceSessionWithCompany(FICTIONAL_LIVE_COMPANY),
+-      ]);
+-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+-      try {
+-        const sessions = loadSourceSessions(file);
+-        expect(sessions).toHaveLength(1);
+-        expect(
+-          (sessions[0].speakers[0] as { company: string }).company,
+-          "must load the live file, not silently fall back to the committed cache"
+-        ).toBe(FICTIONAL_LIVE_COMPANY);
+-
+-        const event = { id: "evt_2026" };
+-        const { calls, client } = recordingImporterClient({
+-          existingSession: null,
+-        });
+-        await expect(
+-          importSessionRecord({
+-            prisma: client,
+-            session: sessions[0],
+-            event,
+-            isDryRun: false,
+-            trackIdByName: { Workshop: "trk_workshop" },
+-            stats: { created: 0, updated: 0, unchanged: 0 },
+-          })
+-        ).rejects.toThrow(/does not occur/);
+-        expect(mutatingImporterCalls(calls)).toEqual([]);
+-      } finally {
+-        logSpy.mockRestore();
+-        warnSpy.mockRestore();
+-        fs.rmSync(tmp, { recursive: true, force: true });
+-      }
+-    },
+-    60_000
+-  );
+-
+-  it(
+-    "a live-source record whose company occurs in the manifest is written (#1480)",
+-    async () => {
+-      const { importSessionRecord, loadSourceSessions } = await import(
+-        "../../scripts/import-ata-2026-sessions.mjs"
+-      );
+-      const { tmp, file } = writeLiveAtaSource([
+-        liveSourceSessionWithCompany("IBM"),
+-      ]);
+-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+-      try {
+-        const sessions = loadSourceSessions(file);
+-        expect(sessions).toHaveLength(1);
+-        expect(
+-          (sessions[0].speakers[0] as { company: string }).company
+-        ).toBe("IBM");
+-
+-        const event = { id: "evt_2026" };
+-        const { calls, client } = recordingImporterClient({
+-          existingSession: null,
+-        });
+-        await importSessionRecord({
+-          prisma: client,
+-          session: sessions[0],
+-          event,
+-          isDryRun: false,
+-          trackIdByName: { Workshop: "trk_workshop" },
+-          stats: { created: 0, updated: 0, unchanged: 0 },
+-        });
+-        expect(mutatingImporterCalls(calls)).toEqual([
+-          { model: "session", method: "create" },
+-          { model: "sessionSpeaker", method: "createMany" },
+-        ]);
+-      } finally {
+-        logSpy.mockRestore();
+-        warnSpy.mockRestore();
+-        fs.rmSync(tmp, { recursive: true, force: true });
+-      }
+-    },
+-    60_000
+-  );
+-});

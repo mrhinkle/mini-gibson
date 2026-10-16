@@ -1,0 +1,117 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "the-gibson-338",
+  "repo": "the-gibson",
+  "repo_url": "https://github.com/The-AIE/the-gibson",
+  "pr": 338,
+  "base_sha": "71341ebec3edfdd65961050588dde77263eecea2",
+  "merge_sha": "d99c9e9135139e8486b546bd489524bf0317d17d",
+  "issue_number": 318,
+  "issues": [
+    318
+  ],
+  "issue_title": "Make silent-noop hash failure deterministic under pipefail and parallel CI",
+  "problem_statement": "Make silent-noop hash failure deterministic under pipefail and parallel CI\n\n<!-- gibson-issue-contract:v1 kind=implementation -->\n\n## Problem and user result\n\nThe parallel self-gate introduced by #303 has exposed a schedule-sensitive false red in the existing silent-noop hash-failure path. `_silent_noop_fp` runs `printf | sha256sum | awk` under a caller's `set -o pipefail`. The test deliberately supplies a hasher that exits immediately. If the consumer exits before the producer drains, Bash's `printf` reports `write error: Broken pipe`; that diagnostic is captured with the expected `NOOP` result and the required suite fails. If the producer drains first, the identical source passes.\n\nVerified occurrences:\n\n- PR #317, hosted run `33890947902`: `progressed: unhashable pair counted as progress`, with `scripts/silent-noop.sh: line 251: printf: write error: Broken pipe`; run-all red after 398s.\n- PR #315, hosted run `33894409974`: the same broken-pipe failure; run-all red after 477s.\n- PR #305 attempt 1 also failed `silent-noop.test.sh` at an unchanged head; its same-SHA hosted rerun and sequential focused run passed. That earlier symptom was different and remains separately unresolved.\n\nThe user result is a deterministic fail-closed liveness sensor: an unavailable or failing digest program yields exactly `sentinel:unhashable`, no leaked diagnostic, no false progress, and no schedule-dependent CI verdict.\n\n## Dependencies and admission\n\nThis is independently actionable discovery, not decomposition behind #241. No existing open issue matched `silent-noop`, `broken pipe`, or the parallel failure signature when filed. Do not claim it while Gibson is above its mutating-lane limit or while another host-wide full gate is active. Re-read current main, live claims, open PR file scopes, and the two failing run logs immediately before claim.\n\n## Exact scope\n\nOnly these files may change:\n\n1. `scripts/silent-noop.sh`\n2. `scripts/tests/silent-noop.test.sh`\n\nThe production seam is `_silent_noop_fp`'s digest pipelines and the focused behavioral suite that invokes them under `set -euo pipefail`.\n\n## Non-goals and preserved behavior\n\n- Do not change `NOOP_BUDGET`, fingerprint formats, clock-line normalization, digest preference order, loop handoff semantics, or what counts as progress.\n- Do not change `scripts/loop.sh`, `scripts/tests/run-all.sh`, workflows, timeouts, quarantine, baselines, policy, dependencies, or human gates.\n- Do not turn a failed hasher into a real digest or suppress the `sentinel:unhashable` result.\n- Do not weaken the existing normalization-failure, unreadable/symlink/special-file, or same-length-content controls.\n\n## Acceptance criteria\n\n- [ ] **C1 \u2014 Fresh admission.** Record current repository/main identity, zero live overlap on the two files, available lane capacity, and a free host-wide heavy-gate slot before creating one claim, branch, and dedicated worktree.\n- [ ] **C2 \u2014 Deterministic failed-hasher result.** Under Bash 3.2-compatible syntax and a caller's `set -euo pipefail`, a digest consumer that exits before consuming a large producer input returns exactly `sentinel:unhashable`, exit 0, and empty stderr on every repetition.\n- [ ] **C3 \u2014 Progress remains fail closed.** Two unhashable fingerprints yield `NOOP`; a valid digest followed by an unhashable fingerprint also yields `NOOP`. Neither path may print an error that changes the captured result or reset the no-progress budget.\n- [ ] **C4 \u2014 Working paths remain exact.** A functioning preferred hasher still emits `state:<digest>`; substantive same-length content changes still count as progress; clock-only changes, missing/unreadable/symlink/directory inputs, and normalization failure remain no-progress with their existing sentinel behavior.",
+  "split": "external_holdout_unseen",
+  "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "bash scripts/tests/silent-noop.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/silent-noop.test.sh::candidate still has EPIPE isolation after mutation copy",
+      "scripts/tests/silent-noop.test.sh::mutation: unprotected producer pipeline fails the large-body exact assertion"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "bash scripts/tests/silent-noop.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/silent-noop.test.sh::--help documents EXAMPLES",
+      "scripts/tests/silent-noop.test.sh::--help documents NOOP_BUDGET",
+      "scripts/tests/silent-noop.test.sh::--help documents RISKS",
+      "scripts/tests/silent-noop.test.sh::--help documents USAGE",
+      "scripts/tests/silent-noop.test.sh::--help documents WHAT I'M ASKING",
+      "scripts/tests/silent-noop.test.sh::--help documents WHAT IT DOES",
+      "scripts/tests/silent-noop.test.sh::--help documents WHY",
+      "scripts/tests/silent-noop.test.sh::--help documents silent_noop_progressed",
+      "scripts/tests/silent-noop.test.sh::--help says it must be sourced",
+      "scripts/tests/silent-noop.test.sh::--help states it is wired into loop.sh (issue #63)",
+      "scripts/tests/silent-noop.test.sh::-h behaves like --help",
+      "scripts/tests/silent-noop.test.sh::AFTER content-awk failure is not hashed empty-body state:<digest>",
+      "scripts/tests/silent-noop.test.sh::AFTER-only content-awk failure yields sentinel:unhashable (survives set -euo)",
+      "scripts/tests/silent-noop.test.sh::a clock-only 'update' still trips the budget",
+      "scripts/tests/silent-noop.test.sh::a command-substitution NOOP_BUDGET does not execute",
+      "scripts/tests/silent-noop.test.sh::a failing hasher yields sentinel:unhashable and returns 0",
+      "scripts/tests/silent-noop.test.sh::a missing state file trips",
+      "scripts/tests/silent-noop.test.sh::a source whose $0 is the sensor's own path is not mistaken for a direct run",
+      "scripts/tests/silent-noop.test.sh::a sourced sensor still defines all functions and passes a real iteration",
+      "scripts/tests/silent-noop.test.sh::advancing round= never trips",
+      "scripts/tests/silent-noop.test.sh::an unreadable state file trips",
+      "scripts/tests/silent-noop.test.sh::an unset STATE_FILE trips",
+      "scripts/tests/silent-noop.test.sh::clean iteration under set -euo pipefail",
+      "scripts/tests/silent-noop.test.sh::control: BEFORE content-awk under wrapper still yields state:<digest>",
+      "scripts/tests/silent-noop.test.sh::control: a working hasher still yields state:<digest>",
+      "scripts/tests/silent-noop.test.sh::control: large body with working hasher still yields state:<digest>",
+      "scripts/tests/silent-noop.test.sh::control: same pair without awk-fail wrapper is clock-only no-progress",
+      "scripts/tests/silent-noop.test.sh::direct --help exits 0",
+      "scripts/tests/silent-noop.test.sh::direct --help writes nothing to stderr",
+      "scripts/tests/silent-noop.test.sh::direct run with '--bogus' exits non-zero (got 2)",
+      "scripts/tests/silent-noop.test.sh::direct run with '--bogus' explains itself on stderr",
+      "scripts/tests/silent-noop.test.sh::direct run with '--bogus' prints nothing to stdout",
+      "scripts/tests/silent-noop.test.sh::direct run with 'check' exits non-zero (got 2)",
+      "scripts/tests/silent-noop.test.sh::direct run with 'check' explains itself on stderr",
+      "scripts/tests/silent-noop.test.sh::direct run with 'check' prints nothing to stdout",
+      "scripts/tests/silent-noop.test.sh::direct run with no arguments exits non-zero (got 2)",
+      "scripts/tests/silent-noop.test.sh::direct run with no arguments explains itself on stderr",
+      "scripts/tests/silent-noop.test.sh::direct run with no arguments prints nothing to stdout",
+      "scripts/tests/silent-noop.test.sh::honours a valid NOOP_BUDGET",
+      "scripts/tests/silent-noop.test.sh::init + check survive a failing hasher under set -euo pipefail",
+      "scripts/tests/silent-noop.test.sh::invalid NOOP_BUDGET falls back to 3",
+      "scripts/tests/silent-noop.test.sh::large-body immediate-exit hasher 2>&1 capture is exactly sentinel:unhashable",
+      "scripts/tests/silent-noop.test.sh::large-body immediate-exit hasher: 100/100 exact sentinel:unhashable, status 0, empty stderr",
+      "scripts/tests/silent-noop.test.sh::legitimate empty substantive body (awk success) still hashes to state:<digest>",
+      "scripts/tests/silent-noop.test.sh::loop-step end-of-step obligation pins column-zero updated:",
+      "scripts/tests/silent-noop.test.sh::loop.sh does not couple to silent-noop private globals",
+      "scripts/tests/silent-noop.test.sh::loop.sh sources silent-noop and calls silent_noop_progressed",
+      "scripts/tests/silent-noop.test.sh::progressed: BEFORE digest + AFTER content-awk-fail is no-progress (fail closed)",
+      "scripts/tests/silent-noop.test.sh::progressed: clock-only updated: rewrite is no-progress",
+      "scripts/tests/silent-noop.test.sh::progressed: directory AFTER is no-progress",
+      "scripts/tests/silent-noop.test.sh::progressed: handoff_sha change counts as progress",
+      "scripts/tests/silent-noop.test.sh::progressed: large unhashable/unhashable is exact NOOP",
+      "scripts/tests/silent-noop.test.sh::progressed: missing AFTER is no-progress",
+      "scripts/tests/silent-noop.test.sh::progressed: same-length round edit counts as progress",
+      "scripts/tests/silent-noop.test.sh::progressed: symlink AFTER is no-progress (no follow)",
+      "scripts/tests/silent-noop.test.sh::progressed: unhashable/unhashable is no-progress",
+      "scripts/tests/silent-noop.test.sh::progressed: working digest \u2192 large unhashable is exact NOOP",
+      "scripts/tests/silent-noop.test.sh::progressed: working digest \u2192 sentinel:unhashable fails closed",
+      "scripts/tests/silent-noop.test.sh::progressed: wrong arity is no-progress (fail closed)",
+      "scripts/tests/silent-noop.test.sh::rejects NOOP_BUDGET=' '",
+      "scripts/tests/silent-noop.test.sh::rejects NOOP_BUDGET='-1'",
+      "scripts/tests/silent-noop.test.sh::rejects NOOP_BUDGET='0'",
+      "scripts/tests/silent-noop.test.sh::rejects NOOP_BUDGET='2x'",
+      "scripts/tests/silent-noop.test.sh::rejects NOOP_BUDGET='abc'",
+      "scripts/tests/silent-noop.test.sh::repeated un-hashable state accrues and trips NOOP_BUDGET",
+      "scripts/tests/silent-noop.test.sh::same-length content change counts as progress",
+      "scripts/tests/silent-noop.test.sh::sourcing prints nothing on stdout or stderr",
+      "scripts/tests/silent-noop.test.sh::the sensor is executable, so --help is reachable without 'bash'",
+      "scripts/tests/silent-noop.test.sh::trips on the 3rd stagnant iteration, not before"
+    ]
+  },
+  "setup": [
+    "test -f scripts/tests/silent-noop.test.sh"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": false,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

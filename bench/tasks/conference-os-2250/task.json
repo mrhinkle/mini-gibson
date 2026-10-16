@@ -1,0 +1,98 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2250",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2250,
+  "base_sha": "24ba6dac83d700ab1405fa67d025b42f515fbe79",
+  "merge_sha": "20cf41bda4d0915649987bda79b17e0d851149a9",
+  "issue_number": 2235,
+  "issues": [
+    2235
+  ],
+  "issue_title": "OSS cleanup 2d: config, CI guards, fixture sensors and infra IDs",
+  "problem_statement": "OSS cleanup 2d: config, CI guards, fixture sensors and infra IDs\n\nPart of #2231.\n\n## Infra IDs\n`config/install-database-map.json`, `config/protected-database-hosts.json`, runbooks (`break-glass`, `demo-refresh`, `neon-pitr-restore`, `pinned-install-promotion`, `docs/LAUNCH-CHECKLIST.md`) and `scripts/database-env-guard.test.mjs` contain real Neon project/endpoint names and Vercel project ids (not credentials, but they identify live infra). Builds read the map, so **don't just delete it**: ship a template (`*.example.json`) plus an env-supplied path, and keep real values only in each install's repo/config.\n\n## References to removed ATA artifacts\n`scripts/neon-rehearsal-cow-guard.mjs`, `neon-rehearsal-trust.test.mjs`, `pr-review-workflows.test.mjs`, `pr-risk-classifier.mjs`, `.github/workflows/{ci,preview-deploy-smoke,production-migrate,pr-review-evidence}.yml`, `.snyk`, `.gitleaksignore` (entries for deleted files), `lighthouserc.json`, `.env.example`, and the real-content sensors (`seed-real-content-manifest.json`, `scripts/lib/seed-fixture-guards.mjs`, `real-content-fixture-branding-sensor*.mjs`, `update-real-content-manifest-digests.mjs`, `agent-archive-data.test.mjs`). Update or remove them so CI is green without the deleted ATA files.\n\n## Also",
+  "split": "temporal_gibson_holdout",
+  "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/seed-fixture-guards.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) fixture branding appearing in a manifest-listed file fails"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/seed-fixture-guards.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/seed-fixture-guards.test.ts::archive write output matches listed source JSON (#1469) omitting seedBatch throws before any write",
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) prisma/seed.ts non-demo ticket fixtures are not purchasable",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) the .mjs twin agrees with the TS allowlist (NVIDIA fails, Northstar passes)",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) marks a closed past sale window with price 0 as not purchasable",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses a listed path whose value is not in the file",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedSpeakerCompanyAllowed exits(1) on NVIDIA (not just Anthropic)",
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) archive sessions-2026.json is the fictional Example Conf sample (#1469)",
+      "tests/unit/seed-fixture-guards.test.ts::real-content source files are revalidated on every lookup (#1469) refuses when a previously-read source file is later mutated",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) does not treat a real company stuffed into the Seed Speaker Co prefix as allowed unless it is a slug",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedTicketTypeAllowed allows purchasable tickets when demoMode is true",
+      "tests/unit/seed-fixture-guards.test.ts::real-content source files are revalidated on every lookup (#1469) refuses when a previously-read source file is later unreadable",
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) prisma/seed.ts archive write calls assertRealArchiveCompanyAllowed with a manifest source path",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedSpeakerCompanyAllowed does not exit on fictional companies",
+      "tests/unit/seed-fixture-guards.test.ts::archive write output matches listed source JSON (#1469) every persisted speakerCompany, speakerBio, and description occurs in sessions-2026.json",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) every scripts .mjs that writes speakerCompany or ticketType.create imports the mjs guard",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedSpeakerRecordsAllowed guards createMany payloads",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) ticket writers call assertSeedTicketTypeAllowed before ticketType.create",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedSpeakerCompanyAllowed exits(1) when the bio names IBM Research",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses a whitespace-padded value that is not byte-for-byte in the file",
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) prisma/seed.ts does not hardcode real-company speakerCompany literals",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) marks bios that name real employers",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed returns the exact verified persist value (null for whitespace-only)",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses absolute, prefixed, and differently-normalized listed paths",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) every writer file exists",
+      "tests/unit/seed-fixture-guards.test.ts::seed surface sensor (#1425) archive speakers-2026.json is the fictional Example Conf sample (#1469)",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) allows empty attribution, allowlisted fictional names, and Seed Speaker Co slugs",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses a derived Seed Speaker Co when the JSON stays pristine",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses an unlisted sourcePath",
+      "tests/unit/seed-fixture-guards.test.ts::archive write output matches listed source JSON (#1469) refuses derived Seed Speaker Co fixtures while the JSON stays pristine",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) marks non-zero price as purchasable regardless of sale window",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedTicketTypeAllowed exits(1) for open-window free tickets on non-demo",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveTextAllowed returns the exact verified persist value for bio and description",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) marks a future-opening sale window as purchasable for fixture purposes",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) coerces a stateful archive value once so a later fictional String() is not persisted",
+      "tests/unit/seed-fixture-guards.test.ts::real-content source files are revalidated on every lookup (#1469) refuses when a previously-read source file is later missing",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedTicketTypeAllowed exits(1) for paid tickets on non-demo events",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) each speakerCompany/company write identifier is passed to the assert (not just imported)",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) exports the fictional allowlist rather than a denylist of logo-map keys",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed accepts a sample employer that occurs byte-for-byte in the listed file",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertSeedTicketTypeAllowed allows closed zero-price tickets on non-demo",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) TS and MJS twins agree on assertRealArchiveTextAllowed return values",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) TS and MJS twins agree on the shared real-archive case list",
+      "tests/unit/seed-fixture-guards.test.ts::real-content source files are revalidated on every lookup (#1469) refuses when a previously-read source file is later truncated to invalid JSON",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) marks both-null sale bounds as an open window (always-on catalog)",
+      "tests/unit/seed-fixture-guards.test.ts::archive write output matches listed source JSON (#1469) a padded archive company is refused and is not persisted on the recorded write",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards predicates (#1425) treats unknown and known-real names as real (fail-closed allowlist)",
+      "tests/unit/seed-fixture-guards.test.ts::seed/import write paths are dominated by the guard (#1425) the .mjs twin agrees with the TS real-archive provenance assert",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) assertRealArchiveCompanyAllowed refuses a missing sourcePath",
+      "tests/unit/seed-fixture-guards.test.ts::archive write output matches listed source JSON (#1469) records the guard return for whitespace-only / NBSP / U+FEFF company, bio, and description",
+      "tests/unit/seed-fixture-guards.test.ts::seed-fixture-guards assert helpers (#1425) a real archive employer still fails assertSeedSpeakerCompanyAllowed (fixture path is not relaxed)"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest",
+    "node_modules/.bin/prisma generate"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

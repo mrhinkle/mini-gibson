@@ -1,0 +1,347 @@
+diff --git a/tests/unit/events-directory.test.ts b/tests/unit/events-directory.test.ts
+index 6117dbe6e..ce27dee32 100644
+--- a/tests/unit/events-directory.test.ts
++++ b/tests/unit/events-directory.test.ts
+@@ -35,6 +35,7 @@ type DirectoryEvent = {
+   id: string;
+   slug: string;
+   name: string;
++  description?: string | null;
+   status: 'PUBLISHED' | 'COMPLETED';
+   startDate: Date;
+   endDate: Date;
+@@ -42,7 +43,11 @@ type DirectoryEvent = {
+   websiteUrl: string;
+   venue: null;
+   _count: { registrations: number; sessions: number; tracks: number };
+-  sessions: [];
++  sessions: Array<{
++    id: string;
++    recordingUrl: string | null;
++    virtualSession: { recordingUrl: string | null } | null;
++  }>;
+ };
+ 
+ function cardByHref(markup: string, href: string): HTMLAnchorElement {
+@@ -55,6 +60,23 @@ function cardByHref(markup: string, href: string): HTMLAnchorElement {
+   return card as HTMLAnchorElement;
+ }
+ 
++/** #2037: name comes from visible contents, not aria-label / aria-labelledby. */
++function expectNameFromVisibleText(
++  card: HTMLAnchorElement,
++  expected: { name: string; cta: string; typeChip?: string }
++): void {
++  expect(card.hasAttribute('aria-label')).toBe(false);
++  expect(card.hasAttribute('aria-labelledby')).toBe(false);
++  const text = card.textContent ?? '';
++  expect(text).toContain(expected.name);
++  expect(text).toContain(expected.cta);
++  if (expected.typeChip) expect(text).toContain(expected.typeChip);
++  const nameIndex = text.indexOf(expected.name);
++  const ctaIndex = text.lastIndexOf(expected.cta);
++  expect(nameIndex).toBeGreaterThanOrEqual(0);
++  expect(ctaIndex).toBeGreaterThan(nameIndex);
++}
++
+ async function renderDirectory(event: DirectoryEvent): Promise<string> {
+   mocks.eventFindMany.mockResolvedValue([event]);
+   return renderToStaticMarkup(await EventsDirectory());
+@@ -85,9 +107,11 @@ describe('EventsDirectory EventCard pre-platform classifier (#1948)', () => {
+     const card = cardByHref(markup, '/events/upcoming-zero-zero-url');
+ 
+     expect(card.hasAttribute('target')).toBe(false);
+-    expect(card.getAttribute('aria-label')).toBe(
+-      'Register: Upcoming Zero Zero Conference'
+-    );
++    expectNameFromVisibleText(card, {
++      name: 'Upcoming Zero Zero Conference',
++      cta: 'Register',
++      typeChip: 'Conference',
++    });
+     expect(card.innerHTML).not.toContain('https://example.test/upcoming');
+   });
+ 
+@@ -111,9 +135,11 @@ describe('EventsDirectory EventCard pre-platform classifier (#1948)', () => {
+ 
+     expect(card.getAttribute('target')).toBe('_blank');
+     expect(card.getAttribute('rel')).toBe('noopener noreferrer');
+-    expect(card.getAttribute('aria-label')).toBe(
+-      'View Recap: Past Zero Zero Conference'
+-    );
++    expectNameFromVisibleText(card, {
++      name: 'Past Zero Zero Conference',
++      cta: 'View Recap',
++      typeChip: 'Conference',
++    });
+   });
+ 
+   it('keeps an upcoming event with real sessions native (no mutation of the upcoming conjunct can uniquely turn this red)', async () => {
+@@ -135,9 +161,11 @@ describe('EventsDirectory EventCard pre-platform classifier (#1948)', () => {
+     const card = cardByHref(markup, '/events/upcoming-with-sessions');
+ 
+     expect(card.hasAttribute('target')).toBe(false);
+-    expect(card.getAttribute('aria-label')).toBe(
+-      'Register: Upcoming With Sessions Conference'
+-    );
++    expectNameFromVisibleText(card, {
++      name: 'Upcoming With Sessions Conference',
++      cta: 'Register',
++      typeChip: 'Conference',
++    });
+   });
+ 
+   it('does not externalize a past event that has native sessions even with a websiteUrl', async () => {
+@@ -158,12 +186,136 @@ describe('EventsDirectory EventCard pre-platform classifier (#1948)', () => {
+     const markup = await renderDirectory(event);
+     const card = cardByHref(markup, '/events/past-with-sessions');
+ 
+-    expect(card.getAttribute('aria-label')).toBe(
+-      'View Event: Past With Sessions Conference'
+-    );
++    expectNameFromVisibleText(card, {
++      name: 'Past With Sessions Conference',
++      cta: 'View Event',
++      typeChip: 'Conference',
++    });
+     expect(card.getAttribute('href')).toBe('/events/past-with-sessions');
+     expect(card.getAttribute('href')).not.toBe(
+       'https://example.test/legacy-but-native'
+     );
+   });
+ });
++
++describe('EventsDirectory EventCard accessible names (#2037)', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    mocks.fetchDisplayMeetupEvents.mockResolvedValue([]);
++  });
++
++  it('keeps an upcoming Register CTA, event name, and type chip in the link contents', async () => {
++    const event: DirectoryEvent = {
++      id: 'evt-upcoming-named',
++      slug: 'upcoming-named',
++      name: 'Triangle AI Summit',
++      description: 'A conference for operators and builders.',
++      status: 'PUBLISHED',
++      startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
++      endDate: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
++      eventType: 'CONFERENCE',
++      websiteUrl: 'https://example.test/upcoming-named',
++      venue: null,
++      _count: { registrations: 12, sessions: 4, tracks: 2 },
++      sessions: [],
++    };
++
++    const markup = await renderDirectory(event);
++    const card = cardByHref(markup, '/events/upcoming-named');
++
++    expectNameFromVisibleText(card, {
++      name: 'Triangle AI Summit',
++      cta: 'Register',
++      typeChip: 'Conference',
++    });
++    expect(card.textContent).toContain('A conference for operators and builders.');
++    expect(card.textContent).toContain('Online');
++    expect(card.hasAttribute('target')).toBe(false);
++  });
++
++  it('keeps a past View Event CTA in the link contents', async () => {
++    const event: DirectoryEvent = {
++      id: 'evt-past-named',
++      slug: 'past-named',
++      name: 'Past Native Conference',
++      status: 'COMPLETED',
++      startDate: new Date('2020-06-01T00:00:00.000Z'),
++      endDate: new Date('2020-06-03T00:00:00.000Z'),
++      eventType: 'CONFERENCE',
++      websiteUrl: 'https://example.test/past-named',
++      venue: null,
++      _count: { registrations: 4, sessions: 2, tracks: 1 },
++      sessions: [],
++    };
++
++    const markup = await renderDirectory(event);
++    const card = cardByHref(markup, '/events/past-named');
++
++    expectNameFromVisibleText(card, {
++      name: 'Past Native Conference',
++      cta: 'View Event',
++      typeChip: 'Conference',
++    });
++    expect(card.getAttribute('href')).toBe('/events/past-named');
++  });
++
++  it('deep-links a recap card with replays and keeps Watch replays discoverable', async () => {
++    const event: DirectoryEvent = {
++      id: 'evt-recap-replays',
++      slug: 'recap-replays',
++      name: 'Replay Conference',
++      status: 'COMPLETED',
++      startDate: new Date('2025-04-01T00:00:00.000Z'),
++      endDate: new Date('2025-04-03T00:00:00.000Z'),
++      eventType: 'CONFERENCE',
++      websiteUrl: 'https://example.test/recap-replays',
++      venue: null,
++      _count: { registrations: 20, sessions: 3, tracks: 1 },
++      sessions: [
++        {
++          id: 'sess-replay-1',
++          recordingUrl: 'https://example.test/recording.mp4',
++          virtualSession: { recordingUrl: null },
++        },
++      ],
++    };
++
++    const markup = await renderDirectory(event);
++    const card = cardByHref(markup, '/events/recap-replays/recap');
++
++    expectNameFromVisibleText(card, {
++      name: 'Replay Conference',
++      cta: 'Watch replays',
++      typeChip: 'Conference',
++    });
++    expect(card.hasAttribute('target')).toBe(false);
++    expect(card.getAttribute('href')).toBe('/events/recap-replays/recap');
++  });
++
++  it('keeps an external pre-platform import on websiteUrl with target=_blank', async () => {
++    const event: DirectoryEvent = {
++      id: 'evt-import-named',
++      slug: 'import-named',
++      name: 'Imported Recap Conference',
++      status: 'COMPLETED',
++      startDate: new Date('2019-01-01T00:00:00.000Z'),
++      endDate: new Date('2019-01-03T00:00:00.000Z'),
++      eventType: 'CONFERENCE',
++      websiteUrl: 'https://example.test/imported',
++      venue: null,
++      _count: { registrations: 0, sessions: 0, tracks: 0 },
++      sessions: [],
++    };
++
++    const markup = await renderDirectory(event);
++    const card = cardByHref(markup, 'https://example.test/imported');
++
++    expect(card.getAttribute('target')).toBe('_blank');
++    expect(card.getAttribute('rel')).toBe('noopener noreferrer');
++    expectNameFromVisibleText(card, {
++      name: 'Imported Recap Conference',
++      cta: 'View Recap',
++      typeChip: 'Conference',
++    });
++  });
++});
+diff --git a/tests/unit/homepage-accessibility-contract.test.ts b/tests/unit/homepage-accessibility-contract.test.ts
+index d7b93e85a..e97c63074 100644
+--- a/tests/unit/homepage-accessibility-contract.test.ts
++++ b/tests/unit/homepage-accessibility-contract.test.ts
+@@ -129,4 +129,78 @@ describe('homepage accessibility contract', () => {
+       4.5,
+     );
+   });
++
++  it('pins PLACE map town labels and sector headings above 4.5 to 1 on their real surfaces (#2037)', () => {
++    const placeSource = readFileSync(
++      join(process.cwd(), 'src/components/homepage/place.tsx'),
++      'utf8',
++    );
++    const mapSource = readFileSync(
++      join(process.cwd(), 'src/components/homepage/place-triangle-map.tsx'),
++      'utf8',
++    );
++    const globalCss = readFileSync(
++      join(process.cwd(), 'src/app/globals.css'),
++      'utf8',
++    );
++    const space900 = readColorToken(globalCss, '--color-space-900');
++    const openSurface = composite(WHITE, space900, 0.04);
++    const renderedWhite50OnOpen = composite(WHITE, openSurface, 0.5);
++    const renderedWhite50OnSection = composite(WHITE, space900, 0.5);
++    const renderedWhite45OnOpen = composite(WHITE, openSurface, 0.45);
++    const renderedWhite45OnSection = composite(WHITE, space900, 0.45);
++
++    expect(placeSource).toContain('bg-space-900');
++    expect(mapSource).toContain('open:bg-white/[0.04]');
++    expect(mapSource).toContain('shrink-0 text-xs text-white/50');
++    expect(mapSource).toContain(
++      'text-xs uppercase tracking-[0.18em] text-white/50',
++    );
++    expect(mapSource).not.toContain('shrink-0 text-xs text-white/45');
++    expect(mapSource).not.toContain(
++      'text-xs uppercase tracking-[0.18em] text-white/45',
++    );
++    expect(contrastRatio(renderedWhite45OnOpen, openSurface)).toBeLessThan(4.5);
++    expect(contrastRatio(renderedWhite45OnSection, space900)).toBeLessThan(4.5);
++    expect(
++      contrastRatio(renderedWhite50OnOpen, openSurface),
++    ).toBeGreaterThanOrEqual(4.5);
++    expect(
++      contrastRatio(renderedWhite50OnSection, space900),
++    ).toBeGreaterThanOrEqual(4.5);
++  });
++
++  it('pins TRACKS outro eyebrow above 4.5 to 1 on the tinted card, and leaves the icon at /45 (#2037)', () => {
++    const tracksSource = readFileSync(
++      join(process.cwd(), 'src/components/homepage/tracks.tsx'),
++      'utf8',
++    );
++    const globalCss = readFileSync(
++      join(process.cwd(), 'src/app/globals.css'),
++      'utf8',
++    );
++    const space900 = readColorToken(globalCss, '--color-space-900');
++    const cardSurface = composite(WHITE, space900, 0.04);
++    const iconSurface = composite(WHITE, cardSurface, 0.04);
++    const renderedWhite50 = composite(WHITE, cardSurface, 0.5);
++    const renderedWhite45 = composite(WHITE, cardSurface, 0.45);
++    const renderedIcon45 = composite(WHITE, iconSurface, 0.45);
++
++    expect(tracksSource).toContain('bg-space-900');
++    expect(tracksSource).toContain('bg-white/[0.04]');
++    expect(tracksSource).toContain(
++      'text-xs uppercase tracking-[0.18em] text-white/50',
++    );
++    expect(tracksSource).not.toContain(
++      'text-xs uppercase tracking-[0.18em] text-white/45',
++    );
++    expect(tracksSource).toContain(
++      'rounded-full bg-white/[0.04] text-white/45',
++    );
++    expect(contrastRatio(renderedWhite45, cardSurface)).toBeLessThan(4.5);
++    expect(contrastRatio(renderedWhite50, cardSurface)).toBeGreaterThanOrEqual(
++      4.5,
++    );
++    expect(contrastRatio(renderedIcon45, iconSurface)).toBeGreaterThanOrEqual(3);
++  });
+ });
+diff --git a/tests/unit/public-link-names.test.ts b/tests/unit/public-link-names.test.ts
+index 37ec1a9b7..5ef7986ea 100644
+--- a/tests/unit/public-link-names.test.ts
++++ b/tests/unit/public-link-names.test.ts
+@@ -94,15 +94,20 @@ describe('public page accessible link names (#270)', () => {
+   it('names event cards in the shared events directory', () => {
+     // The listing moved from the /events page (now a 308 to /) into the
+     // shared EventsDirectory component (#657).
+-    // #831: visible CTA is type-aware (Register/RSVP/View Event); aria-label
+-    // still embeds the event name for accessible link naming.
++    // #831: visible CTA is type-aware (Register/RSVP/View Event); the event
++    // name must still reach the wrapping Link's accessible name.
++    // #2037: do not set aria-label={actionLabel} — that replaced the card's
++    // visible text (type chip, name, date, location, CTA) and failed WCAG
++    // 2.5.3 Label in Name. Name comes from the Link's contents.
+     const directory = source('src/components/events-directory.tsx');
+ 
+-    expect(directory).toContain('aria-label={actionLabel}');
+-    expect(directory).toMatch(
++    expect(directory).not.toContain('aria-label={actionLabel}');
++    expect(directory).not.toMatch(
+       /actionLabel\s*=\s*`\$\{primaryCta\}:\s*\$\{event\.name\}`/
+     );
+-    expect(directory).toContain('event.name');
++    expect(directory).toContain('{event.name}');
++    expect(directory).toContain('{primaryCta}');
++    expect(directory).toContain('eventCardPrimaryActionLabel');
+   });
+ });
+ 

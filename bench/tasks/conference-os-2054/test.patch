@@ -1,0 +1,222 @@
+diff --git a/tests/unit/event-footer-contrast.test.ts b/tests/unit/event-footer-contrast.test.ts
+new file mode 100644
+index 000000000..c78026eac
+--- /dev/null
++++ b/tests/unit/event-footer-contrast.test.ts
+@@ -0,0 +1,216 @@
++/** @vitest-environment jsdom
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { createElement, type ReactNode } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it, vi } from 'vitest';
++import { THEME_PRESETS } from '@/lib/theme';
++
++vi.mock('next/link', () => ({
++  default: ({
++    href,
++    children,
++    className,
++  }: {
++    href: string;
++    children: ReactNode;
++    className?: string;
++  }) => createElement('a', { href, className }, children),
++}));
++
++vi.mock('@/components/space-background', () => ({
++  SpaceBackground: () => null,
++}));
++
++vi.mock('@/components/social-icon', () => ({
++  SocialIcon: () => null,
++}));
++
++import { EventPublicFooter } from '@/components/event-public-footer';
++
++const COLUMN_NAV = [
++  {
++    label: 'Conference',
++    children: [{ href: '/events/all-things-ai-2027', label: 'Overview' }],
++  },
++  {
++    label: 'Community',
++    children: [{ href: '/events/all-things-ai-2027/speakers', label: 'Speakers' }],
++  },
++];
++
++function readColorToken(source: string, token: string): readonly number[] {
++  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++  const match = source.match(
++    new RegExp(`${escapedToken}:\\s*#([0-9a-f]{6})`, 'i'),
++  );
++  if (!match?.[1]) throw new Error(`Missing six-digit color token ${token}`);
++  return [0, 2, 4].map((offset) =>
++    Number.parseInt(match[1]!.slice(offset, offset + 2), 16),
++  );
++}
++
++/** Tailwind v4 default palette is oklch; convert to sRGB for WCAG 2.x. */
++function oklchToSrgb(Lpct: number, C: number, h: number): readonly number[] {
++  const L = Lpct / 100;
++  const hRad = (h * Math.PI) / 180;
++  const a = C * Math.cos(hRad);
++  const b = C * Math.sin(hRad);
++  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
++  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
++  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
++  const l = l_ ** 3;
++  const m = m_ ** 3;
++  const s = s_ ** 3;
++  const rLin = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
++  const gLin = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
++  const bLin = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
++  const toSrgb = (channel: number): number => {
++    const encoded =
++      channel <= 0.0031308
++        ? 12.92 * channel
++        : 1.055 * Math.pow(Math.max(channel, 0), 1 / 2.4) - 0.055;
++    return Math.round(Math.max(0, Math.min(1, encoded)) * 255);
++  };
++  return [toSrgb(rLin), toSrgb(gLin), toSrgb(bLin)];
++}
++
++function readOklchToken(source: string, token: string): readonly number[] {
++  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++  const match = source.match(
++    new RegExp(
++      `${escapedToken}:\\s*oklch\\(([0-9.]+)%\\s+([0-9.]+)\\s+([0-9.]+)\\)`,
++      'i',
++    ),
++  );
++  if (!match?.[1] || !match[2] || !match[3]) {
++    throw new Error(`Missing oklch color token ${token}`);
++  }
++  return oklchToSrgb(
++    Number.parseFloat(match[1]),
++    Number.parseFloat(match[2]),
++    Number.parseFloat(match[3]),
++  );
++}
++
++function hexToRgb(hex: string): readonly number[] {
++  const n = Number.parseInt(hex.slice(1), 16);
++  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
++}
++
++function relativeLuminance(rgb: readonly number[]): number {
++  const [red, green, blue] = rgb.map((channel) => {
++    const value = channel / 255;
++    return value <= 0.04045
++      ? value / 12.92
++      : ((value + 0.055) / 1.055) ** 2.4;
++  });
++  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
++}
++
++function contrastRatio(
++  foreground: readonly number[],
++  background: readonly number[],
++): number {
++  const foregroundLuminance = relativeLuminance(foreground);
++  const backgroundLuminance = relativeLuminance(background);
++  return (
++    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
++    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
++  );
++}
++
++function renderFooter(
++  props: Partial<Parameters<typeof EventPublicFooter>[0]> = {},
++): HTMLDivElement {
++  const markup = renderToStaticMarkup(
++    createElement(EventPublicFooter, {
++      eventSlug: 'all-things-ai-2027',
++      eventName: 'All Things AI 2027',
++      visualTemplate: 'orbit',
++      footerNav: COLUMN_NAV,
++      ...props,
++    }),
++  );
++  const container = document.createElement('div');
++  container.innerHTML = markup;
++  return container;
++}
++
++function headingClassTokens(container: HTMLDivElement): string[] {
++  const heading = container.querySelector(
++    '[data-testid="event-footer-columns"] .min-w-\\[8rem\\] p',
++  );
++  if (!heading) throw new Error('Footer column heading not rendered');
++  return heading.className.split(/\s+/).filter(Boolean);
++}
++
++describe('event footer column heading contrast (#2051)', () => {
++  const globalCss = readFileSync(
++    join(process.cwd(), 'src/app/globals.css'),
++    'utf8',
++  );
++  const tailwindTheme = readFileSync(
++    join(process.cwd(), 'node_modules/tailwindcss/theme.css'),
++    'utf8',
++  );
++  const space900 = readColorToken(globalCss, '--color-space-900');
++  const gray400 = readOklchToken(tailwindTheme, '--color-gray-400');
++  const gray500 = readOklchToken(tailwindTheme, '--color-gray-500');
++  const launchpad = THEME_PRESETS.find((preset) => preset.id === 'launchpad');
++  if (!launchpad) throw new Error('launchpad theme preset missing');
++
++  it('renders orbit column headings in text-gray-400, not the failing text-gray-500', () => {
++    const tokens = headingClassTokens(renderFooter());
++    expect(tokens).toContain('text-gray-400');
++    expect(tokens).not.toContain('text-gray-500');
++  });
++
++  it('pins orbit headings to the same secondary token as footer body/links', () => {
++    const container = renderFooter();
++    const footer = container.querySelector(
++      '[data-testid="event-public-footer"]',
++    );
++    if (!footer) throw new Error('Event public footer not rendered');
++    expect(footer.className.split(/\s+/)).toContain('bg-space-900');
++    expect(footer.className.split(/\s+/)).toContain('text-gray-400');
++    expect(headingClassTokens(container)).toContain('text-gray-400');
++  });
++
++  it('keeps gray-500 under 4.5:1 on the ATA/Launchpad footer background', () => {
++    expect(launchpad.themeDarkBg.toLowerCase()).toBe('#0b1426');
++    expect(space900).toEqual(hexToRgb('#0b1426'));
++    expect(contrastRatio(gray500, space900)).toBeLessThan(4.5);
++  });
++
++  it('pins gray-400 above 4.5:1 on ATA/Launchpad and the other dark orbit surfaces', () => {
++    const darkSurfaces: Array<{ name: string; rgb: readonly number[] }> = [
++      { name: 'globals space-900 / ATA unthemed', rgb: space900 },
++      { name: 'launchpad themeDarkBg', rgb: hexToRgb(launchpad.themeDarkBg) },
++    ];
++    for (const preset of THEME_PRESETS) {
++      // Orbit footers are dark-mission. The minimal preset's light themeDarkBg
++      // also paints the event name `text-white` onto space-900 — a broken
++      // pairing, not the ATA 2027 path. Skip it rather than require a token
++      // that cannot pass on both #0b1426 and #f8fafc.
++      if (preset.id === 'minimal') continue;
++      darkSurfaces.push({
++        name: `${preset.id} themeDarkBg`,
++        rgb: hexToRgb(preset.themeDarkBg),
++      });
++    }
++
++    expect(contrastRatio(gray400, space900)).toBeGreaterThanOrEqual(4.5);
++    for (const surface of darkSurfaces) {
++      expect(
++        contrastRatio(gray400, surface.rgb),
++        `${surface.name} ${contrastRatio(gray400, surface.rgb).toFixed(3)}:1`,
++      ).toBeGreaterThanOrEqual(4.5);
++    }
++  });
++});

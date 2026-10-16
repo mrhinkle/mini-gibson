@@ -1,0 +1,18 @@
+diff --git a/src/components/event-public-footer.tsx b/src/components/event-public-footer.tsx
+index 75e217364..189f92c6b 100644
+--- a/src/components/event-public-footer.tsx
++++ b/src/components/event-public-footer.tsx
+@@ -101,9 +101,12 @@ export function EventPublicFooter({
+     ? 'inline-flex min-h-11 items-center gap-2 text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-700'
+     : 'inline-flex min-h-11 items-center gap-2 text-sm font-medium text-nebula-300 hover:text-nebula-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nebula-400';
+ 
++  // gray-400, not gray-500: on bg-space-900 (#0b1426, ATA/Launchpad), gray-500
++  // is 3.80:1 — under the 4.5:1 AA floor. gray-400 is 7.07:1 and matches this
++  // footer's secondary/link text.
+   const headingClass = isBroadside
+     ? 'mb-3 text-xs font-semibold uppercase tracking-wide text-stone-500'
+-    : 'mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500';
++    : 'mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400';
+ 
+   // null → hardcoded fallback; array → DB override (empty array = intentional empty).
+   const usingOverride = footerNav !== null && footerNav !== undefined;

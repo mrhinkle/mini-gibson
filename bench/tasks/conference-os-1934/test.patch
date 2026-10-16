@@ -1,0 +1,802 @@
+diff --git a/tests/unit/mcp-session-schedule-validation.test.ts b/tests/unit/mcp-session-schedule-validation.test.ts
+new file mode 100644
+index 000000000..bf05536a8
+--- /dev/null
++++ b/tests/unit/mcp-session-schedule-validation.test.ts
+@@ -0,0 +1,796 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import type { McpAuthContext } from "@/lib/mcp-acl";
++
++type EventRow = { id: string; venueId: string; slug: string };
++type RoomRow = {
++  id: string;
++  venueId: string;
++  isActive: boolean;
++  name: string;
++  capacity: number | null;
++  roomType: string;
++};
++type TrackRow = { id: string; eventId: string };
++type SessionRow = {
++  id: string;
++  eventId: string;
++  title: string;
++  roomId: string | null;
++  startTime: Date;
++  endTime: Date;
++  speakerName: string | null;
++  sessionType: string;
++  capacityOverride: number | null;
++  trackId: string | null;
++  isPublished: boolean;
++};
++
++const { store, mocks } = vi.hoisted(() => {
++  const store = {
++    events: new Map<string, EventRow>(),
++    rooms: new Map<string, RoomRow>(),
++    tracks: new Map<string, TrackRow>(),
++    sessions: new Map<string, SessionRow>(),
++    createdCount: 0,
++  };
++
++  return {
++    store,
++    mocks: {
++      sessionCreate: vi.fn(),
++      sessionUpdate: vi.fn(),
++      sessionUpdateMany: vi.fn(),
++      sessionFindUnique: vi.fn(),
++      sessionFindMany: vi.fn(),
++      sessionFindFirst: vi.fn(),
++      sessionFindFirstOrThrow: vi.fn(),
++      roomFindFirst: vi.fn(),
++      roomFindUnique: vi.fn(),
++      trackFindFirst: vi.fn(),
++      eventFindUnique: vi.fn(),
++      auditLogCreate: vi.fn(),
++      requireAdmin: vi.fn(),
++      revalidatePath: vi.fn(),
++    },
++  };
++});
++
++vi.mock("@/lib/db", () => ({
++  prisma: {
++    session: {
++      create: mocks.sessionCreate,
++      update: mocks.sessionUpdate,
++      updateMany: mocks.sessionUpdateMany,
++      findUnique: mocks.sessionFindUnique,
++      findMany: mocks.sessionFindMany,
++      findFirst: mocks.sessionFindFirst,
++      findFirstOrThrow: mocks.sessionFindFirstOrThrow,
++    },
++    room: {
++      findFirst: mocks.roomFindFirst,
++      findUnique: mocks.roomFindUnique,
++    },
++    track: { findFirst: mocks.trackFindFirst },
++    event: { findUnique: mocks.eventFindUnique },
++    auditLog: { create: mocks.auditLogCreate },
++  },
++}));
++
++vi.mock("@/lib/auth", () => ({ requireAdmin: mocks.requireAdmin }));
++vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
++
++import {
++  createSession,
++  updateSession,
++} from "../../src/lib/mcp-tools/handlers";
++import {
++  createSession as createOrganizerSession,
++  updateSession as updateOrganizerSession,
++} from "../../src/app/(admin)/organizer/events/[slug]/schedule/actions";
++
++const EVENT_ID = "event-1";
++const OTHER_EVENT_ID = "event-2";
++const VENUE_ID = "venue-1";
++const OTHER_VENUE_ID = "venue-2";
++const ROOM_MAIN = "room-main";
++const ROOM_BREAKOUT = "room-breakout";
++const ROOM_INACTIVE = "room-inactive";
++const ROOM_OTHER_VENUE = "room-other-venue";
++const TRACK_OWN = "track-own";
++const TRACK_FOREIGN = "track-foreign";
++const SESSION_EXISTING = "session-existing";
++const SESSION_PARALLEL = "session-parallel";
++const SESSION_LATER = "session-later";
++const SESSION_OTHER_EVENT = "session-other-event";
++
++const T14 = "2027-04-08T14:00:00.000Z";
++const T15 = "2027-04-08T15:00:00.000Z";
++const T16 = "2027-04-08T16:00:00.000Z";
++const T17 = "2027-04-08T17:00:00.000Z";
++const T1430 = "2027-04-08T14:30:00.000Z";
++
++const scopedCtx: McpAuthContext = {
++  keyId: "key_event_1",
++  eventId: EVENT_ID,
++  scopes: ["mcp"],
++  role: "event_admin",
++};
++
++function seed() {
++  store.events.set(EVENT_ID, {
++    id: EVENT_ID,
++    venueId: VENUE_ID,
++    slug: "cosmic-2027",
++  });
++  store.events.set(OTHER_EVENT_ID, {
++    id: OTHER_EVENT_ID,
++    venueId: OTHER_VENUE_ID,
++    slug: "other-2027",
++  });
++
++  store.rooms.set(ROOM_MAIN, {
++    id: ROOM_MAIN,
++    venueId: VENUE_ID,
++    isActive: true,
++    name: "Main Hall",
++    capacity: 200,
++    roomType: "MAIN_STAGE",
++  });
++  store.rooms.set(ROOM_BREAKOUT, {
++    id: ROOM_BREAKOUT,
++    venueId: VENUE_ID,
++    isActive: true,
++    name: "Breakout A",
++    capacity: 40,
++    roomType: "WORKSHOP",
++  });
++  store.rooms.set(ROOM_INACTIVE, {
++    id: ROOM_INACTIVE,
++    venueId: VENUE_ID,
++    isActive: false,
++    name: "Closed Room",
++    capacity: 20,
++    roomType: "WORKSHOP",
++  });
++  store.rooms.set(ROOM_OTHER_VENUE, {
++    id: ROOM_OTHER_VENUE,
++    venueId: OTHER_VENUE_ID,
++    isActive: true,
++    name: "Other Venue Hall",
++    capacity: 100,
++    roomType: "MAIN_STAGE",
++  });
++
++  store.tracks.set(TRACK_OWN, { id: TRACK_OWN, eventId: EVENT_ID });
++  store.tracks.set(TRACK_FOREIGN, {
++    id: TRACK_FOREIGN,
++    eventId: OTHER_EVENT_ID,
++  });
++
++  store.sessions.set(SESSION_EXISTING, {
++    id: SESSION_EXISTING,
++    eventId: EVENT_ID,
++    title: "Opening Keynote",
++    roomId: ROOM_MAIN,
++    startTime: new Date(T14),
++    endTime: new Date(T15),
++    speakerName: "Ada Lovelace",
++    sessionType: "KEYNOTE",
++    capacityOverride: null,
++    trackId: TRACK_OWN,
++    isPublished: true,
++  });
++  store.sessions.set(SESSION_PARALLEL, {
++    id: SESSION_PARALLEL,
++    eventId: EVENT_ID,
++    title: "Workshop",
++    roomId: ROOM_BREAKOUT,
++    startTime: new Date(T14),
++    endTime: new Date(T15),
++    speakerName: "Grace Hopper",
++    sessionType: "WORKSHOP",
++    capacityOverride: null,
++    trackId: TRACK_OWN,
++    isPublished: true,
++  });
++  store.sessions.set(SESSION_LATER, {
++    id: SESSION_LATER,
++    eventId: EVENT_ID,
++    title: "Closing",
++    roomId: ROOM_MAIN,
++    startTime: new Date(T16),
++    endTime: new Date(T17),
++    speakerName: "Bob",
++    sessionType: "TALK",
++    capacityOverride: null,
++    trackId: TRACK_OWN,
++    isPublished: true,
++  });
++  store.sessions.set(SESSION_OTHER_EVENT, {
++    id: SESSION_OTHER_EVENT,
++    eventId: OTHER_EVENT_ID,
++    title: "Foreign event talk",
++    roomId: ROOM_OTHER_VENUE,
++    startTime: new Date(T14),
++    endTime: new Date(T15),
++    speakerName: "Eve",
++    sessionType: "TALK",
++    capacityOverride: null,
++    trackId: TRACK_FOREIGN,
++    isPublished: true,
++  });
++}
++
++function installPrisma() {
++  mocks.sessionFindUnique.mockImplementation(
++    async ({ where }: { where: { id: string } }) =>
++      store.sessions.get(where.id) ?? null
++  );
++
++  mocks.sessionFindFirst.mockImplementation(
++    async ({
++      where,
++    }: {
++      where: { id?: string; eventId?: string };
++    }) => {
++      const rows = [...store.sessions.values()].filter((session) => {
++        if (where.id && session.id !== where.id) return false;
++        if (where.eventId && session.eventId !== where.eventId) return false;
++        return true;
++      });
++      return rows[0] ?? null;
++    }
++  );
++
++  mocks.sessionFindFirstOrThrow.mockImplementation(async (args: { where: { id?: string; eventId?: string } }) => {
++    const row = await mocks.sessionFindFirst(args);
++    if (!row) throw new Error("Session not found");
++    return row;
++  });
++
++  mocks.sessionFindMany.mockImplementation(
++    async ({
++      where,
++    }: {
++      where?: { eventId?: string; id?: { not?: string } };
++    }) =>
++      [...store.sessions.values()].filter((session) => {
++        if (where?.eventId && session.eventId !== where.eventId) return false;
++        if (where?.id?.not && session.id === where.id.not) return false;
++        return true;
++      })
++  );
++
++  mocks.sessionCreate.mockImplementation(
++    async ({ data }: { data: Partial<SessionRow> & { eventId: string; title: string } }) => {
++      store.createdCount += 1;
++      const created: SessionRow = {
++        id: `session-created-${store.createdCount}`,
++        eventId: data.eventId,
++        title: data.title,
++        roomId: data.roomId ?? null,
++        startTime: data.startTime as Date,
++        endTime: data.endTime as Date,
++        speakerName: data.speakerName ?? null,
++        sessionType: data.sessionType ?? "TALK",
++        capacityOverride: data.capacityOverride ?? null,
++        trackId: data.trackId ?? null,
++        isPublished: data.isPublished ?? false,
++      };
++      store.sessions.set(created.id, created);
++      return {
++        id: created.id,
++        title: created.title,
++        startTime: created.startTime,
++        endTime: created.endTime,
++        isPublished: created.isPublished,
++      };
++    }
++  );
++
++  mocks.sessionUpdate.mockImplementation(
++    async ({
++      where,
++      data,
++    }: {
++      where: { id: string };
++      data: Partial<SessionRow>;
++    }) => {
++      const existing = store.sessions.get(where.id);
++      if (!existing) throw new Error("Session not found");
++      const updated = { ...existing, ...data };
++      store.sessions.set(where.id, updated);
++      return {
++        id: updated.id,
++        title: updated.title,
++        isPublished: updated.isPublished,
++        startTime: updated.startTime,
++        endTime: updated.endTime,
++      };
++    }
++  );
++
++  mocks.sessionUpdateMany.mockImplementation(
++    async ({
++      where,
++      data,
++    }: {
++      where: { id: string; eventId: string };
++      data: Partial<SessionRow>;
++    }) => {
++      const existing = store.sessions.get(where.id);
++      if (!existing || existing.eventId !== where.eventId) {
++        return { count: 0 };
++      }
++      store.sessions.set(where.id, { ...existing, ...data });
++      return { count: 1 };
++    }
++  );
++
++  mocks.roomFindUnique.mockImplementation(
++    async ({ where }: { where: { id: string } }) => {
++      const room = store.rooms.get(where.id);
++      return room ? { venueId: room.venueId } : null;
++    }
++  );
++
++  mocks.roomFindFirst.mockImplementation(
++    async ({
++      where,
++    }: {
++      where: {
++        id?: string;
++        isActive?: boolean;
++        venue?: { events?: { some?: { id?: string } } };
++      };
++    }) => {
++      if (!where.id) return null;
++      const room = store.rooms.get(where.id);
++      if (!room) return null;
++      if (where.isActive === true && room.isActive !== true) return null;
++      const eventId = where.venue?.events?.some?.id;
++      if (eventId) {
++        const event = store.events.get(eventId);
++        if (!event || event.venueId !== room.venueId) return null;
++      }
++      return {
++        id: room.id,
++        name: room.name,
++        capacity: room.capacity,
++        roomType: room.roomType,
++      };
++    }
++  );
++
++  mocks.trackFindFirst.mockImplementation(
++    async ({ where }: { where: { id?: string; eventId?: string } }) => {
++      if (!where.id) return null;
++      const track = store.tracks.get(where.id);
++      if (!track) return null;
++      if (where.eventId && track.eventId !== where.eventId) return null;
++      return { id: track.id };
++    }
++  );
++
++  mocks.eventFindUnique.mockImplementation(
++    async ({
++      where,
++      select,
++    }: {
++      where: { id: string };
++      select?: Record<string, boolean>;
++    }) => {
++      const event = store.events.get(where.id);
++      if (!event) return null;
++      if (select && "venueId" in select && !("slug" in select)) {
++        return { venueId: event.venueId };
++      }
++      if (select && "slug" in select && !("venueId" in select)) {
++        return { slug: event.slug };
++      }
++      return event;
++    }
++  );
++
++  mocks.auditLogCreate.mockResolvedValue({ id: "audit-1" });
++  mocks.requireAdmin.mockResolvedValue("admin-1");
++  mocks.revalidatePath.mockReturnValue(undefined);
++}
++
++function expectNoSessionWrite() {
++  expect(mocks.sessionCreate).not.toHaveBeenCalled();
++  expect(mocks.sessionUpdate).not.toHaveBeenCalled();
++  expect(mocks.sessionUpdateMany).not.toHaveBeenCalled();
++  expect(mocks.auditLogCreate).not.toHaveBeenCalled();
++}
++
++async function expectRejectNoWrite(
++  action: () => Promise<unknown>,
++  message: string
++) {
++  await expect(action()).rejects.toThrow(message);
++  expectNoSessionWrite();
++}
++
++function mcpCreate(params: Record<string, unknown>) {
++  return createSession(params, scopedCtx, EVENT_ID);
++}
++
++function mcpUpdate(params: Record<string, unknown>) {
++  return updateSession(params, scopedCtx);
++}
++
++const organizerCreateBase = {
++  title: "Organizer talk",
++  startTime: T15,
++  endTime: T16,
++  sessionType: "TALK" as const,
++};
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  store.events.clear();
++  store.rooms.clear();
++  store.tracks.clear();
++  store.sessions.clear();
++  store.createdCount = 0;
++  seed();
++  installPrisma();
++});
++
++describe("MCP session scheduling validation (#1906)", () => {
++  it("create with endTime <= startTime rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpCreate({
++          title: "Inverted times",
++          startTime: T15,
++          endTime: T14,
++          roomId: ROOM_MAIN,
++        }),
++      "A session must end after it starts."
++    );
++  });
++
++  it("update that patches only endTime so merged endTime <= startTime rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_EXISTING,
++          endTime: T14,
++        }),
++      "A session must end after it starts."
++    );
++  });
++
++  it("update that patches only roomId into a booked room rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_PARALLEL,
++          roomId: ROOM_MAIN,
++        }),
++      'Main Hall is already booked for "Opening Keynote" in this time slot.'
++    );
++  });
++
++  it("update that patches only startTime into an overlap on the existing room rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_LATER,
++          startTime: T1430,
++        }),
++      'Main Hall is already booked for "Opening Keynote" in this time slot.'
++    );
++  });
++
++  it("create with a track belonging to a different event rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpCreate({
++          title: "Foreign track talk",
++          startTime: T15,
++          endTime: T16,
++          trackId: TRACK_FOREIGN,
++          roomId: ROOM_BREAKOUT,
++        }),
++      "The selected track does not belong to this event."
++    );
++  });
++
++  it("update with a track belonging to a different event rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_EXISTING,
++          trackId: TRACK_FOREIGN,
++        }),
++      "The selected track does not belong to this event."
++    );
++  });
++
++  it("create with an inactive room rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpCreate({
++          title: "Closed room talk",
++          startTime: T15,
++          endTime: T16,
++          roomId: ROOM_INACTIVE,
++        }),
++      "The selected room is not available for this event."
++    );
++  });
++
++  it("update with an inactive room rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_EXISTING,
++          roomId: ROOM_INACTIVE,
++        }),
++      "The selected room is not available for this event."
++    );
++  });
++
++  it("create with a room whose venue does not host this event rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpCreate({
++          title: "Wrong venue talk",
++          startTime: T15,
++          endTime: T16,
++          roomId: ROOM_OTHER_VENUE,
++        }),
++      "The selected room does not belong to this event venue."
++    );
++  });
++
++  it("update with a room whose venue does not host this event rejects and does not write", async () => {
++    await expectRejectNoWrite(
++      () =>
++        mcpUpdate({
++          sessionId: SESSION_EXISTING,
++          roomId: ROOM_OTHER_VENUE,
++        }),
++      "The selected room does not belong to this event venue."
++    );
++  });
++
++  it("adjacent back-to-back room booking is allowed on create", async () => {
++    const created = await mcpCreate({
++      title: "Next hour",
++      startTime: T15,
++      endTime: T16,
++      roomId: ROOM_MAIN,
++      speakerName: "Ada Lovelace",
++    });
++
++    expect(created).toEqual(
++      expect.objectContaining({
++        title: "Next hour",
++        isPublished: false,
++      })
++    );
++    expect(mocks.sessionCreate).toHaveBeenCalledTimes(1);
++    expect(mocks.auditLogCreate).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({ action: "MCP_CREATE_SESSION" }),
++      })
++    );
++  });
++
++  it("adjacent back-to-back room booking is allowed on update", async () => {
++    const updated = await mcpUpdate({
++      sessionId: SESSION_PARALLEL,
++      startTime: T15,
++      endTime: T16,
++      roomId: ROOM_MAIN,
++    });
++
++    expect(updated).toEqual(
++      expect.objectContaining({ id: SESSION_PARALLEL })
++    );
++    expect(mocks.sessionUpdate).toHaveBeenCalledTimes(1);
++    expect(mocks.auditLogCreate).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({ action: "MCP_UPDATE_SESSION" }),
++      })
++    );
++  });
++
++  it("authorized valid create still writes and audits MCP_CREATE_SESSION", async () => {
++    const created = await mcpCreate({
++      title: "Valid talk",
++      startTime: T15,
++      endTime: T16,
++      roomId: ROOM_BREAKOUT,
++      trackId: TRACK_OWN,
++    });
++
++    expect(created).toEqual(
++      expect.objectContaining({ title: "Valid talk" })
++    );
++    expect(mocks.sessionCreate).toHaveBeenCalledTimes(1);
++    expect(mocks.auditLogCreate).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          action: "MCP_CREATE_SESSION",
++          entityType: "session",
++        }),
++      })
++    );
++  });
++
++  it("authorized valid update still writes and audits MCP_UPDATE_SESSION", async () => {
++    const updated = await mcpUpdate({
++      sessionId: SESSION_EXISTING,
++      title: "Opening Keynote (revised)",
++    });
++
++    expect(updated).toEqual(
++      expect.objectContaining({
++        id: SESSION_EXISTING,
++        title: "Opening Keynote (revised)",
++      })
++    );
++    expect(mocks.sessionUpdate).toHaveBeenCalledTimes(1);
++    expect(mocks.auditLogCreate).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({ action: "MCP_UPDATE_SESSION" }),
++      })
++    );
++  });
++
++  it("eventInScope miss still rejects before any write (pre-existing regression)", async () => {
++    await expectRejectNoWrite(
++      () =>
++        updateSession(
++          { sessionId: SESSION_OTHER_EVENT, title: "Hijack" },
++          scopedCtx
++        ),
++      "Session is outside this API key's event scope"
++    );
++  });
++});
++
++describe("MCP vs organizer schedule parity (#1906)", () => {
++  it("foreign track: both entrypoints reject with the same message", async () => {
++    const message = "The selected track does not belong to this event.";
++    await expect(
++      mcpCreate({
++        title: "Foreign track talk",
++        startTime: T15,
++        endTime: T16,
++        trackId: TRACK_FOREIGN,
++      })
++    ).rejects.toThrow(message);
++    await expect(
++      createOrganizerSession(EVENT_ID, {
++        ...organizerCreateBase,
++        trackId: TRACK_FOREIGN,
++      })
++    ).rejects.toThrow(message);
++
++    vi.clearAllMocks();
++    installPrisma();
++
++    await expect(
++      mcpUpdate({ sessionId: SESSION_EXISTING, trackId: TRACK_FOREIGN })
++    ).rejects.toThrow(message);
++    await expect(
++      updateOrganizerSession(EVENT_ID, SESSION_EXISTING, {
++        trackId: TRACK_FOREIGN,
++      })
++    ).rejects.toThrow(message);
++  });
++
++  it("unavailable room (inactive): both entrypoints reject with the same message", async () => {
++    const message = "The selected room is not available for this event.";
++    await expect(
++      mcpCreate({
++        title: "Closed room talk",
++        startTime: T15,
++        endTime: T16,
++        roomId: ROOM_INACTIVE,
++      })
++    ).rejects.toThrow(message);
++    await expect(
++      createOrganizerSession(EVENT_ID, {
++        ...organizerCreateBase,
++        roomId: ROOM_INACTIVE,
++      })
++    ).rejects.toThrow(message);
++
++    vi.clearAllMocks();
++    installPrisma();
++
++    await expect(
++      mcpUpdate({ sessionId: SESSION_EXISTING, roomId: ROOM_INACTIVE })
++    ).rejects.toThrow(message);
++    await expect(
++      updateOrganizerSession(EVENT_ID, SESSION_EXISTING, {
++        roomId: ROOM_INACTIVE,
++      })
++    ).rejects.toThrow(message);
++  });
++
++  it("unavailable room (wrong venue): both entrypoints reject with the same message", async () => {
++    const message = "The selected room does not belong to this event venue.";
++    await expect(
++      mcpCreate({
++        title: "Wrong venue talk",
++        startTime: T15,
++        endTime: T16,
++        roomId: ROOM_OTHER_VENUE,
++      })
++    ).rejects.toThrow(message);
++    await expect(
++      createOrganizerSession(EVENT_ID, {
++        ...organizerCreateBase,
++        roomId: ROOM_OTHER_VENUE,
++      })
++    ).rejects.toThrow(message);
++
++    vi.clearAllMocks();
++    installPrisma();
++
++    await expect(
++      mcpUpdate({ sessionId: SESSION_EXISTING, roomId: ROOM_OTHER_VENUE })
++    ).rejects.toThrow(message);
++    await expect(
++      updateOrganizerSession(EVENT_ID, SESSION_EXISTING, {
++        roomId: ROOM_OTHER_VENUE,
++      })
++    ).rejects.toThrow(message);
++  });
++
++  it("end<=start: both entrypoints reject with the same message", async () => {
++    const message = "A session must end after it starts.";
++    await expect(
++      mcpCreate({
++        title: "Inverted times",
++        startTime: T15,
++        endTime: T14,
++      })
++    ).rejects.toThrow(message);
++    await expect(
++      createOrganizerSession(EVENT_ID, {
++        title: "Inverted times",
++        startTime: T15,
++        endTime: T14,
++        sessionType: "TALK",
++      })
++    ).rejects.toThrow(message);
++
++    vi.clearAllMocks();
++    installPrisma();
++
++    await expect(
++      mcpUpdate({ sessionId: SESSION_EXISTING, endTime: T14 })
++    ).rejects.toThrow(message);
++    await expect(
++      updateOrganizerSession(EVENT_ID, SESSION_EXISTING, { endTime: T14 })
++    ).rejects.toThrow(message);
++  });
++
++  it("merged overlap (startTime-only patch): both entrypoints reject with the same message", async () => {
++    const message =
++      'Main Hall is already booked for "Opening Keynote" in this time slot.';
++    await expect(
++      mcpUpdate({ sessionId: SESSION_LATER, startTime: T1430 })
++    ).rejects.toThrow(message);
++    await expect(
++      updateOrganizerSession(EVENT_ID, SESSION_LATER, {
++        startTime: T1430,
++      })
++    ).rejects.toThrow(message);
++  });
++});

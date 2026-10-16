@@ -1,0 +1,582 @@
+diff --git a/src/app/(public)/events/[eventSlug]/speakers/page.tsx b/src/app/(public)/events/[eventSlug]/speakers/page.tsx
+index d352e7a33..952c33e32 100644
+--- a/src/app/(public)/events/[eventSlug]/speakers/page.tsx
++++ b/src/app/(public)/events/[eventSlug]/speakers/page.tsx
+@@ -9,11 +9,13 @@ import { SpeakerCard, type SpeakerCardTalk } from "@/components/speaker-card";
+ import { isSchedulePublished } from "@/lib/schedule-visibility";
+ import { isSessionWithinEventWindow } from "@/lib/schedule-editor";
+ import { resolveVisualTemplate } from "@/lib/visual-templates";
++import { directorySpeakerIdentities } from "@/lib/public-speaker-people";
+ import {
+   linkedSpeakerProfile,
+   resolveSpeakerDisplay,
+   soleLinkedAccount,
+   speakerSnapshot,
++  strictSpeakerNameKey,
+   type LinkedSpeakerProfiles,
+ } from "@/lib/speaker-display";
+ import { loadLinkedSpeakerProfiles } from "@/lib/speaker-linked-profiles";
+@@ -41,8 +43,20 @@ type SessionRow = {
+   sessionType: string;
+   startTime: Date;
+   speakerName: string | null;
++  speakerTitle?: string | null;
++  speakerCompany?: string | null;
+   speakerPhoto: string | null;
+   speakerClerkUserId: string | null;
++  speakers?: ReadonlyArray<{
++    name: string;
++    title?: string | null;
++    company?: string | null;
++    imageUrl?: string | null;
++    linkedinUrl?: string | null;
++    bio?: string | null;
++    displayOrder?: number | null;
++    clerkUserId?: string | null;
++  }> | null;
+   room: { name: string } | null;
+   cfpSubmission: {
+     organization: string | null;
+@@ -93,9 +107,6 @@ function groupSpeakers(
+   const byName = new Map<string, GroupedSpeaker>();
+ 
+   for (const session of sessions) {
+-    const name = session.speakerName?.trim();
+-    if (!name) continue;
+-    const key = name.toLowerCase();
+     const talk: SpeakerCardTalk = {
+       title: session.title,
+       sessionType: session.sessionType,
+@@ -103,31 +114,33 @@ function groupSpeakers(
+       roomName: session.room?.name ?? null,
+       sessionId: session.id,
+     };
+-    const existing = byName.get(key);
+-    if (existing) {
+-      existing.talks.push(talk);
+-      if (session.sessionType === "KEYNOTE") existing.isKeynote = true;
+-      if (!existing.photo && session.speakerPhoto) {
+-        existing.photo = session.speakerPhoto;
++    for (const person of directorySpeakerIdentities(session)) {
++      const key = strictSpeakerNameKey(person.name);
++      if (!key) continue;
++      const existing = byName.get(key);
++      if (existing) {
++        if (!existing.talks.some((item) => item.sessionId === session.id)) {
++          existing.talks.push(talk);
++        }
++        if (session.sessionType === "KEYNOTE") existing.isKeynote = true;
++        if (!existing.photo && person.photo) existing.photo = person.photo;
++        if (!existing.jobTitle && person.jobTitle) existing.jobTitle = person.jobTitle;
++        if (!existing.organization && person.organization) {
++          existing.organization = person.organization;
++        }
++        existing.linkedAccounts.push(person.clerkUserId);
++      } else {
++        byName.set(key, {
++          name: person.name,
++          photo: person.photo,
++          jobTitle: person.jobTitle,
++          organization: person.organization,
++          isKeynote: session.sessionType === "KEYNOTE",
++          talks: [talk],
++          clerkUserId: null,
++          linkedAccounts: [person.clerkUserId],
++        });
+       }
+-      if (!existing.jobTitle && session.cfpSubmission?.jobTitle) {
+-        existing.jobTitle = session.cfpSubmission.jobTitle;
+-      }
+-      if (!existing.organization && session.cfpSubmission?.organization) {
+-        existing.organization = session.cfpSubmission.organization;
+-      }
+-      existing.linkedAccounts.push(session.speakerClerkUserId);
+-    } else {
+-      byName.set(key, {
+-        name,
+-        photo: session.speakerPhoto,
+-        jobTitle: session.cfpSubmission?.jobTitle ?? null,
+-        organization: session.cfpSubmission?.organization ?? null,
+-        isKeynote: session.sessionType === "KEYNOTE",
+-        talks: [talk],
+-        clerkUserId: null,
+-        linkedAccounts: [session.speakerClerkUserId],
+-      });
+     }
+   }
+ 
+@@ -158,11 +171,15 @@ export default async function SpeakersPage({
+       sessions: {
+         where: {
+           isPublished: true,
+-          speakerName: { not: null },
+           sessionType: { notIn: ["BREAK", "LUNCH", "NETWORKING"] },
++          OR: [
++            { speakerName: { not: null } },
++            { speakers: { some: {} } },
++          ],
+         },
+         include: {
+           room: true,
++          speakers: { orderBy: { displayOrder: "asc" } },
+           cfpSubmission: {
+             select: {
+               organization: true,
+@@ -190,7 +207,10 @@ export default async function SpeakersPage({
+       )
+     : [];
+   const profiles = await loadLinkedSpeakerProfiles(
+-    publicSessions.map((session) => session.speakerClerkUserId),
++    publicSessions.flatMap((session) => [
++      session.speakerClerkUserId,
++      ...(session.speakers ?? []).map((row) => row.clerkUserId),
++    ]),
+   );
+   const grouped = groupSpeakers(publicSessions, profiles);
+   const keynotes = grouped.filter((s) => s.isKeynote);
+diff --git a/src/lib/public-speaker-people.ts b/src/lib/public-speaker-people.ts
+new file mode 100644
+index 000000000..7b98ab2d3
+--- /dev/null
++++ b/src/lib/public-speaker-people.ts
+@@ -0,0 +1,169 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle
++ * SPDX-License-Identifier: AGPL-3.0-or-later
++ */
++
++import { strictSpeakerNameKey } from "@/lib/speaker-display";
++
++/**
++ * People shown on the public speaker page and the per-event directory (#2258).
++ *
++ * A session with one or more named SessionSpeaker rows yields one person per
++ * distinct strictSpeakerNameKey, in displayOrder (ascending). Ties keep the
++ * order the rows were given. The flat Session.speakerName is a person only
++ * when the session has zero named rows — importers store the joined
++ * "A & B" string there, and that joined string is not its own person.
++ *
++ * Someone who is both a row and the flat name on the same session is one
++ * person (the row). The same strict key on two sessions is one person.
++ *
++ * Profile snapshots are row fields, then the session's flat speaker* fields
++ * when the row field is null. Callers pass that snapshot to speakerSnapshot /
++ * resolveSpeakerDisplay; this module does not apply linked-account precedence.
++ * Directory cards keep the pre-#2258 flat sources (photo, CFP title and
++ * organization) when the session has no rows.
++ */
++
++export type PublicSessionSpeakerRow = {
++  name: string;
++  title?: string | null;
++  company?: string | null;
++  imageUrl?: string | null;
++  linkedinUrl?: string | null;
++  bio?: string | null;
++  displayOrder?: number | null;
++  clerkUserId?: string | null;
++};
++
++export type PublicSpeakerSessionSource = {
++  speakerName?: string | null;
++  speakerTitle?: string | null;
++  speakerCompany?: string | null;
++  speakerBio?: string | null;
++  speakerPhoto?: string | null;
++  speakerXHandle?: string | null;
++  speakerLinkedin?: string | null;
++  speakerClerkUserId?: string | null;
++  speakers?: readonly PublicSessionSpeakerRow[] | null;
++  cfpSubmission?: {
++    organization?: string | null;
++    jobTitle?: string | null;
++  } | null;
++};
++
++export type PublicSpeakerPerson = {
++  name: string;
++  photo: string | null;
++  company: string | null;
++  jobTitle: string | null;
++  bio: string | null;
++  linkedinUrl: string | null;
++  xHandle: string | null;
++  /** Row clerkUserId, or the session's speakerClerkUserId when there are no rows. */
++  clerkUserId: string | null;
++};
++
++export type DirectorySpeakerIdentity = {
++  name: string;
++  photo: string | null;
++  jobTitle: string | null;
++  organization: string | null;
++  clerkUserId: string | null;
++};
++
++function text(value: string | null | undefined): string | null {
++  const trimmed = value?.trim();
++  return trimmed ? trimmed : null;
++}
++
++export function sessionHasSpeakerRows(
++  session: { speakers?: readonly { name?: string | null }[] | null },
++): boolean {
++  return (session.speakers ?? []).some((row) => text(row.name));
++}
++
++/** Named rows, earliest displayOrder first. Equal orders keep input order. */
++export function orderedSpeakerRows(
++  rows: readonly PublicSessionSpeakerRow[] | null | undefined,
++): PublicSessionSpeakerRow[] {
++  return [...(rows ?? [])]
++    .filter((row) => text(row.name))
++    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
++}
++
++/**
++ * People on one session. The first entry is who a Session.id resolves to
++ * when the session has rows: the first named row by displayOrder.
++ */
++export function peopleOnSession(
++  session: PublicSpeakerSessionSource,
++): PublicSpeakerPerson[] {
++  const rows = orderedSpeakerRows(session.speakers);
++  if (rows.length === 0) {
++    const name = text(session.speakerName);
++    if (!name) return [];
++    return [
++      {
++        name,
++        photo: text(session.speakerPhoto),
++        company: text(session.speakerCompany),
++        jobTitle: text(session.speakerTitle),
++        bio: text(session.speakerBio),
++        linkedinUrl: text(session.speakerLinkedin),
++        xHandle: text(session.speakerXHandle),
++        clerkUserId: session.speakerClerkUserId ?? null,
++      },
++    ];
++  }
++
++  const seen = new Set<string>();
++  const people: PublicSpeakerPerson[] = [];
++  for (const row of rows) {
++    const name = text(row.name)!;
++    const key = strictSpeakerNameKey(name);
++    if (!key || seen.has(key)) continue;
++    seen.add(key);
++    people.push({
++      name,
++      photo: text(row.imageUrl) ?? text(session.speakerPhoto),
++      company: text(row.company) ?? text(session.speakerCompany),
++      jobTitle: text(row.title) ?? text(session.speakerTitle),
++      bio: text(row.bio) ?? text(session.speakerBio),
++      linkedinUrl: text(row.linkedinUrl) ?? text(session.speakerLinkedin),
++      // SessionSpeaker has no x handle; the flat field is the only source.
++      xHandle: text(session.speakerXHandle),
++      clerkUserId: row.clerkUserId ?? null,
++    });
++  }
++  return people;
++}
++
++/**
++ * Directory card identities. Flat sessions keep CFP title/org and the session
++ * photo. Row sessions prefer the row, then flat speaker* fields, then CFP.
++ */
++export function directorySpeakerIdentities(
++  session: PublicSpeakerSessionSource,
++): DirectorySpeakerIdentity[] {
++  if (!sessionHasSpeakerRows(session)) {
++    const name = text(session.speakerName);
++    if (!name) return [];
++    return [
++      {
++        name,
++        photo: session.speakerPhoto ?? null,
++        jobTitle: session.cfpSubmission?.jobTitle ?? null,
++        organization: session.cfpSubmission?.organization ?? null,
++        clerkUserId: session.speakerClerkUserId ?? null,
++      },
++    ];
++  }
++
++  return peopleOnSession(session).map((person) => ({
++    name: person.name,
++    photo: person.photo ?? session.speakerPhoto ?? null,
++    jobTitle: person.jobTitle ?? session.cfpSubmission?.jobTitle ?? null,
++    organization: person.company ?? session.cfpSubmission?.organization ?? null,
++    clerkUserId: person.clerkUserId,
++  }));
++}
+diff --git a/src/lib/public-speaker-session.ts b/src/lib/public-speaker-session.ts
+index 329f1c733..d30829165 100644
+--- a/src/lib/public-speaker-session.ts
++++ b/src/lib/public-speaker-session.ts
+@@ -6,13 +6,21 @@ import 'server-only';
+ 
+ import { cache } from 'react';
+ import { prisma } from '@/lib/db';
++import { isSessionWithinEventWindow } from '@/lib/schedule-editor';
+ import { isSchedulePublished } from '@/lib/schedule-visibility';
+ import { slugify } from '@/lib/slug';
++import {
++  peopleOnSession,
++  sessionHasSpeakerRows,
++  type PublicSpeakerPerson,
++  type PublicSpeakerSessionSource,
++} from '@/lib/public-speaker-people';
+ import {
+   linkedSpeakerProfile,
+   resolveSpeakerDisplay,
+   soleLinkedAccount,
+   speakerSnapshot,
++  strictSpeakerNameKey,
+   type SpeakerDisplay,
+ } from '@/lib/speaker-display';
+ import { loadLinkedSpeakerProfiles } from '@/lib/speaker-linked-profiles';
+@@ -41,6 +49,20 @@ const publicSpeakerSessionSelect = {
+       xHandle: true,
+       timezone: true,
+       scheduleStatus: true,
++      startDate: true,
++      endDate: true,
++    },
++  },
++  speakers: {
++    select: {
++      name: true,
++      title: true,
++      company: true,
++      imageUrl: true,
++      linkedinUrl: true,
++      bio: true,
++      displayOrder: true,
++      clerkUserId: true,
+     },
+   },
+ } as const;
+@@ -101,10 +123,87 @@ async function resolvePublicSpeakerDisplay(
+   return resolveSpeakerDisplay(snapshot, linkedSpeakerProfile(profiles, linkedId));
+ }
+ 
++type WindowedEvent = {
++  startDate?: Date | string | null;
++  endDate?: Date | string | null;
++};
++
++/**
++ * Event.startDate and Event.endDate are required in the schema. A caller that
++ * did not select them (or a unit fixture that omits them) skips the window so
++ * a partial event cannot hide every session.
++ */
++function sessionInEventWindow(
++  session: { startTime: Date; endTime: Date },
++  event: WindowedEvent,
++): boolean {
++  if (event.startDate == null || event.endDate == null) return true;
++  return isSessionWithinEventWindow(
++    session.startTime,
++    session.endTime,
++    event.startDate,
++    event.endDate,
++  );
++}
++
++function personOnSession(
++  session: PublicSpeakerSessionSource,
++  strictKey: string,
++): PublicSpeakerPerson | undefined {
++  return peopleOnSession(session).find(
++    (person) => strictSpeakerNameKey(person.name) === strictKey,
++  );
++}
++
+ /**
+- * Resolve a public speaker profile by Session.id or by slugified speaker name
+- * (e.g. "dr-nebula-vex"). Returns all published sessions for that speaker
+- * within the event, newest-first by start time.
++ * #2001 for a resolved person. By session id, only that session's own link
++ * counts (the first SessionSpeaker row when the session has rows, otherwise
++ * Session.speakerClerkUserId). By name, soleLinkedAccount across the person's
++ * sessions: two different accounts show the snapshot only.
++ */
++async function resolvePersonDisplay(
++  sessions: readonly (PublicSpeakerSessionSource & { id: string })[],
++  strictKey: string,
++  ownSessionId?: string,
++): Promise<SpeakerDisplay> {
++  const appearances = sessions.flatMap((session) => {
++    const person = personOnSession(session, strictKey);
++    return person ? [{ ...person, sessionId: session.id }] : [];
++  });
++  const own = ownSessionId
++    ? appearances.find((person) => person.sessionId === ownSessionId)
++    : undefined;
++  const linkedId = ownSessionId
++    ? (own?.clerkUserId ?? null)
++    : soleLinkedAccount(appearances.map((person) => person.clerkUserId));
++  // By session id the requested session is always the snapshot source; a
++  // missing linked account on that row must not fall through to an earlier
++  // appearance's fields (Codex review, #2258 round 1).
++  const primary = own ?? appearances[0];
++  const snapshot = speakerSnapshot({
++    photo: primary?.photo ?? null,
++    company: primary?.company ?? null,
++    jobTitle: primary?.jobTitle ?? null,
++    bio: primary?.bio ?? null,
++    linkedinUrl: primary?.linkedinUrl ?? null,
++    xHandle: primary?.xHandle ?? null,
++  });
++  if (!linkedId || !primary) return snapshot;
++  const profiles = await loadLinkedSpeakerProfiles([linkedId]);
++  return resolveSpeakerDisplay(snapshot, linkedSpeakerProfile(profiles, linkedId));
++}
++
++/**
++ * Resolve a public speaker profile by Session.id or by slugify(name).
++ *
++ * Session.id on a multi-row session is the first named SessionSpeaker by
++ * displayOrder (ascending; ties keep query order). The joined flat
++ * speakerName ("A & B") does not resolve when the session has rows: the URL
++ * key is slugify of each row's name. A session with zero rows still resolves
++ * by slugify(speakerName).
++ *
++ * Sessions are startTime ascending. Unpublished sessions, draft schedules,
++ * and sessions outside the event window are omitted.
+  */
+ async function findPublicEventSpeakerUncached(
+   eventSlug: string,
+@@ -112,27 +211,58 @@ async function findPublicEventSpeakerUncached(
+ ) {
+   const bySession = await findPublicSpeakerSessionUncached(eventSlug, speakerKey);
+   if (bySession) {
++    if (!sessionHasSpeakerRows(bySession)) {
++      const peers = await prisma.session.findMany({
++        where: {
++          event: { slug: eventSlug },
++          isPublished: true,
++          speakerName: bySession.speakerName,
++        },
++        select: publicSpeakerSessionSelect,
++        orderBy: { startTime: 'asc' },
++      });
++      const published = peers.filter(
++        (session) =>
++          isSchedulePublished(session.event.scheduleStatus) &&
++          sessionInEventWindow(session, bySession.event),
++      );
++      return published.length > 0
++        ? {
++            speakerName: bySession.speakerName!,
++            speakerSlug: slugify(bySession.speakerName!),
++            sessions: published,
++            event: bySession.event,
++            display: await resolvePublicSpeakerDisplay(published, bySession),
++          }
++        : null;
++    }
++
++    const anchor = peopleOnSession(bySession)[0];
++    if (!anchor) return null;
++    const strictKey = strictSpeakerNameKey(anchor.name);
+     const peers = await prisma.session.findMany({
+       where: {
+         event: { slug: eventSlug },
+         isPublished: true,
+-        speakerName: bySession.speakerName,
++        OR: [{ speakerName: { not: null } }, { speakers: { some: {} } }],
+       },
+       select: publicSpeakerSessionSelect,
+       orderBy: { startTime: 'asc' },
+     });
+-    const published = peers.filter((session) =>
+-      isSchedulePublished(session.event.scheduleStatus)
++    const published = peers.filter(
++      (session) =>
++        isSchedulePublished(session.event.scheduleStatus) &&
++        sessionInEventWindow(session, bySession.event) &&
++        personOnSession(session, strictKey),
+     );
+-    return published.length > 0
+-      ? {
+-          speakerName: bySession.speakerName!,
+-          speakerSlug: slugify(bySession.speakerName!),
+-          sessions: published,
+-          event: bySession.event,
+-          display: await resolvePublicSpeakerDisplay(published, bySession),
+-        }
+-      : null;
++    if (published.length === 0) return null;
++    return {
++      speakerName: anchor.name,
++      speakerSlug: slugify(anchor.name),
++      sessions: published,
++      event: bySession.event,
++      display: await resolvePersonDisplay(published, strictKey, bySession.id),
++    };
+   }
+ 
+   const event = await prisma.event.findUnique({
+@@ -144,6 +274,8 @@ async function findPublicEventSpeakerUncached(
+       xHandle: true,
+       timezone: true,
+       scheduleStatus: true,
++      startDate: true,
++      endDate: true,
+     },
+   });
+   if (!event || !isSchedulePublished(event.scheduleStatus)) return null;
+@@ -152,25 +284,47 @@ async function findPublicEventSpeakerUncached(
+     where: {
+       event: { slug: eventSlug },
+       isPublished: true,
+-      speakerName: { not: null },
+       sessionType: { notIn: ['BREAK', 'LUNCH', 'NETWORKING'] },
++      OR: [{ speakerName: { not: null } }, { speakers: { some: {} } }],
+     },
+     select: publicSpeakerSessionSelect,
+     orderBy: { startTime: 'asc' },
+   });
+ 
+-  const matched = candidates.filter(
++  const visible = candidates.filter(
+     (session) =>
+-      session.speakerName && slugify(session.speakerName) === speakerKey
++      isSchedulePublished(session.event.scheduleStatus) &&
++      sessionInEventWindow(session, event),
++  );
++  const slugHit = visible.find((session) =>
++    peopleOnSession(session).some((person) => slugify(person.name) === speakerKey),
+   );
++  if (!slugHit) return null;
++  const anchor = peopleOnSession(slugHit).find(
++    (person) => slugify(person.name) === speakerKey,
++  );
++  if (!anchor) return null;
++  const strictKey = strictSpeakerNameKey(anchor.name);
++  const matched = visible.filter((session) => personOnSession(session, strictKey));
+   if (matched.length === 0) return null;
+ 
++  if (matched.every((session) => !sessionHasSpeakerRows(session))) {
++    return {
++      speakerName: matched[0]!.speakerName!,
++      speakerSlug: speakerKey,
++      sessions: matched,
++      event,
++      display: await resolvePublicSpeakerDisplay(matched),
++    };
++  }
++
++  const displayPerson = personOnSession(matched[0]!, strictKey) ?? anchor;
+   return {
+-    speakerName: matched[0]!.speakerName!,
++    speakerName: displayPerson.name,
+     speakerSlug: speakerKey,
+     sessions: matched,
+     event,
+-    display: await resolvePublicSpeakerDisplay(matched),
++    display: await resolvePersonDisplay(matched, strictKey),
+   };
+ }
+ 

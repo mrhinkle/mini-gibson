@@ -1,0 +1,88 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "the-gibson-78",
+  "repo": "the-gibson",
+  "repo_url": "https://github.com/The-AIE/the-gibson",
+  "pr": 78,
+  "base_sha": "51594b578b87811ac3a4e6a87362247da259a6de",
+  "merge_sha": "995b6e6df360ccbbbf746fe612ae77a9acbf9fff",
+  "issue_number": 62,
+  "issues": [
+    62
+  ],
+  "issue_title": "Harness: make legacy date-only claim staleness deterministic on BSD/macOS",
+  "problem_statement": "Harness: make legacy date-only claim staleness deterministic on BSD/macOS\n\n## Evidence\n\nDuring independent reviews of PR #58 and PR #60, the full sensor sweep intermittently reported:\n\n`claim.test.sh: 26 passed, 1 failed`\n\nEach immediate rerun passed `27 passed, 0 failed`; #58 then passed five more focused reruns and a final full suite, and #60's final suite passed 324/0. Neither PR changed `scripts/claim.sh`, `scripts/claims-status.sh`, or `scripts/tests/claim.test.sh`.\n\nAn independent fresh-main reproduction at fresh main failed once in 12 runs. The exact assertion was:\n\n`FAIL \u2014 flags a stale claim (missing 'STALE')`\n\nThe legacy row was present; only its `STALE` marker was absent.\n\n## Likely scope\n\n`scripts/tests/claim.test.sh` uses a date-only legacy timestamp exactly one calendar day old. On BSD/macOS, the fallback parser in `scripts/claims-status.sh` fills missing time fields from the current clock. Because `NOW` is captured before the parse, a second-boundary crossing can make the computed age 86,399 seconds (23 whole hours) instead of 24 hours.\n\n## Acceptance\n\n- Define deterministic UTC semantics for legacy date-only claim timestamps.\n- Add regression coverage for the exact 24-hour boundary with a controllable/fixed clock.\n- Keep the stale-claim assertion; do not weaken or remove it to make the test pass.\n- `claim.test.sh` passes repeated runs on macOS, and failures retain the specific failed assertion rather than only the summary count.",
+  "split": "external_holdout_unseen",
+  "runner": "shell",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "bash scripts/tests/claim.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/claim.test.sh::STALE at exactly 24h from date-only midnight UTC",
+      "scripts/tests/claim.test.sh::leading-zero epoch is base-10 STALE(24h)",
+      "scripts/tests/claim.test.sh::not STALE one second under 24h",
+      "scripts/tests/claim.test.sh::oversized epoch exits 2",
+      "scripts/tests/claim.test.sh::oversized epoch validation error",
+      "scripts/tests/claim.test.sh::oversized never succeeds with a live table",
+      "scripts/tests/claim.test.sh::set-empty epoch exits 2",
+      "scripts/tests/claim.test.sh::set-empty epoch validation error",
+      "scripts/tests/claim.test.sh::set-empty never succeeds with a live table"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "bash scripts/tests/claim.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/claim.test.sh::STALE marks the legacy claim id",
+      "scripts/tests/claim.test.sh::allowed",
+      "scripts/tests/claim.test.sh::both slices live",
+      "scripts/tests/claim.test.sh::broad claim over a live narrow claim is refused",
+      "scripts/tests/claim.test.sh::claim still landed on main",
+      "scripts/tests/claim.test.sh::claim succeeds",
+      "scripts/tests/claim.test.sh::does not append to the shared table",
+      "scripts/tests/claim.test.sh::flags a stale claim",
+      "scripts/tests/claim.test.sh::includes legacy rows",
+      "scripts/tests/claim.test.sh::includes the legacy claim one second under 24h",
+      "scripts/tests/claim.test.sh::leading-zero decimal epoch does not abort",
+      "scripts/tests/claim.test.sh::leading-zero epoch still lists the claim",
+      "scripts/tests/claim.test.sh::legacy scope overlap is refused",
+      "scripts/tests/claim.test.sh::names the conflicting claim",
+      "scripts/tests/claim.test.sh::names the holder",
+      "scripts/tests/claim.test.sh::narrow claim inside a live broad claim is refused",
+      "scripts/tests/claim.test.sh::no claim was written",
+      "scripts/tests/claim.test.sh::oversized never pretends no live claims",
+      "scripts/tests/claim.test.sh::points at --slice",
+      "scripts/tests/claim.test.sh::records the scope",
+      "scripts/tests/claim.test.sh::records the session",
+      "scripts/tests/claim.test.sh::refuses",
+      "scripts/tests/claim.test.sh::same issue via a legacy row is refused",
+      "scripts/tests/claim.test.sh::says it is a slice",
+      "scripts/tests/claim.test.sh::set-empty never pretends no live claims",
+      "scripts/tests/claim.test.sh::shows slice one",
+      "scripts/tests/claim.test.sh::shows slice two",
+      "scripts/tests/claim.test.sh::sibling untouched",
+      "scripts/tests/claim.test.sh::still on its branch",
+      "scripts/tests/claim.test.sh::the claim commit touches nothing else",
+      "scripts/tests/claim.test.sh::uncommitted work untouched",
+      "scripts/tests/claim.test.sh::unrelated scope is allowed",
+      "scripts/tests/claim.test.sh::wrote docs/claims/issue-42-password-reset.md"
+    ]
+  },
+  "setup": [
+    "test -f scripts/tests/claim.test.sh"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": false,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

@@ -1,0 +1,431 @@
+diff --git a/docs/user/organizer.md b/docs/user/organizer.md
+index ff1a15647..48acfe105 100644
+--- a/docs/user/organizer.md
++++ b/docs/user/organizer.md
+@@ -53,6 +53,26 @@ Code of Conduct, and Accessibility information before sending people to a live
+ registration flow. Policy and legal content remain the operator's
+ responsibility.
+ 
++## Public navigation
++
++Open `/organizer/events/<event-slug>/navigation` to rename, reorder, group,
++hide, or add links in an event's header and footer. The header uses the same
++configured links on desktop and mobile. On sites with a parent-site bar, the
++featured event's navigation also appears on site-level pages.
++
++The default event menu contains Participate, Schedule, Speakers, Sponsors,
++Partners, and Event Info. Past events and Past speakers are not added
++automatically. To add these in the event editor, use full HTTPS URLs with
++**External** enabled: `https://<event-site>/speakers` for the speaker archive,
++or a group linking to `https://<event-site>/events/<past-event-slug>`. Internal
++event links are restricted to the current event. Removing a menu link does
++not remove its page.
++
++With no saved rows, the editor previews the built-in defaults. The first edit
++saves the whole list. Hiding every item keeps the menu empty; deleting every
++saved row restores the defaults. Event identity, search, Help, account controls,
++and the separately managed registration action are outside this link list.
++
+ ## Build and publish the program
+ 
+ - Configure the CFP before sending speakers to `/events/<event-slug>/cfp`.
+diff --git a/src/app/(public)/public-layout-client.tsx b/src/app/(public)/public-layout-client.tsx
+index ba8505901..f9002cb20 100644
+--- a/src/app/(public)/public-layout-client.tsx
++++ b/src/app/(public)/public-layout-client.tsx
+@@ -25,7 +25,6 @@ import {
+   type NavLink,
+ } from '@/lib/public-event-nav';
+ import {
+-  buildEventsBarEntries,
+   eventBarDetails,
+   familyParentEntries,
+   resolveEventsBar,
+@@ -74,25 +73,22 @@ interface PublicLayoutClientProps {
+  */
+ 
+ /**
+- * #1983: parent-site bar links. Smaller and lower-contrast than the events bar
+- * (white at 75% on a darker ground, about 10:1), and no weight above 400.
+- *
+- * The parent bar is always dark, whatever the event's visual template, so it
+- * carries no template hook class (`vt-nav-link`, `vt-nav-panel`, `vt-nav-brand`):
+- * Broadside's `!important` ink colors would put dark text on this dark ground.
++ * #1983: parent-site links sit on white, above the event's themed navigation.
++ * Keep their colors independent of the event template, including dropdowns,
++ * so the parent brand has the same treatment across events.
+  */
+ const parentBarFocusClass =
+-  'focus-visible:text-white focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white';
++  'focus-visible:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-700';
+ const parentBarLinkClass = (active: boolean) =>
+   `inline-flex min-h-11 shrink-0 items-center rounded-md px-2 py-2 text-[0.8125rem] whitespace-nowrap transition-colors ${parentBarFocusClass} ${
+-    active ? 'bg-white/10 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'
++    active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+   }`;
+ const parentBarPanelLinkClass = (active: boolean) =>
+   `flex min-h-11 items-center rounded-md px-3 py-2 text-[0.8125rem] transition-colors ${parentBarFocusClass} ${
+-    active ? 'bg-white/10 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'
++    active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+   }`;
+ const parentBarPanelClass =
+-  'fixed z-50 min-w-[13rem] rounded-md border border-white/10 bg-space-900 p-1 shadow-lg';
++  'fixed z-50 w-max min-w-[13rem] max-w-[calc(100vw-1rem)] rounded-md border border-slate-200 bg-white p-1 wrap-anywhere shadow-lg';
+ 
+ /**
+  * #1983: the nearest ancestor that is the containing block for `position:
+@@ -134,7 +130,7 @@ function NavDropdown({
+   template: VisualTemplateId;
+   /** #1983: the parent bar and the events bar can both hold a same-named menu. */
+   idPrefix?: string;
+-  /** #1983: the parent-site bar is always dark and quieter than the header. */
++  /** #1983: the parent-site bar has its own white background and dark text. */
+   tone?: 'default' | 'parent';
+ }) {
+   const isParent = tone === 'parent';
+@@ -160,19 +156,31 @@ function NavDropdown({
+    * move the button; only a resize or a scroll of the nav strip itself can, and
+    * both re-measure.
+    */
+-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+   const containerRef = useRef<HTMLDivElement>(null);
+   const buttonRef = useRef<HTMLButtonElement>(null);
++  const panelRef = useRef<HTMLDivElement>(null);
+   const active = isNavGroupActive(pathname, group);
+   const panelId = `${idPrefix}-${group.label.toLowerCase().replace(/\W+/g, '-')}`;
+ 
+   const measure = () => {
+     const rect = buttonRef.current?.getBoundingClientRect();
+-    if (!rect) return;
++    const panel = panelRef.current;
++    if (!rect || !panel) return;
+     const block = fixedContainingBlock(buttonRef.current)?.getBoundingClientRect();
+-    setPos({ left: rect.left - (block?.left ?? 0), top: rect.bottom + 4 - (block?.top ?? 0) });
++    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
++    panel.style.maxWidth = `${Math.max(0, viewportWidth - 16)}px`;
++    const width = panel.getBoundingClientRect().width;
++    const left = Math.max(8, Math.min(rect.left, viewportWidth - width - 8));
++    panel.style.left = `${left - (block?.left ?? 0)}px`;
++    panel.style.top = `${rect.bottom + 4 - (block?.top ?? 0)}px`;
+   };
+ 
++  // A hidden panel has no width. Clamp after it opens, before paint, so a
++  // right-aligned final menu stays inside the viewport in either header.
++  useLayoutEffect(() => {
++    if (open) measure();
++  }, [open]);
++
+   // Close when focus or a click leaves the menu, and on Escape.
+   useEffect(() => {
+     if (!open) return;
+@@ -240,10 +248,10 @@ function NavDropdown({
+         />
+       </button>
+       <div
++        ref={panelRef}
+         id={panelId}
+         hidden={!open}
+-        style={pos ? { left: pos.left, top: pos.top } : undefined}
+-        className={isParent ? parentBarPanelClass : `vt-nav-panel fixed z-50 min-w-[13rem] border p-1 shadow-lg ${
++        className={isParent ? parentBarPanelClass : `vt-nav-panel fixed z-50 w-max min-w-[13rem] max-w-[calc(100vw-1rem)] border p-1 wrap-anywhere shadow-lg ${
+           isBroadside
+             ? 'rounded-sm border-stone-200 bg-[#faf9f7]'
+             : 'rounded-md border-white/10 bg-space-900'
+@@ -500,11 +508,10 @@ export default function PublicLayoutClient({
+   const parentEntries = family
+     ? familyParentEntries(family.parentNav, family.parentSiteUrl)
+     : [];
+-  // Site-level pages show the featured event's nav so the event is always a
+-  // click away; event pages keep their own nav and override, unchanged.
+-  const barEntries = family
+-    ? buildEventsBarEntries(eventsBar?.eventNav ?? [], family.pastEvents)
+-    : [];
++  // Use the same defaults or organizer override as the single header and
++  // Navigation editor. Never append archive links outside that configuration;
++  // an intentionally empty override must stay empty on desktop and mobile.
++  const barEntries = eventsBar?.eventNav ?? [];
+   const barCta =
+     !eventSlug && homepageCampaignCta
+       ? {
+@@ -573,33 +580,49 @@ export default function PublicLayoutClient({
+ 
+   const familyHeader = family ? (
+     <>
+-      {/* #1983 parent-site bar: thin, not sticky, always dark. Its fixed h-11
++      {/* #1983 parent-site bar: thin, not sticky, always white. Its fixed h-11
+           is in the server-rendered markup, so no layout shift on hydration. */}
+-      <div className="border-b border-white/10 bg-[#070d1a]" data-parent-bar="" data-testid="parent-site-bar">
+-        <div className="mx-auto flex h-11 max-w-7xl min-w-0 items-center gap-4 px-4 sm:px-6 lg:px-8">
++      <div className="border-b border-slate-200 bg-white" data-parent-bar="" data-testid="parent-site-bar">
++        <div className="mx-auto flex h-11 max-w-7xl min-w-0 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+           {/* The brand logo links to the parent site, same tab, on every page. */}
+           <a
+             href={family.parentSiteUrl}
+             aria-label={`${family.parentSiteName} home`}
+-            className={`flex min-h-11 shrink-0 items-center rounded-md ${parentBarFocusClass}`}
++            className={`flex min-h-11 min-w-0 max-w-[35vw] shrink-0 items-center rounded-md sm:max-w-[10rem] ${parentBarFocusClass}`}
+           >
+             {family.parentLogoUrl ? (
+               // eslint-disable-next-line @next/next/no-img-element
+               <img
+                 src={family.parentLogoUrl}
+                 alt=""
+-                className="h-7 w-auto max-w-[45vw] object-contain sm:max-w-[10rem]"
++                className="h-7 w-auto max-w-[35vw] object-contain sm:max-w-[10rem]"
+               />
+             ) : (
+-              <span className="text-sm font-medium text-white">{family.parentSiteName}</span>
++              <span className="truncate text-sm font-medium text-slate-900">{family.parentSiteName}</span>
+             )}
+           </a>
+           <nav
+             aria-label={family.parentSiteName}
+-            className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
++            className="ml-auto hidden min-w-0 flex-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] xl:block [&::-webkit-scrollbar]:hidden"
+           >
+-            {parentEntries.map((entry) => renderBarEntry(entry, 'parent'))}
++            <div className="flex w-max min-w-full items-center justify-end gap-0.5">
++              {parentEntries.map((entry) => renderBarEntry(entry, 'parent'))}
++            </div>
+           </nav>
++          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2 xl:ml-2" data-testid="parent-site-utilities">
++            <SearchForm
++              action="/search"
++              placeholder="Search"
++              variant="public"
++              compact
++              enableShortcut
++              className="hidden w-36 sm:flex lg:w-44 [&_input]:placeholder:text-slate-500 [&_svg]:text-slate-500"
++            />
++            <ContextualHelpPanel headerTone="light" />
++            <ConditionalUserButton
++              signInClassName={`inline-flex min-h-11 items-center rounded-md px-2 text-sm font-medium whitespace-nowrap text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 ${parentBarFocusClass}`}
++            />
++          </div>
+         </div>
+       </div>
+ 
+@@ -618,19 +641,18 @@ export default function PublicLayoutClient({
+               <Link
+                 href={`/events/${barEvent.slug}`}
+                 aria-current={pathname === `/events/${barEvent.slug}` ? 'page' : undefined}
+-                className="vt-events-identity flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm sm:text-base"
++                className="vt-events-identity flex min-h-11 min-w-0 flex-1 flex-col justify-center text-sm sm:text-base xl:max-w-64 xl:flex-none"
+                 data-testid="events-bar-identity"
+               >
+-                <span className={`min-w-0 truncate font-medium ${isBroadside ? 'text-stone-900' : 'text-white'}`}>
++                <span className={`max-w-full truncate font-medium ${isBroadside ? 'text-stone-900' : 'text-white'}`}>
+                   {barEvent.name}
+                 </span>
+                 {eventBarDetails(barEvent) ? (
+                   <span
+-                    className={`hidden min-w-0 truncate text-sm sm:inline ${
++                    className={`max-w-full truncate text-xs ${
+                       isBroadside ? 'text-stone-600' : 'text-[#66AAFF]'
+                     }`}
+                   >
+-                    <span aria-hidden="true">· </span>
+                     {eventBarDetails(barEvent)}
+                   </span>
+                 ) : null}
+@@ -638,61 +660,42 @@ export default function PublicLayoutClient({
+             ) : (
+               <div className="min-w-0 flex-1" aria-hidden="true" />
+             )}
+-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+-              {barCta ? (
+-                <NavAnchor
+-                  href={barCta.href}
+-                  external={barCta.external}
+-                  className={`${barCtaClass} hidden md:inline-flex`}
+-                  aria-label={barCta.ariaLabel}
+-                  aria-current={barCtaCurrent}
+-                >
+-                  {barCta.label}
+-                </NavAnchor>
+-              ) : null}
+-              <SearchForm
+-                action="/search"
+-                placeholder="Search"
+-                variant={isBroadside ? 'public' : 'public-dark'}
+-                compact
+-                enableShortcut
+-                className="hidden lg:flex"
+-              />
+-              <ContextualHelpPanel headerTone={isBroadside ? 'light' : 'dark'} />
+-              <ConditionalUserButton
+-                signInClassName={`inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium transition-colors ${
+-                  isBroadside
+-                    ? 'text-stone-700 hover:bg-stone-900/5 hover:text-stone-900'
+-                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+-                }`}
+-              />
+-              <button
+-                type="button"
+-                onClick={() => setSidebarOpen(!sidebarOpen)}
+-                className={`vt-nav-menu-btn inline-flex min-h-11 min-w-11 items-center justify-center rounded-md md:hidden ${
+-                  isBroadside
+-                    ? 'text-stone-700 hover:bg-stone-900/5 hover:text-stone-900'
+-                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
+-                }`}
+-                aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+-                aria-expanded={sidebarOpen}
+-                aria-controls={eventSlug ? 'event-mobile-navigation' : 'home-mobile-navigation'}
++            <nav
++              aria-label={barEvent?.name ?? 'Events'}
++              className="ml-auto hidden min-w-0 flex-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] xl:block [&::-webkit-scrollbar]:hidden"
++            >
++              <div className="flex w-max min-w-full items-center justify-end gap-0.5">
++                {barEntries.map((entry) => renderBarEntry(entry, 'event'))}
++              </div>
++            </nav>
++            {barCta ? (
++              <NavAnchor
++                href={barCta.href}
++                external={barCta.external}
++                className={`${barCtaClass} hidden sm:inline-flex`}
++                aria-label={barCta.ariaLabel}
++                aria-current={barCtaCurrent}
+               >
+-                {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+-              </button>
+-            </div>
++                {barCta.label}
++              </NavAnchor>
++            ) : null}
++            <button
++              type="button"
++              onClick={() => setSidebarOpen(!sidebarOpen)}
++              className={`vt-nav-menu-btn inline-flex min-h-11 min-w-11 items-center justify-center rounded-md xl:hidden ${
++                isBroadside
++                  ? 'text-stone-700 hover:bg-stone-900/5 hover:text-stone-900'
++                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
++              }`}
++              aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
++              aria-expanded={sidebarOpen}
++              aria-controls={eventSlug ? 'event-mobile-navigation' : 'home-mobile-navigation'}
++            >
++              {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
++            </button>
+           </div>
+ 
+-          <nav
+-            aria-label={barEvent?.name ?? 'Events'}
+-            className={`hidden min-w-0 items-center gap-0.5 overflow-x-auto overscroll-x-contain border-t py-2 [-ms-overflow-style:none] [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden ${
+-              isBroadside ? 'border-stone-200/80' : 'border-white/10'
+-            }`}
+-          >
+-            {barEntries.map((entry) => renderBarEntry(entry, 'event'))}
+-          </nav>
+-
+-          {/* Phone: one menu, two labelled sections in the same order as the bars.
++          {/* Phone/tablet: one menu, two labelled sections in the same order as the bars.
+               It scrolls itself, below the header, so the last links and the CTA
+               stay reachable by touch; the fallback top (6.375rem = parent bar
+               45px + events row 56px + border) is the unscrolled worst case. */}
+@@ -700,7 +703,7 @@ export default function PublicLayoutClient({
+             ref={familyMenuRef}
+             id={eventSlug ? 'event-mobile-navigation' : 'home-mobile-navigation'}
+             hidden={!sidebarOpen}
+-            className={`max-h-[calc(100vh_-_var(--events-menu-top,6.375rem))] overflow-y-auto overscroll-contain border-t px-2 py-4 supports-[height:100dvh]:max-h-[calc(100dvh_-_var(--events-menu-top,6.375rem))] md:hidden ${
++            className={`max-h-[calc(100vh_-_var(--events-menu-top,6.375rem))] overflow-y-auto overscroll-contain border-t px-2 py-4 supports-[height:100dvh]:max-h-[calc(100dvh_-_var(--events-menu-top,6.375rem))] xl:hidden ${
+               isBroadside ? 'border-stone-200' : 'border-white/10'
+             } ${sidebarOpen ? '' : 'hidden'}`}
+           >
+diff --git a/src/lib/public-family-nav-query.ts b/src/lib/public-family-nav-query.ts
+index a3e02cd6c..b5c6d0968 100644
+--- a/src/lib/public-family-nav-query.ts
++++ b/src/lib/public-family-nav-query.ts
+@@ -5,7 +5,8 @@
+  */
+ 
+ /**
+- * #1983: server-only read for the events bar's derived "Past events" menu.
++ * #1983: server-only read of recent public event identities for the header.
++ * Kept for event names during soft navigation, not automatic archive links.
+  * Kept apart from `public-header-nav.ts` so the client shell never pulls
+  * Prisma into the browser bundle.
+  */
+@@ -13,7 +14,7 @@
+ import type { Prisma } from '@prisma/client';
+ import { prisma } from '@/lib/db';
+ 
+-/** The menu is a shortcut, not an archive: the newest few only. */
++/** Bound the identity seed to the newest few public conferences. */
+ export const PAST_EVENTS_NAV_LIMIT = 6;
+ 
+ /**
+@@ -46,7 +47,7 @@ export async function loadPastEventsNav(
+       take: PAST_EVENTS_NAV_LIMIT,
+     });
+   } catch {
+-    // A failed read drops the menu; it must never fail the page.
++    // A failed read drops fallback identities; it must never fail the page.
+     return [];
+   }
+ }
+diff --git a/src/lib/public-header-nav.ts b/src/lib/public-header-nav.ts
+index f8a53cad6..9a320f1e1 100644
+--- a/src/lib/public-header-nav.ts
++++ b/src/lib/public-header-nav.ts
+@@ -16,7 +16,6 @@ import {
+   isNavGroup,
+   publicEventNav,
+   type NavEntry,
+-  type NavGroup,
+   type NavLink,
+ } from '@/lib/public-event-nav';
+ import type { PublicBrandPayload } from '@/lib/public-brand';
+@@ -46,7 +45,7 @@ export type PublicFamilyNav = {
+    * Pre-derived rather than the full brand payload, to keep the seed small.
+    */
+   featured: FeaturedEventsBar | null;
+-  /** Derived, newest first, bounded. Empty omits the menu. */
++  /** Recent public event identities for soft navigation; does not add menu entries. */
+   pastEvents: Array<{ slug: string; name: string }>;
+ };
+ 
+@@ -59,9 +58,6 @@ export type PublicFamilyEventsBar = {
+ 
+ export type FeaturedEventsBar = PublicFamilyEventsBar & { event: PublicFamilyEvent };
+ 
+-export const PAST_EVENTS_LABEL = 'Past events';
+-export const PAST_SPEAKERS_LINK: NavLink = { href: '/speakers', label: 'Past speakers' };
+-
+ /** A stored parent URL is trusted only when it is still an absolute https URL. */
+ export function readParentSiteUrl(value: string | null | undefined): string | null {
+   const trimmed = value?.trim();
+@@ -119,24 +115,6 @@ export function eventBarDetails(event: PublicFamilyEvent): string {
+   return [event.dates, event.city].filter(Boolean).join(', ');
+ }
+ 
+-/** Event nav, then the derived Past events menu (omitted when empty), then Past speakers. */
+-export function buildEventsBarEntries(
+-  eventNav: readonly NavEntry[],
+-  pastEvents: ReadonlyArray<{ slug: string; name: string }>
+-): NavEntry[] {
+-  const past: NavGroup | null =
+-    pastEvents.length > 0
+-      ? {
+-          label: PAST_EVENTS_LABEL,
+-          children: pastEvents.map((event) => ({
+-            href: `/events/${event.slug}`,
+-            label: event.name,
+-          })),
+-        }
+-      : null;
+-  return [...eventNav, ...(past ? [past] : []), PAST_SPEAKERS_LINK];
+-}
+-
+ function hostWithoutWww(url: string): string | null {
+   try {
+     return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+@@ -230,7 +208,7 @@ const NO_EVENTS_BAR: PublicFamilyEventsBar = { event: null, eventNav: [], cta: n
+  * - a site-level route gets the featured event's bar;
+  * - the seeded event route gets its own identity, route nav and CTA;
+  * - the featured event's route gets the featured bar;
+- * - any other event route keeps its own nav and CTA, named from Past events
++ * - any other event route keeps its own nav and CTA, named from recent events
+  *   when listed there. It never shows another event's nav or CTA.
+  */
+ export function resolveEventsBar(

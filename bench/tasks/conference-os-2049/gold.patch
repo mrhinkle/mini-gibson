@@ -1,0 +1,53 @@
+diff --git a/src/app/(public)/events/[eventSlug]/schedule/schedule-board-view.tsx b/src/app/(public)/events/[eventSlug]/schedule/schedule-board-view.tsx
+index 2f40d0fd6..1666e7052 100644
+--- a/src/app/(public)/events/[eventSlug]/schedule/schedule-board-view.tsx
++++ b/src/app/(public)/events/[eventSlug]/schedule/schedule-board-view.tsx
+@@ -216,10 +216,13 @@ export function ScheduleBoardView({
+           style={{
+             gridTemplateColumns: `${SCHEDULE_BOARD_TIME_AXIS_WIDTH}px repeat(${columns.length}, minmax(0, 1fr))`,
+           }}
+-          role="grid"
++          role="region"
+           aria-label="Visual schedule by track"
+         >
+-          <div className="sticky left-0 z-30 border-b border-r border-gray-200 bg-gray-50 p-3 text-xs font-semibold text-gray-600">
++          <div
++            className="sticky left-0 z-30 border-b border-r border-gray-200 bg-gray-50 p-3 text-xs font-semibold text-gray-600"
++            aria-hidden
++          >
+             Time
+           </div>
+           {columns.map((column) => (
+@@ -238,9 +241,11 @@ export function ScheduleBoardView({
+                 borderTopColor: column.color || '#9ca3af',
+                 borderTopStyle: 'solid',
+               }}
+-              role="columnheader"
++              role="group"
++              aria-labelledby={`track-column-${column.id}-heading`}
+             >
+               <p
++                id={`track-column-${column.id}-heading`}
+                 className="truncate text-sm font-semibold text-gray-900"
+                 title={column.name}
+               >
+@@ -254,7 +259,7 @@ export function ScheduleBoardView({
+             </div>
+           ))}
+ 
+-          <div className="sticky left-0 z-20 bg-gray-50">
++          <div className="sticky left-0 z-20 bg-gray-50" aria-hidden>
+             {slotMinutes.map((minute) => (
+               <div
+                 key={minute}
+@@ -273,8 +278,8 @@ export function ScheduleBoardView({
+               key={column.id}
+               className="relative border-r border-gray-100 last:border-r-0"
+               style={{ height: slotMinutes.length * SCHEDULE_BOARD_SLOT_HEIGHT }}
+-              role="gridcell"
+-              aria-label={column.name}
++              role="group"
++              aria-labelledby={`track-column-${column.id}-heading`}
+             >
+               {slotMinutes.map((minute) => (
+                 <div

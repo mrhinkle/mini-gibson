@@ -1,0 +1,13 @@
+diff --git a/tests/unit/atai-site-chrome.test.ts b/tests/unit/atai-site-chrome.test.ts
+index 8c36f0995..0aa03bdd1 100644
+--- a/tests/unit/atai-site-chrome.test.ts
++++ b/tests/unit/atai-site-chrome.test.ts
+@@ -138,7 +138,7 @@ describe('All Things AI site chrome', () => {
+       'Why the Triangle?',
+     ]);
+     expect(ATAI_FOOTER_COLUMNS.map((c) => c.label)).toEqual(['Conference', 'Community', 'Connect']);
+-    expect(ATAI_FOOTER_LEGAL_LINKS.map((l) => l.label)).toEqual(['Privacy Policy', 'All Things Open', 'The AIE Network']);
++    expect(ATAI_FOOTER_LEGAL_LINKS.map((l) => l.label)).toEqual(['Privacy Policy', 'Code of Conduct', 'Environmental Policy', 'Terms and Conditions', 'All Things Open', 'The AIE Network']);
+   });
+ 
+   it('points allthingsai.org pages at absolute URLs and events-site pages at local routes', () => {

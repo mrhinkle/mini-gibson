@@ -1,0 +1,15 @@
+diff --git a/src/lib/security-headers.ts b/src/lib/security-headers.ts
+index 2950e7de7..434360ef2 100644
+--- a/src/lib/security-headers.ts
++++ b/src/lib/security-headers.ts
+@@ -642,7 +642,9 @@ export function buildContentSecurityPolicy(
+     "worker-src 'self' blob:",
+     "object-src 'none'",
+     "base-uri 'self'",
+-    "form-action 'self'",
++    // #2272: Meta Pixel falls back to a hidden-form POST to /tr/ when an
++    // event is too large for its GET beacon. Exact origin only.
++    "form-action 'self' https://www.facebook.com",
+     "frame-ancestors 'none'",
+     "upgrade-insecure-requests",
+   ];

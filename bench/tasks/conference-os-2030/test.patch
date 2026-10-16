@@ -1,0 +1,124 @@
+diff --git a/tests/unit/public-schedule-page.test.ts b/tests/unit/public-schedule-page.test.ts
+index abbf4ffc5..bded7891c 100644
+--- a/tests/unit/public-schedule-page.test.ts
++++ b/tests/unit/public-schedule-page.test.ts
+@@ -26,7 +26,10 @@ describe('public schedule page gate', () => {
+       name: 'Test Event',
+       scheduleStatus: 'DRAFT',
+       timezone: 'America/New_York',
+-      tracks: [{ id: 'secret-track', name: 'Secret', color: null }],
++      tracks: [{
++        id: 'secret-track', name: 'Secret', color: null,
++        marketingDescription: 'Not ready to announce',
++      }],
+       sessions: [{ id: 'secret-session', title: 'Not public yet' }],
+     });
+ 
+@@ -51,4 +54,31 @@ describe('public schedule page gate', () => {
+     const result = (await SchedulePage({ params })) as ReactElement;
+     expect(result.type).toBe(ScheduleClient);
+   });
++
++  it.each([
++    ['  Learn to build AI products.  ', 'Learn to build AI products.'],
++    [null, null],
++    ['', null],
++    [' \n\t ', null],
++  ])('projects only public track copy (%j)', async (marketingDescription, expected) => {
++    mocks.eventFindUnique.mockResolvedValue({
++      name: 'Test Event',
++      scheduleStatus: 'PUBLISHED',
++      timezone: 'America/New_York',
++      tracks: [{
++        id: 'builders', name: 'Builders', color: '#0055ff',
++        marketingDescription,
++        description: 'Private organizer notes must never be a fallback',
++      }],
++      sessions: [],
++    });
++
++    const result = (await SchedulePage({ params })) as ReactElement<{ tracks: unknown[] }>;
++    expect(result.props.tracks).toEqual([{
++      id: 'builders', name: 'Builders', color: '#0055ff', marketingDescription: expected,
++    }]);
++    expect(mocks.eventFindUnique.mock.calls[0][0].include.tracks.select).toEqual({
++      id: true, name: true, color: true, marketingDescription: true,
++    });
++  });
+ });
+diff --git a/tests/unit/schedule-track-guide.test.ts b/tests/unit/schedule-track-guide.test.ts
+new file mode 100644
+index 000000000..725e61a06
+--- /dev/null
++++ b/tests/unit/schedule-track-guide.test.ts
+@@ -0,0 +1,70 @@
++/** @vitest-environment jsdom */
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { createElement } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { fireEvent } from '@testing-library/react';
++import { describe, expect, it } from 'vitest';
++import { render, screen, within } from '../helpers/component-render';
++import ScheduleClient from '../../src/app/(public)/events/[eventSlug]/schedule/schedule-client';
++import { ScheduleTrackGuide } from '../../src/app/(public)/events/[eventSlug]/schedule/schedule-track-guide';
++
++const tracks = [
++  { id: 'builders', name: 'Builders', color: '#0055ff', marketingDescription: 'Build useful AI products.' },
++  { id: 'users', name: 'Users', color: '#0055ff', marketingDescription: 'Use AI in your daily work.' },
++  { id: 'keynote', name: 'Keynote', color: null, marketingDescription: null },
++];
++
++describe('public schedule track guide', () => {
++  it('includes all public descriptions in initial HTML as escaped, untruncated text', () => {
++    const description = '<script>alert("test")</script>\n' + 'Full public copy. '.repeat(30);
++    const html = renderToStaticMarkup(createElement(ScheduleTrackGuide, {
++      tracks: [...tracks, { id: 'long', name: 'Long <track>', marketingDescription: description }],
++      selectedTrackId: null,
++    }));
++    const document = new DOMParser().parseFromString(html, 'text/html');
++    expect(document.querySelector('details')?.open).toBe(true);
++    expect(document.querySelectorAll('dt')).toHaveLength(3);
++    expect(Array.from(document.querySelectorAll('dd'), (item) => item.textContent)).toEqual([
++      tracks[0].marketingDescription, tracks[1].marketingDescription, description.trim(),
++    ]);
++    expect(document.querySelector('script')).toBeNull();
++  });
++
++  it.each([null, '', ' \n\t ', undefined])('omits an empty guide for %j public copy', (copy) => {
++    const html = renderToStaticMarkup(createElement(ScheduleTrackGuide, {
++      tracks: [{ id: 'empty', name: 'Empty', marketingDescription: copy }], selectedTrackId: null,
++    }));
++    expect(html).toBe('');
++  });
++
++  it.each(['keynote', 'unknown'])('omits the guide for a selection with no public copy: %s', (id) => {
++    expect(renderToStaticMarkup(createElement(ScheduleTrackGuide, {
++      tracks, selectedTrackId: id,
++    }))).toBe('');
++  });
++
++  it.each(['table', 'grid', 'broadside'] as const)('keeps descriptions in sync with %s track filters', (view) => {
++    render(createElement(ScheduleClient, {
++      eventSlug: 'test-event', timezone: 'UTC', tracks, sessions: [],
++      visualTemplate: view === 'broadside' ? 'broadside' : 'orbit',
++    }));
++    if (view === 'grid') fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
++
++    expect(screen.getByText('Build useful AI products.')).toBeTruthy();
++    expect(screen.getByText('Use AI in your daily work.')).toBeTruthy();
++    const filters = within(screen.getByRole('group', { name: 'Tracks' }));
++    fireEvent.click(filters.getByRole('button', { name: 'Users' }));
++    expect(screen.getByText('Use AI in your daily work.')).toBeTruthy();
++    expect(screen.queryByText('Build useful AI products.')).toBeNull();
++
++    fireEvent.click(filters.getByRole('button', { name: 'Keynote' }));
++    expect(screen.queryByText('About the tracks')).toBeNull();
++    fireEvent.click(filters.getByRole('button', { name: 'All Tracks' }));
++    expect(screen.getByText('Build useful AI products.')).toBeTruthy();
++    expect(screen.getByText('Use AI in your daily work.')).toBeTruthy();
++  });
++});

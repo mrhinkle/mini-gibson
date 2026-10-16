@@ -1,0 +1,216 @@
+diff --git a/tests/unit/public-schedule-metadata.test.ts b/tests/unit/public-schedule-metadata.test.ts
+new file mode 100644
+index 000000000..19529738a
+--- /dev/null
++++ b/tests/unit/public-schedule-metadata.test.ts
+@@ -0,0 +1,210 @@
++/**
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const mocks = vi.hoisted(() => ({ eventFindUnique: vi.fn() }));
++
++vi.mock('@/lib/db', () => ({
++  prisma: { event: { findUnique: mocks.eventFindUnique } },
++}));
++
++import { generateMetadata } from '@/app/(public)/events/[eventSlug]/schedule/page';
++import { publicAppUrl } from '@/lib/public-app-url';
++
++const GENERIC_SITE_DESCRIPTION =
++  'The community for AI practitioners and users — news, events, and insights delivered to your inbox.';
++
++const DRAFT_SESSION_TITLE = 'SECRET_DRAFT_SESSION_NeverAnnounce';
++const DRAFT_SPEAKER_NAME = 'SECRET_DRAFT_SPEAKER_NeverAnnounce';
++
++type MetadataEventRow = {
++  name: string;
++  slug: string;
++  description: string | null;
++  bannerUrl: string | null;
++  logoUrl: string | null;
++  startDate: Date | null;
++  endDate: Date | null;
++  websiteUrl: string | null;
++  customDomain: string | null;
++  scheduleStatus: 'DRAFT' | 'PUBLISHED' | null;
++  venue: { city: string | null; state: string | null; name: string | null } | null;
++  pageConfig: { heroImageUrl: string | null } | null;
++  sessions?: Array<{ title: string; speakerName: string }>;
++};
++
++function metadataEventRow(
++  overrides: Partial<MetadataEventRow> = {}
++): MetadataEventRow {
++  return {
++    name: 'All Things AI 2026',
++    slug: 'all-things-ai-2026',
++    description: 'The gathering for AI practitioners and builders in Durham.',
++    bannerUrl: null,
++    logoUrl: null,
++    startDate: new Date('2026-09-10T12:00:00.000Z'),
++    endDate: new Date('2026-09-11T12:00:00.000Z'),
++    websiteUrl: null,
++    customDomain: null,
++    scheduleStatus: 'PUBLISHED',
++    venue: { city: 'Durham', state: 'NC', name: 'Carolina Theatre' },
++    pageConfig: { heroImageUrl: null },
++    sessions: [
++      { title: DRAFT_SESSION_TITLE, speakerName: DRAFT_SPEAKER_NAME },
++    ],
++    ...overrides,
++  };
++}
++
++/**
++ * Honour Prisma `select` so a missing field (customDomain, or an accidental
++ * sessions include) actually drops from the row the page sees.
++ */
++function mockFindUniqueRow(row: MetadataEventRow | null) {
++  mocks.eventFindUnique.mockImplementation(
++    async (args: {
++      where: { slug: string };
++      select?: Record<string, unknown>;
++    }) => {
++      if (!row || args.where.slug !== row.slug) return null;
++      if (!args.select) return row;
++      const picked: Record<string, unknown> = {};
++      for (const [key, included] of Object.entries(args.select)) {
++        if (included) {
++          picked[key] = row[key as keyof MetadataEventRow];
++        }
++      }
++      return picked;
++    }
++  );
++}
++
++function metadataText(metadata: unknown): string {
++  return JSON.stringify(metadata);
++}
++
++describe('public schedule generateMetadata (#2031)', () => {
++  const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
++
++  beforeEach(() => {
++    mocks.eventFindUnique.mockReset();
++    process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com';
++  });
++
++  afterEach(() => {
++    if (originalAppUrl === undefined) {
++      delete process.env.NEXT_PUBLIC_APP_URL;
++    } else {
++      process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
++    }
++  });
++
++  it('emits an event-specific description, not the generic site line', async () => {
++    mockFindUniqueRow(metadataEventRow());
++
++    const metadata = await generateMetadata({
++      params: Promise.resolve({ eventSlug: 'all-things-ai-2026' }),
++    });
++
++    expect(metadata.description).toBeTruthy();
++    expect(metadata.description).toContain(
++      'The gathering for AI practitioners and builders in Durham.'
++    );
++    expect(metadata.title).toContain('All Things AI 2026');
++    expect(metadata.description).not.toBe(GENERIC_SITE_DESCRIPTION);
++    expect(metadataText(metadata)).not.toContain(GENERIC_SITE_DESCRIPTION);
++  });
++
++  it('uses the public-app origin for canonical and OG url on the default domain', async () => {
++    mockFindUniqueRow(metadataEventRow({ customDomain: null }));
++
++    const metadata = await generateMetadata({
++      params: Promise.resolve({ eventSlug: 'all-things-ai-2026' }),
++    });
++
++    const canonical = publicAppUrl('/events/all-things-ai-2026/schedule');
++    expect(metadata.alternates?.canonical).toBe(canonical);
++    expect(metadata.openGraph?.url).toBe(canonical);
++    expect(canonical).toBe(
++      'https://app.example.com/events/all-things-ai-2026/schedule'
++    );
++  });
++
++  it('rewrites the canonical to https://conf.example.com/schedule on a custom domain', async () => {
++    mockFindUniqueRow(metadataEventRow({ customDomain: 'conf.example.com' }));
++
++    const metadata = await generateMetadata({
++      params: Promise.resolve({ eventSlug: 'all-things-ai-2026' }),
++    });
++
++    expect(metadata.alternates?.canonical).toBe(
++      'https://conf.example.com/schedule'
++    );
++    expect(metadata.openGraph?.url).toBe('https://conf.example.com/schedule');
++  });
++
++  it('returns title only, with no canonical, when the event is missing', async () => {
++    mockFindUniqueRow(null);
++
++    const metadata = await generateMetadata({
++      params: Promise.resolve({ eventSlug: 'does-not-exist' }),
++    });
++
++    expect(metadata).toEqual({ title: 'Schedule' });
++    expect(metadata.alternates).toBeUndefined();
++    expect(metadata.description).toBeUndefined();
++
++    // Missing-event lookup still goes through the event-level select so a
++    // title-only findUnique (no select) cannot satisfy this branch.
++    expect(mocks.eventFindUnique).toHaveBeenCalledTimes(1);
++    const lookup = mocks.eventFindUnique.mock.calls[0]?.[0] as
++      | { where?: { slug?: string }; select?: Record<string, unknown> }
++      | undefined;
++    expect(lookup?.where).toEqual({ slug: 'does-not-exist' });
++    expect(lookup?.select).toEqual(
++      expect.objectContaining({
++        customDomain: true,
++        slug: true,
++      })
++    );
++    expect(lookup?.select).not.toHaveProperty('sessions');
++  });
++
++  it('never puts session titles or speakers in unpublished-schedule metadata', async () => {
++    mockFindUniqueRow(
++      metadataEventRow({
++        scheduleStatus: 'DRAFT',
++        sessions: [
++          { title: DRAFT_SESSION_TITLE, speakerName: DRAFT_SPEAKER_NAME },
++        ],
++      })
++    );
++
++    const metadata = await generateMetadata({
++      params: Promise.resolve({ eventSlug: 'all-things-ai-2026' }),
++    });
++
++    const select = mocks.eventFindUnique.mock.calls[0]?.[0]?.select as
++      | Record<string, unknown>
++      | undefined;
++    expect(select).toBeDefined();
++    expect(select).not.toHaveProperty('sessions');
++    expect(select).not.toHaveProperty('tracks');
++    expect(select).not.toHaveProperty('scheduleStatus');
++
++    const blob = metadataText(metadata);
++    expect(blob).not.toContain(DRAFT_SESSION_TITLE);
++    expect(blob).not.toContain(DRAFT_SPEAKER_NAME);
++    // Event-level fields still appear — same boundary as the event home page.
++    expect(metadata.description).toContain(
++      'The gathering for AI practitioners and builders in Durham.'
++    );
++    expect(metadata.title).toContain('All Things AI 2026');
++    expect(metadata.alternates?.canonical).toBe(
++      publicAppUrl('/events/all-things-ai-2026/schedule')
++    );
++  });
++});

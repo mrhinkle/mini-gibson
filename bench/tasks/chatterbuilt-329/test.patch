@@ -1,0 +1,119 @@
+diff --git a/apps/mcp/lib/issue-325-preset-itemtypes.test.ts b/apps/mcp/lib/issue-325-preset-itemtypes.test.ts
+new file mode 100644
+index 00000000..89850d98
+--- /dev/null
++++ b/apps/mcp/lib/issue-325-preset-itemtypes.test.ts
+@@ -0,0 +1,113 @@
++import fs from "node:fs";
++import path from "node:path";
++import { describe, it, expect } from "vitest";
++import { INDUSTRIES } from "./presets";
++import { renderSiteTs } from "./render-site-ts";
++
++/**
++ * Issue #325 — presets emit industry-appropriate itemTypes.
++ *
++ * The template's contact route consumes site.itemTypes for its dropdown and
++ * fail-closed validation; without it every preset-rendered customer site
++ * serves the generic default list. Each preset now ships itemTypes derived
++ * MECHANICALLY from its own services: the service names verbatim, plus the
++ * terminal "Other" (verbatim from the template example's own itemTypes).
++ * No invented copy — if the derivation rule changes, this sensor changes
++ * with it.
++ */
++
++const PRESETS_DIR = path.join(__dirname, "..", "content", "presets");
++
++type Preset = {
++  services: { name: string }[];
++  itemTypes?: string[];
++};
++
++function loadPreset(industry: string): Preset {
++  const raw = fs.readFileSync(
++    path.join(PRESETS_DIR, `${industry}.json`),
++    "utf8",
++  );
++  return JSON.parse(raw) as Preset;
++}
++
++describe("issue #325 — every preset ships itemTypes", () => {
++  it("UNIT-325-all-presets-nonempty: all 8 presets declare a non-empty itemTypes array", () => {
++    expect(INDUSTRIES).toHaveLength(8);
++    for (const industry of INDUSTRIES) {
++      const preset = loadPreset(industry);
++      expect(preset.itemTypes, `${industry} missing itemTypes`).toBeDefined();
++      expect(Array.isArray(preset.itemTypes), industry).toBe(true);
++      expect(preset.itemTypes!.length, industry).toBeGreaterThan(0);
++    }
++  });
++
++  it("UNIT-325-derivation-rule: itemTypes = the preset's own service names + 'Other' (mechanical, no invented copy)", () => {
++    for (const industry of INDUSTRIES) {
++      const preset = loadPreset(industry);
++      const expected = [...preset.services.map((s) => s.name), "Other"];
++      expect(preset.itemTypes, industry).toEqual(expected);
++    }
++  });
++
++  it("UNIT-325-no-placeholder-tokens: no itemTypes entry carries a {PLACEHOLDER} token", () => {
++    for (const industry of INDUSTRIES) {
++      const preset = loadPreset(industry);
++      for (const entry of preset.itemTypes ?? []) {
++        expect(entry, industry).not.toMatch(/\{[A-Z_]+\}/);
++      }
++    }
++  });
++});
++
++describe("issue #325 — itemTypes passes through render_site_ts", () => {
++  it("UNIT-325-render-passthrough: a filled config's itemTypes lands verbatim in rendered site.ts (contact-route parity)", () => {
++    const config = {
++      meta: {
++        name: "Acme HVAC",
++        tagline: "Cold air fast.",
++        description:
++          "Owner-operated heating and cooling repair, maintenance, and installs for homes in Austin with clear diagnostics and honest ETAs from a licensed local crew.",
++        url: "https://acme-hvac.example",
++        schedulingUrl: "",
++      },
++      hero: { headline: "AC down? Call.", subheadline: "Repair and installs." },
++      services: [
++        {
++          slug: "ac-repair",
++          name: "AC Repair",
++          seo: {
++            title: "AC Repair Austin",
++            description: "Same-day AC repair in Austin when available.",
++          },
++        },
++      ],
++      itemTypes: ["AC Repair", "Other"],
++      process: {
++        steps: [
++          { step: 1, title: "Call", description: "Tell us what broke." },
++          { step: 2, title: "Fix", description: "We repair it." },
++        ],
++      },
++      faq: [
++        { question: "Q1?", answer: "A1" },
++        { question: "Q2?", answer: "A2" },
++        { question: "Q3?", answer: "A3" },
++        { question: "Q4?", answer: "A4" },
++        { question: "Q5?", answer: "A5" },
++      ],
++      contactSection: { title: "Contact" },
++      scheduleSection: { title: "Schedule" },
++      contact: { phone: "+1 (512) 555-0100" },
++    };
++
++    const result = renderSiteTs(JSON.stringify(config));
++    expect(result.ok).toBe(true);
++    if (!result.ok) return;
++    // The template's contact route reads site.itemTypes (array, length > 0)
++    // for the dropdown; the rendered source must carry the key and values.
++    expect(result.source).toMatch(/itemTypes:\s*\[/);
++    expect(result.source).toContain('"AC Repair"');
++    expect(result.source).toContain('"Other"');
++  });
++});

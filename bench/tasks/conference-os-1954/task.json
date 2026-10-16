@@ -1,0 +1,59 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-1954",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 1954,
+  "base_sha": "12d8b4debf29ae8d478bccdf56b8f5364036d2db",
+  "merge_sha": "87e0dce6121c44eb2ca78e9755c435e281027e2a",
+  "issue_number": 1912,
+  "issues": [
+    1912
+  ],
+  "issue_title": "Public sponsor-booth YouTube embeds are blocked by CSP",
+  "problem_statement": "Public sponsor-booth YouTube embeds are blocked by CSP\n\n## Problem\n\nIndependent exact-head review of #1903 found a pre-existing CSP mismatch outside that PR: `src/lib/public-sponsor-booth.ts` emits `https://www.youtube.com/embed/...`, but generated `frame-src` does not allow `https://www.youtube.com`. Browsers therefore block those sponsor-booth embeds.\n\n## Safe direction\n\nPrefer normalizing this helper to the already allowlisted privacy-enhanced `https://www.youtube-nocookie.com` origin rather than widening CSP to another YouTube host. Add a source-to-generated-policy contract test and a removal/widening mutant.\n\n## Boundaries\n\nDo not change tenant content, upload media, widen CSP with wildcards, deploy/promote, seed/import, alter schema/secrets, or make pricing/legal decisions. Not part of milestone 1.1 unless explicitly triaged there.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-sponsor-booth.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-sponsor-booth.test.ts::toVideoEmbedUrl embeds YouTube watch and short links",
+      "tests/unit/public-sponsor-booth.test.ts::toVideoEmbedUrl emits a frame-src origin already allowlisted by generated CSP"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/public-sponsor-booth.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/public-sponsor-booth.test.ts::public booth page isolation guard builds props via toPublicSponsorBoothView (public-safe projection)",
+      "tests/unit/public-sponsor-booth.test.ts::public booth page isolation guard does not import the private passes panel helper",
+      "tests/unit/public-sponsor-booth.test.ts::public booth page isolation guard does not query or reference private sponsor-portal models/fields",
+      "tests/unit/public-sponsor-booth.test.ts::public booth page isolation guard embeds booth video through toVideoEmbedUrl, not a hardcoded YouTube host",
+      "tests/unit/public-sponsor-booth.test.ts::toPublicSponsorBoothView hides unpublished virtual booth content",
+      "tests/unit/public-sponsor-booth.test.ts::toPublicSponsorBoothView never includes private fields even if source had extra keys",
+      "tests/unit/public-sponsor-booth.test.ts::toPublicSponsorBoothView prefers event-level logo override",
+      "tests/unit/public-sponsor-booth.test.ts::toPublicSponsorBoothView projects only public marketing fields",
+      "tests/unit/public-sponsor-booth.test.ts::toPublicSponsorBoothView strips DiceBear placeholder logos (#718) and substitutes hand marks when known",
+      "tests/unit/public-sponsor-booth.test.ts::toVideoEmbedUrl embeds Vimeo paths",
+      "tests/unit/public-sponsor-booth.test.ts::toVideoEmbedUrl returns null for non-embeddable URLs"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

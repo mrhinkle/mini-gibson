@@ -1,0 +1,113 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2042",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2042,
+  "base_sha": "efb2c571815945276b3278dc4d5cff40f737781f",
+  "merge_sha": "ac6ff283e4abf076d90d98b680945aa9d359d366",
+  "issue_number": 2040,
+  "issues": [
+    2040
+  ],
+  "issue_title": "Public header: icon-only search and help, plus a Get Involved page (flat events menu)",
+  "problem_statement": "Public header: icon-only search and help, plus a Get Involved page (flat events menu)\n\n## Problem\nMark wants the events.allthingsai.org top menu flattened, after the Dribbble \"JoyToys\" pattern: centered text links, small round icon buttons on the right, **no dropdowns**, a **\"?\" icon with no \"Help\" text**, and a **magnifying glass for search** instead of the text field.\nOwner decision 2026-09-14: **option A, flat two bars**.\nWireframe (low-fi, attached per doctrine): https://claude.ai/code/artifact/62d69b20-c93d-42e8-bb80-25b9e89517f5\n\n## Core changes (ConferenceOS `main`, all tenants)\n1. **Icon-only search in the parent-site bar.** The utilities show a round magnifying-glass button, not the text field. Activating it opens the existing `SearchForm`; \u2318K / Ctrl+K opens and focuses it; Escape closes it. The accessible name stays \"Search\" and the form keeps `role=\"search\"`. The phone menu panel keeps its full search field.\n2. **Icon-only help trigger.** `ContextualHelpPanel` shows only the CircleHelp \"?\" icon, with no visible \"Help\" text. The accessible name, `title`, panel, and route-help gating are unchanged.\n3. **Get Involved page** at `/events/[eventSlug]/get-involved`. It lists the same participation options as today's default \"Participate\" menu, from one shared function so the two cannot drift:\n   - Submit a Talk, only while `cfpOpen`;\n   - Register, only while registration shows;\n   - Apply for a Scholarship;\n   - Volunteer;\n   - Sponsor the event.\n\n   Each option is a card with a one-line description and a link. The default grouped event nav is unchanged.\n\n## Not code (ATA data, after release)\n- The flat header uses the existing per-event header override (`NavItem` `scope=EVENT`, `placement=HEADER`, \"Event header\" editor): Schedule \u00b7 Speakers \u00b7 Sponsors \u00b7 Venue & Travel \u00b7 FAQ \u00b7 Get Involved.\n- Parent-bar rows flattened to Events \u00b7 Webinars \u00b7 Speak \u00b7 Sponsor \u00b7 About \u00b7 News.\n- Moved links go to footer rows.\n- Other sites keep their dropdowns.\n\n## Acceptance\n- Header tests updated for icon-only search and help, with keyboard behaviour (open, \u2318K, Escape, focus) and accessible names asserted.\n- A Get Involved page test covers the option set under `cfpOpen` true/false and register shown/hidden, via the shared function; the nav test still passes against the same function.\n- The page returns `notFound` for an unknown event and handles CANCELLED like the sibling pages do.\n- a11y/link-name suites stay green.",
+  "split": "external_holdout_unseen",
+  "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/contextual-help-panel.test.ts tests/unit/get-involved-page.test.ts tests/unit/public-event-nav.test.ts tests/unit/public-two-bar-header.test.ts tests/unit/search-toggle-contract.test.ts tests/unit/search-toggle.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel supports an icon-only trigger without changing its accessible name",
+      "tests/unit/get-involved-page.test.ts::Get Involved page derives cards from the shared brand participation options",
+      "tests/unit/get-involved-page.test.ts::Get Involved page does not render a second main landmark",
+      "tests/unit/get-involved-page.test.ts::Get Involved page gives every card an action that does not repeat its heading",
+      "tests/unit/get-involved-page.test.ts::Get Involved page omits CFP and register when their shared options are closed",
+      "tests/unit/get-involved-page.test.ts::Get Involved page opens an external ticket page in a new tab",
+      "tests/unit/get-involved-page.test.ts::Get Involved page returns event metadata",
+      "tests/unit/get-involved-page.test.ts::Get Involved page returns notFound for an unknown event",
+      "tests/unit/get-involved-page.test.ts::Get Involved page shows the cancelled notice instead of options for a cancelled event",
+      "tests/unit/public-event-nav.test.ts::public event navigation keeps Participate children equal to the shared link helper",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) puts search, Help and signed-out/in controls in the white parent bar (broadside)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) puts search, Help and signed-out/in controls in the white parent bar (orbit)",
+      "tests/unit/search-toggle-contract.test.ts::owns the keyboard shortcut instead of binding the inner form",
+      "tests/unit/search-toggle.test.ts::SearchToggle Control-K opens and focuses",
+      "tests/unit/search-toggle.test.ts::SearchToggle Escape closes and restores focus; outside click closes",
+      "tests/unit/search-toggle.test.ts::SearchToggle Meta-K opens and focuses",
+      "tests/unit/search-toggle.test.ts::SearchToggle Meta-K while open pulls focus back to the search field",
+      "tests/unit/search-toggle.test.ts::SearchToggle ignores the shortcut while the toggle is hidden below its breakpoint",
+      "tests/unit/search-toggle.test.ts::SearchToggle points aria-controls at the panel only while it exists",
+      "tests/unit/search-toggle.test.ts::SearchToggle starts closed and opens with focus",
+      "tests/unit/search-toggle.test.ts::SearchToggle submits through the existing search navigation"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/contextual-help-panel.test.ts tests/unit/get-involved-page.test.ts tests/unit/public-event-nav.test.ts tests/unit/public-two-bar-header.test.ts tests/unit/search-toggle-contract.test.ts tests/unit/search-toggle.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel announces loading failures without exposing an empty dialog",
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel announces loading in a dedicated status without making the document live",
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel closes and changes context when the route changes",
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel loads route-scoped help and restores trigger focus after Escape",
+      "tests/unit/contextual-help-panel.test.ts::ContextualHelpPanel uses a legible trigger treatment on light public headers",
+      "tests/unit/public-event-nav.test.ts::public event navigation does not surface CFP, Scholarships or Volunteer as top-level items",
+      "tests/unit/public-event-nav.test.ts::public event navigation does not surface Sessions as a top-level item (Schedule owns session listings)",
+      "tests/unit/public-event-nav.test.ts::public event navigation drops the Home tab \u2014 the header logo is the home link (#835)",
+      "tests/unit/public-event-nav.test.ts::public event navigation gates Submit a Talk independently of showRegister (#851)",
+      "tests/unit/public-event-nav.test.ts::public event navigation groups Register, Submit a Talk, Scholarship, Volunteer, Sponsor under Participate (#720 / #835)",
+      "tests/unit/public-event-nav.test.ts::public event navigation includes Submit a Talk first among Participate children when cfpOpen is true (#851)",
+      "tests/unit/public-event-nav.test.ts::public event navigation keeps every route reachable \u2014 grouping must not drop a destination",
+      "tests/unit/public-event-nav.test.ts::public event navigation keeps the prospectus link exact so Sponsors and Participate cannot both read as current (#835)",
+      "tests/unit/public-event-nav.test.ts::public event navigation labels the default groups exactly \"Participate\" and \"Event Info\", children unchanged (#1983)",
+      "tests/unit/public-event-nav.test.ts::public event navigation leads with Participate, then browse surfaces, then Event Info (#835 / #1983)",
+      "tests/unit/public-event-nav.test.ts::public event navigation leaves the event home reachable only via the logo, not a nav item (#835)",
+      "tests/unit/public-event-nav.test.ts::public event navigation marks Event Info current whenever the visitor is on any page inside it",
+      "tests/unit/public-event-nav.test.ts::public event navigation marks Participate current on participation pages",
+      "tests/unit/public-event-nav.test.ts::public event navigation never labels an event-bar group \"Get Involved\" or \"About\", in any option combination (#1983)",
+      "tests/unit/public-event-nav.test.ts::public event navigation omits Register when showRegister is false (closed/past) (#784)",
+      "tests/unit/public-event-nav.test.ts::public event navigation omits Submit a Talk when cfpOpen is false or undefined (#851)",
+      "tests/unit/public-event-nav.test.ts::public event navigation rewrites Register to the third-party ticket URL when provided (#784)",
+      "tests/unit/public-event-nav.test.ts::public event navigation surfaces FAQ under the Event Info menu so attendees can find it (#740)",
+      "tests/unit/public-event-nav.test.ts::public event navigation surfaces Partners as a top-level item routing to /partners (#736)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) applies ATA branding to both bars while preserving the event template and other families",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) honors editor visibility, order and optional archive groups on event and site pages (broadside)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) honors editor visibility, order and optional archive groups on event and site pages (orbit)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) keeps a rightmost dropdown inside the viewport and reclamps when its strip scrolls",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) keeps event identity, navigation and ticket action in one row",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) keeps the expanded phone menu within the viewport below the header, scrolling itself",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) keeps the featured event navigation on the speaker archive without adding archive links",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) keeps the single header for a tenant without a parent site: logo to the event page or home",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) leads with the featured event and its nav without adding archive links",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) links the logo to the parent site, same tab, on event pages and site pages",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) positions an events-bar menu inside the blurred sticky header, not a bar-height too low",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) puts the phone menu in one panel: the parent site section, then the event section",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) renders the parent bar items with a disclosure dropdown, parent-site links in the same tab",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) respects an all-hidden editor configuration without resurrecting links (broadside)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) respects an all-hidden editor configuration without resurrecting links (orbit)",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) server-renders the parent bar at a fixed height, after the skip link and before the sticky header",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) shows the event page identity and marks the current event link",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) soft navigation keeps the layout seed (Next reuses shared layouts) event A \u2192 event B: the featured bar for the featured event, and never another event's nav elsewhere",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) soft navigation keeps the layout seed (Next reuses shared layouts) event page \u2192 /speakers: the featured identity, event nav and CTA stay",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) soft navigation keeps the layout seed (Next reuses shared layouts) site page \u2192 featured event page: the identity, event nav and CTA stay",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) the parent bar ignores visual-template nav styles carries no template-hooked class, even under Broadside with a menu open",
+      "tests/unit/public-two-bar-header.test.ts::public shell: two bars, one family (#1983) the parent bar ignores visual-template nav styles has no template or theme selector aimed at the parent bar"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

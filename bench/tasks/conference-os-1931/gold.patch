@@ -1,0 +1,69 @@
+diff --git a/src/components/night-sky-canvas.tsx b/src/components/night-sky-canvas.tsx
+index 870a8a82c..ff754fc75 100644
+--- a/src/components/night-sky-canvas.tsx
++++ b/src/components/night-sky-canvas.tsx
+@@ -37,6 +37,8 @@ export interface NightSkyCanvasProps {
+   opacity?: number;
+   /** Show the persistent manual motion control for an explicitly opted-in band. */
+   showMotionControl?: boolean;
++  /** Keep simultaneous motion controls on distinct edges. */
++  motionControlPosition?: 'left' | 'right';
+ }
+ 
+ export interface AmbientNightSkyProps
+@@ -64,6 +66,7 @@ export function NightSkyCanvas({
+   starCount = 100,
+   opacity = 1,
+   showMotionControl = false,
++  motionControlPosition = 'right',
+ }: NightSkyCanvasProps) {
+   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+   const controllerRef = useRef<NightSkyMotionController | null>(null);
+@@ -510,7 +513,7 @@ export function NightSkyCanvas({
+           onClick={togglePaused}
+           aria-controls={canvasId}
+           aria-pressed={manuallyPaused}
+-          className="absolute bottom-4 right-4 z-20 inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 bg-space-900/80 px-4 text-xs font-medium text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-space-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
++          className={`absolute bottom-4 ${motionControlPosition === 'left' ? 'left-4' : 'right-4'} z-20 inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 bg-space-900/80 px-4 text-xs font-medium text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-space-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+         >
+           {manuallyPaused ? 'Resume animation' : 'Pause animation'}
+         </button>
+@@ -521,8 +524,8 @@ export function NightSkyCanvas({
+ 
+ /**
+  * Registry-driven bands opt in to the shared ambient layer explicitly.
+- * Existing hero backgrounds continue to use a control-free NightSkyCanvas,
+- * while an omitted or false `enabled` value renders no ambient layer at all.
++ * SpaceHeroBg enables this same control for every animated hero background;
++ * an omitted or false `enabled` value still renders no ambient layer at all.
+  */
+ export function AmbientNightSky({ enabled = false, ...props }: AmbientNightSkyProps) {
+   return enabled ? <NightSkyCanvas {...props} showMotionControl /> : null;
+diff --git a/src/components/space-hero-bg.tsx b/src/components/space-hero-bg.tsx
+index adbc6cdd5..41bc6e0cb 100644
+--- a/src/components/space-hero-bg.tsx
++++ b/src/components/space-hero-bg.tsx
+@@ -15,6 +15,8 @@
+  * change. `shootingStarCount` and `preload` are retained for that
+  * compatibility but are no-ops — the canvas draws no shooting stars, and
+  * there is no longer an LCP hero image to preload (#400's concern).
++ * Every animated instance uses NightSkyCanvas's shared accessible motion
++ * control so homepage and event-hero consumers cannot omit it accidentally.
+  */
+ 
+ import { NightSkyCanvas } from './night-sky-canvas';
+@@ -38,7 +40,13 @@ export function SpaceHeroBg({
+   return (
+     <>
+       {/* Animated night sky */}
+-      <NightSkyCanvas seed={seed} starCount={starCount} opacity={imageOpacity} />
++      <NightSkyCanvas
++        seed={seed}
++        starCount={starCount}
++        opacity={imageOpacity}
++        showMotionControl
++        motionControlPosition="left"
++      />
+ 
+       {/* Gradient overlays for text readability and edge blending */}
+       <div className="absolute inset-0 bg-gradient-to-b from-[#0B1426]/60 via-transparent to-[#0B1426]/90" />

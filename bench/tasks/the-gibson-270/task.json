@@ -1,0 +1,62 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "the-gibson-270",
+  "repo": "the-gibson",
+  "repo_url": "https://github.com/The-AIE/the-gibson",
+  "pr": 270,
+  "base_sha": "fde8246169cfb6d2af1ed93276eb5b350c3f94eb",
+  "merge_sha": "9964485708e43682015d7a918ac0a3fff5d48f05",
+  "issue_number": 260,
+  "issues": [
+    260
+  ],
+  "issue_title": "run-all: enforce per-suite timeout portably on macOS",
+  "problem_statement": "run-all: enforce per-suite timeout portably on macOS\n\n## Problem\n\n`scripts/tests/run-all.sh` documents `--timeout SECONDS` as a per-suite timeout with a 600-second default, but `run_limited()` only enforces it when a `timeout` executable happens to be on `PATH`. macOS does not ship GNU `timeout`, so the option silently becomes unbounded rather than failing closed or using a portable watchdog.\n\nObserved while verifying #255 on 2026-08-29:\n\n- `command -v timeout` returned no executable on the Mac runner;\n- the full suite accepted the default timeout configuration but ran for about 87 minutes;\n- individual suites included roughly 20-minute and 23-minute runs, both well beyond the advertised 600-second limit;\n- the run ultimately passed, so this is not a #255 correctness failure, but it is a false bounded-completion contract for local and unattended runs.\n\nRelevant implementation: `scripts/tests/run-all.sh:700-705` falls through to an ordinary unbounded `\"$@\"` invocation when `timeout` is unavailable.\n\n## Sprint contract\n\n- [ ] Enforce a non-zero `--timeout SECONDS` on supported macOS and Linux hosts without requiring an undeclared GNU coreutils installation.\n- [ ] Never silently convert a requested/default timeout into an unbounded run. If the portable watchdog cannot start, fail before running suites with a clear remediation.\n- [ ] Preserve `--timeout 0` as the explicit opt-out.\n- [ ] Preserve the existing timed-out disposition and report (`timed out after <N>s`) without misclassifying ordinary suite exit codes.\n- [ ] Terminate the timed-out suite and its descendants so a timeout does not leave background workers holding files, ports, locks, or credentials.\n- [ ] Add deterministic fixtures covering: timeout utility absent, a suite exceeding the limit, a suite completing inside the limit, exit-code preservation, `--timeout 0`, descendant cleanup, and invalid timeout values.\n- [ ] Keep Bash 3.2 compatibility for the shell entrypoint and avoid network/runtime installation during the gate.\n- [ ] Run focused timeout/toolchain tests plus the full repository gate with zero failed and zero quarantined, followed by exact-head independent review.\n\n## Affected area\n\n- `scripts/tests/run-all.sh`;\n- a small portable watchdog helper if needed;\n- focused run-all/toolchain fixtures and `scripts/README.md` inventory if a helper is added.\n\n## Dependencies\n\nNo open dependencies. #255 closed through PR #259 and current-main `sensors` passed at the merge commit. The defect does not depend on #255.s implementation.\n\n## Tier\n\nB \u2014 the current interface falsely promises bounded completion and can strand unattended lanes, but it does not alter production data, authorization, money, consent, or release topology.\n\n## Non-goals\n\n- shortening legitimate suite work or weakening tests to fit the limit;\n- installing GNU coreutils as a hidden prerequisite;\n- changing the 600-second default in this repair;\n- treating a timeout as success or quarantine.",
+  "split": "external_holdout_unseen",
+  "runner": "shell",
+  "test_globs": [
+    "**/*.test.*"
+  ],
+  "f2p": {
+    "commands": [
+      "bash scripts/tests/wall-timeout.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/wall-timeout.test.sh::leader-exit residual child is reaped",
+      "scripts/tests/wall-timeout.test.sh::missing portable runtime fails before suites with remediation",
+      "scripts/tests/wall-timeout.test.sh::run-all sources the shared helper without GNU timeout",
+      "scripts/tests/wall-timeout.test.sh::timed-out descendant is reaped",
+      "scripts/tests/wall-timeout.test.sh::timeout-absent over-limit run returns 124"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "bash scripts/tests/wall-timeout.test.sh"
+    ],
+    "test_ids": [
+      "scripts/tests/wall-timeout.test.sh::TIMEOUT=0 is the explicit unbounded path",
+      "scripts/tests/wall-timeout.test.sh::exit 0 passes through",
+      "scripts/tests/wall-timeout.test.sh::invalid timeout '-1' is refused",
+      "scripts/tests/wall-timeout.test.sh::invalid timeout '1.5' is refused",
+      "scripts/tests/wall-timeout.test.sh::invalid timeout 'abc' is refused",
+      "scripts/tests/wall-timeout.test.sh::leader-exit race preserves exit 0",
+      "scripts/tests/wall-timeout.test.sh::nonzero exit passes through",
+      "scripts/tests/wall-timeout.test.sh::ordinary nonzero exit is preserved",
+      "scripts/tests/wall-timeout.test.sh::run-all exposes one extractable thin wrapper",
+      "scripts/tests/wall-timeout.test.sh::stdin passes through",
+      "scripts/tests/wall-timeout.test.sh::stdout passes through",
+      "scripts/tests/wall-timeout.test.sh::timed-out disposition remains distinct",
+      "scripts/tests/wall-timeout.test.sh::under-limit stdout succeeds"
+    ]
+  },
+  "setup": [
+    "test -f scripts/tests/wall-timeout.test.sh"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": false,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

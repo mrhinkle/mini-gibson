@@ -1,0 +1,51 @@
+{
+  "schema_version": "gibson-bench-task/v0.1",
+  "task_id": "conference-os-2275",
+  "repo": "conference-os",
+  "repo_url": "https://github.com/The-AIE/conference-os",
+  "pr": 2275,
+  "base_sha": "5f86ac6743364c15f991b3b38964cca395d2101b",
+  "merge_sha": "0ed97c46b1895a4539f9376da5a9f8d2b00bd7a0",
+  "issue_number": null,
+  "issues": [],
+  "issue_title": "fix(public): mirror How We Dogfood AI under About on the ATA parent bar",
+  "problem_statement": "fix(public): mirror How We Dogfood AI under About on the ATA parent bar\n\nMirrors a public repository (pull request 185) (Mark, 2026-10-12): \"How We Dogfood AI\" is back under About on allthingsai.org, second item after Our Story, linking `https://allthingsai.org/about/dogfooding-ai`.\n\nVerification: `vitest run tests/unit/atai-site-chrome.test.ts` 7/7.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)",
+  "split": "external_holdout",
+  "runner": "vitest",
+  "test_globs": [
+    "**/*.test.*",
+    "**/tests/**",
+    "scripts/tests/**"
+  ],
+  "f2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome mirrors allthingsai.org: Events, Get Involved, About"
+    ]
+  },
+  "p2p": {
+    "commands": [
+      "node_modules/.bin/vitest run --reporter=json --outputFile <logs>/vitest.json --maxWorkers 2 --testTimeout 20000 --hookTimeout 20000 tests/unit/atai-site-chrome.test.ts"
+    ],
+    "test_ids": [
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome keeps the event bar below, and a phone menu with the site groups then the event",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome swaps the event footer for the site footer only for the All Things AI parent",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome renders the site bar with menus, contact and updates icons, and the search pill",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome points allthingsai.org pages at absolute URLs and events-site pages at local routes",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome opens a menu on click with every link, closing on Escape",
+      "tests/unit/atai-site-chrome.test.ts::All Things AI site chrome renders the allthingsai.org footer on site pages, and the product footer elsewhere"
+    ]
+  },
+  "setup": [
+    "test -x node_modules/.bin/vitest"
+  ],
+  "time_budget_s": 90,
+  "requires_node_modules": true,
+  "gold_patch": {
+    "path": "gold.patch",
+    "visibility": "never_shown_to_agent"
+  },
+  "test_patch": "test.patch"
+}

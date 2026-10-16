@@ -1,0 +1,167 @@
+diff --git a/apps/mcp/content/presets/auto-detailing.json b/apps/mcp/content/presets/auto-detailing.json
+index a0c61676..13203355 100644
+--- a/apps/mcp/content/presets/auto-detailing.json
++++ b/apps/mcp/content/presets/auto-detailing.json
+@@ -13,7 +13,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Auto detailing in {CITY} — wash packages, full interior/exterior details, ceramic coating, and clear before/after results. Mobile service in {AREA_SERVED} plus shop-bay work when the job needs it.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/cerakote-shop.json b/apps/mcp/content/presets/cerakote-shop.json
+index 98d95c46..93a55ed2 100644
+--- a/apps/mcp/content/presets/cerakote-shop.json
++++ b/apps/mcp/content/presets/cerakote-shop.json
+@@ -11,7 +11,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Certified Cerakote applicator in {CITY}. Surface prep, coating, and oven curing for firearms, automotive parts, knives, tools, and hard-use gear.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/handyman.json b/apps/mcp/content/presets/handyman.json
+index 2a590dc0..98200a8b 100644
+--- a/apps/mcp/content/presets/handyman.json
++++ b/apps/mcp/content/presets/handyman.json
+@@ -13,7 +13,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential handyman services in {CITY} — general repairs, fixture swaps, carpentry touch-ups, and punch-list jobs with clear scopes and honest ETAs.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/house-cleaning.json b/apps/mcp/content/presets/house-cleaning.json
+index 5d2c8408..18270420 100644
+--- a/apps/mcp/content/presets/house-cleaning.json
++++ b/apps/mcp/content/presets/house-cleaning.json
+@@ -13,7 +13,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential house cleaning in {CITY} — standard, deep, and move-out cleans with transparent pricing by home size. Recurring or one-time. Easy booking.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/hvac.json b/apps/mcp/content/presets/hvac.json
+index e628b975..faf55833 100644
+--- a/apps/mcp/content/presets/hvac.json
++++ b/apps/mcp/content/presets/hvac.json
+@@ -13,7 +13,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential HVAC repair, maintenance, and installs in {CITY}. AC and furnace service, seasonal tune-ups, and clear same-day priority when the board allows.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/landscaping.json b/apps/mcp/content/presets/landscaping.json
+index 4ca0688a..dc0fa168 100644
+--- a/apps/mcp/content/presets/landscaping.json
++++ b/apps/mcp/content/presets/landscaping.json
+@@ -13,7 +13,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential landscaping in {CITY} — mowing and maintenance, mulch and beds, seasonal cleanup, and property curb-appeal work with clear scopes and honest ETAs.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/painting.json b/apps/mcp/content/presets/painting.json
+index 21d5eba8..08a8ee80 100644
+--- a/apps/mcp/content/presets/painting.json
++++ b/apps/mcp/content/presets/painting.json
+@@ -14,7 +14,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential painting in {CITY} — interior repaint, exterior paint, and cabinet refinish with clear scopes, prep notes, and honest timelines.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/content/presets/plumbing.json b/apps/mcp/content/presets/plumbing.json
+index 48956e27..4b62c958 100644
+--- a/apps/mcp/content/presets/plumbing.json
++++ b/apps/mcp/content/presets/plumbing.json
+@@ -14,7 +14,8 @@
+     "tagline": "{TAGLINE}",
+     "description": "Residential plumbing in {CITY} — drain clearing, water heaters, fixture installs, and leak diagnosis with clear scopes and honest ETAs.",
+     "url": "https://{DOMAIN}",
+-    "schedulingUrl": "{SCHEDULING_URL}"
++    "schedulingUrl": "{SCHEDULING_URL}",
++    "reviewsUrl": "{REVIEWS_URL}"
+   },
+   "contact": {
+     "phone": "{PHONE}",
+diff --git a/apps/mcp/lib/render-site-ts.ts b/apps/mcp/lib/render-site-ts.ts
+index 293bed24..b1eb9f63 100644
+--- a/apps/mcp/lib/render-site-ts.ts
++++ b/apps/mcp/lib/render-site-ts.ts
+@@ -52,6 +52,22 @@ export type Service = {
+  */
+ const DROP_KEYS = new Set(["industry", "reviewBeforeShip"]);
+ 
++/** Unresolved template placeholder token like `{REVIEWS_URL}` (whole value). */
++const TOKEN_ONLY_RE = /^\{[A-Z][A-Z0-9_]*\}$/;
++
++/**
++ * Usable URL-ish string: non-empty after trim and not a leftover `{TOKEN}`
++ * placeholder. Mirrors business-brain's usability bar (#331) — fail closed,
++ * never emit an empty or unresolved review link into a customer site.
++ */
++function isUsableUrlString(value: unknown): value is string {
++  if (typeof value !== "string") return false;
++  const t = value.trim();
++  if (!t) return false;
++  if (TOKEN_ONLY_RE.test(t)) return false;
++  return true;
++}
++
+ /**
+  * Transform filled preset JSON into the flat site object shape used by
+  * amendmentworks content/site.ts (meta fields become top-level).
+@@ -75,6 +91,15 @@ export function configToSiteObject(
+     ] as const) {
+       if (key in meta) out[key] = meta[key];
+     }
++
++    // #331: interview REVIEWS_URL lands on meta.reviewsUrl (the first path
++    // business-brain's review_collection signal checks). Hoisted to the
++    // rendered site object ONLY when usable — an empty/skipped answer or a
++    // leftover {REVIEWS_URL} token emits NO field (fail closed; the site
++    // keeps its honest no-reviews-link behavior).
++    if (isUsableUrlString(meta.reviewsUrl)) {
++      out.reviewsUrl = meta.reviewsUrl.trim();
++    }
+   }
+ 
+   for (const [key, value] of Object.entries(config)) {
+diff --git a/docs/active-work.md b/docs/active-work.md
+index 72318c16..9137e720 100644
+--- a/docs/active-work.md
++++ b/docs/active-work.md
+@@ -31,6 +31,7 @@ Labels: `agent-claimed`, `blocked`, `gibson-halt`.
+ | 2026-08-02T00:15Z | issue-323-day-zero-orphan-cleanup | apps/mcp/app/api/[transport]/route.ts, apps/mcp/lib/issue-323-day-zero-cleanup-contract.test.ts (new), docs/active-work.md | cb-finish driver iter 43 |
+ | 2026-08-02T01:20Z | issue-325-preset-itemtypes | apps/mcp/content/presets/*.json (8 files), apps/mcp/lib/issue-325-preset-itemtypes.test.ts (new), docs/active-work.md | cb-finish driver iter 44 |
+ | 2026-08-02T04:20Z | chore-claim-row-two-phase-cleanup | docs/active-work.md | cb-finish driver iter 46 |
++| 2026-08-02T06:40Z | issue-331-reviews-url | apps/mcp/content/presets/*.json (8 files), apps/mcp/lib/render-site-ts.ts, apps/mcp/lib/issue-331-reviews-url-contract.test.ts (new), docs/active-work.md | cb-finish driver iter 48 |
+ 
+ Releasing stale rows (two-phase, enforced by `scripts/check-active-work.mjs`):
+ once a claim's work has merged and its issue, if any, is closed, append a

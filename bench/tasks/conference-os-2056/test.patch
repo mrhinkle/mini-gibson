@@ -1,0 +1,200 @@
+diff --git a/tests/unit/event-footer-broadside-contrast.test.ts b/tests/unit/event-footer-broadside-contrast.test.ts
+new file mode 100644
+index 000000000..c23781a58
+--- /dev/null
++++ b/tests/unit/event-footer-broadside-contrast.test.ts
+@@ -0,0 +1,194 @@
++/** @vitest-environment jsdom
++ * Copyright (c) 2026 Mark R. Hinkle. All Rights Reserved.
++ * Unauthorized copying, modification, or distribution of this file,
++ * via any medium, is strictly prohibited.
++ */
++
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { createElement, type ReactNode } from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it, vi } from 'vitest';
++
++vi.mock('next/link', () => ({
++  default: ({
++    href,
++    children,
++    className,
++  }: {
++    href: string;
++    children: ReactNode;
++    className?: string;
++  }) => createElement('a', { href, className }, children),
++}));
++
++vi.mock('@/components/space-background', () => ({
++  SpaceBackground: () => null,
++}));
++
++vi.mock('@/components/social-icon', () => ({
++  SocialIcon: () => null,
++}));
++
++import { EventPublicFooter } from '@/components/event-public-footer';
++
++const COLUMN_NAV = [
++  {
++    label: 'Conference',
++    children: [{ href: '/events/demo', label: 'Overview' }],
++  },
++  {
++    label: 'Connect',
++    children: [{ href: '/events/demo/policies', label: 'Policies' }],
++  },
++];
++
++/** Tailwind v4 default palette is oklch; convert to sRGB for WCAG 2.x. */
++function oklchToSrgb(Lpct: number, C: number, h: number): readonly number[] {
++  const L = Lpct / 100;
++  const hRad = (h * Math.PI) / 180;
++  const a = C * Math.cos(hRad);
++  const b = C * Math.sin(hRad);
++  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
++  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
++  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
++  const l = l_ ** 3;
++  const m = m_ ** 3;
++  const s = s_ ** 3;
++  const rLin = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
++  const gLin = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
++  const bLin = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
++  const toSrgb = (channel: number): number => {
++    const encoded =
++      channel <= 0.0031308
++        ? 12.92 * channel
++        : 1.055 * Math.pow(Math.max(channel, 0), 1 / 2.4) - 0.055;
++    return Math.round(Math.max(0, Math.min(1, encoded)) * 255);
++  };
++  return [toSrgb(rLin), toSrgb(gLin), toSrgb(bLin)];
++}
++
++function readOklchToken(source: string, token: string): readonly number[] {
++  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++  const match = source.match(
++    new RegExp(
++      `${escapedToken}:\\s*oklch\\(([0-9.]+)%\\s+([0-9.]+)\\s+([0-9.]+)\\)`,
++      'i',
++    ),
++  );
++  if (!match?.[1] || !match[2] || !match[3]) {
++    throw new Error(`Missing oklch color token ${token}`);
++  }
++  return oklchToSrgb(
++    Number.parseFloat(match[1]),
++    Number.parseFloat(match[2]),
++    Number.parseFloat(match[3]),
++  );
++}
++
++function hexToRgb(hex: string): readonly number[] {
++  const n = Number.parseInt(hex.slice(1), 16);
++  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
++}
++
++function relativeLuminance(rgb: readonly number[]): number {
++  const [red, green, blue] = rgb.map((channel) => {
++    const value = channel / 255;
++    return value <= 0.04045
++      ? value / 12.92
++      : ((value + 0.055) / 1.055) ** 2.4;
++  });
++  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
++}
++
++function contrastRatio(
++  foreground: readonly number[],
++  background: readonly number[],
++): number {
++  const foregroundLuminance = relativeLuminance(foreground);
++  const backgroundLuminance = relativeLuminance(background);
++  return (
++    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
++    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
++  );
++}
++
++function renderFooter(
++  props: Partial<Parameters<typeof EventPublicFooter>[0]> = {},
++): HTMLDivElement {
++  const markup = renderToStaticMarkup(
++    createElement(EventPublicFooter, {
++      eventSlug: 'demo',
++      eventName: 'Demo Event',
++      visualTemplate: 'broadside',
++      footerNav: COLUMN_NAV,
++      ...props,
++    }),
++  );
++  const container = document.createElement('div');
++  container.innerHTML = markup;
++  return container;
++}
++
++function headingClassTokens(container: HTMLDivElement): string[] {
++  const heading = container.querySelector(
++    '[data-testid="event-footer-columns"] .min-w-\\[8rem\\] p',
++  );
++  if (!heading) throw new Error('Footer column heading not rendered');
++  return heading.className.split(/\s+/).filter(Boolean);
++}
++
++function footerBgHex(container: HTMLDivElement): string {
++  const footer = container.querySelector('[data-testid="event-public-footer"]');
++  if (!footer) throw new Error('Event public footer not rendered');
++  const match = footer.className.match(/bg-\[(#[0-9a-f]{6})\]/i);
++  if (!match?.[1]) {
++    throw new Error('Broadside footer is missing an arbitrary bg-[#rrggbb] class');
++  }
++  return match[1].toLowerCase();
++}
++
++describe('event footer Broadside column heading contrast (#2055)', () => {
++  const globalCss = readFileSync(
++    join(process.cwd(), 'src/app/globals.css'),
++    'utf8',
++  );
++  const tailwindTheme = readFileSync(
++    join(process.cwd(), 'node_modules/tailwindcss/theme.css'),
++    'utf8',
++  );
++  const stone500 = readOklchToken(tailwindTheme, '--color-stone-500');
++  const stone600 = readOklchToken(tailwindTheme, '--color-stone-600');
++  const stone700 = readOklchToken(tailwindTheme, '--color-stone-700');
++
++  it('renders Broadside column headings in text-stone-600, not the failing text-stone-500', () => {
++    const tokens = headingClassTokens(renderFooter());
++    expect(tokens).toContain('text-stone-600');
++    expect(tokens).not.toContain('text-stone-500');
++  });
++
++  it('paints the Broadside footer with the same #f5f2eb as the visual-template token', () => {
++    const container = renderFooter();
++    const painted = footerBgHex(container);
++    expect(painted).toBe('#f5f2eb');
++
++    const vtBlock = globalCss.match(
++      /\[data-visual-template="broadside"\]\s*\{([^}]+)\}/,
++    )?.[1];
++    const token = vtBlock?.match(/--vt-footer-bg:\s*(#[0-9a-f]{6})/i)?.[1];
++    expect(token?.toLowerCase()).toBe(painted);
++  });
++
++  it('keeps stone-500 under 4.5:1 on the Broadside footer background', () => {
++    const bg = hexToRgb(footerBgHex(renderFooter()));
++    expect(contrastRatio(stone500, bg)).toBeLessThan(4.5);
++  });
++
++  it('pins stone-600 above 4.5:1 and secondary to stone-700 social links', () => {
++    const bg = hexToRgb(footerBgHex(renderFooter()));
++    const headingRatio = contrastRatio(stone600, bg);
++    const socialRatio = contrastRatio(stone700, bg);
++    expect(headingRatio).toBeGreaterThanOrEqual(4.5);
++    expect(headingRatio).toBeLessThan(socialRatio);
++  });
++});

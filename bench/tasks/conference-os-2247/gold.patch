@@ -1,0 +1,14 @@
+diff --git a/src/lib/atai-site-chrome.ts b/src/lib/atai-site-chrome.ts
+index 71f016f40..b21cb824e 100644
+--- a/src/lib/atai-site-chrome.ts
++++ b/src/lib/atai-site-chrome.ts
+@@ -130,6 +130,9 @@ export const ATAI_FOOTER_COLUMNS: readonly AtaiChromeGroup[] = [
+ /** Footer bottom-bar links, after the copyright line. */
+ export const ATAI_FOOTER_LEGAL_LINKS: readonly AtaiChromeLink[] = [
+   { label: 'Privacy Policy', href: site('/privacy-policy') },
++  { label: 'Code of Conduct', href: site('/code-of-conduct') },
++  { label: 'Environmental Policy', href: site('/environmental-policy') },
++  { label: 'Terms and Conditions', href: site('/terms-and-conditions') },
+   { label: 'All Things Open', href: 'https://allthingsopen.org', newTab: true },
+   { label: 'The AIE Network', href: 'https://theaie.net', newTab: true },
+ ];

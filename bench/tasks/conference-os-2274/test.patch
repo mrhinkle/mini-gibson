@@ -1,0 +1,21 @@
+diff --git a/tests/unit/security-headers.test.ts b/tests/unit/security-headers.test.ts
+index 76ddbfc3f..d650b29fd 100644
+--- a/tests/unit/security-headers.test.ts
++++ b/tests/unit/security-headers.test.ts
+@@ -147,6 +147,16 @@ describe("security headers", () => {
+     expect(frameSources).not.toContain("blob:");
+   });
+ 
++  it("lets Meta Pixel POST to www.facebook.com and nothing broader (#2272)", () => {
++    const csp = buildContentSecurityPolicy({ nonce: "formActionNonce" });
++
++    expect(directive(csp, "form-action")).toBe(
++      "form-action 'self' https://www.facebook.com",
++    );
++    // Meta's rotating Lambda/Cloud Run probe hosts stay blocked everywhere.
++    expect(csp).not.toMatch(/on\.aws|run\.app/);
++  });
++
+   it("rejects empty nonce", () => {
+     expect(() => buildContentSecurityPolicy({ nonce: "" })).toThrow(/nonce/i);
+   });

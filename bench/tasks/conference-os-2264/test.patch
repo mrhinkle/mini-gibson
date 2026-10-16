@@ -1,0 +1,206 @@
+diff --git a/tests/unit/apply-production-homepage-manifest.test.ts b/tests/unit/apply-production-homepage-manifest.test.ts
+index 390be7c7f..a4bfd791f 100644
+--- a/tests/unit/apply-production-homepage-manifest.test.ts
++++ b/tests/unit/apply-production-homepage-manifest.test.ts
+@@ -23,7 +23,7 @@ import {
+ import { PRODUCTION_DATABASE_HOST_MARKER } from "../../scripts/protected-database-hosts.mjs";
+ 
+ const ORG_SLUG = "example-conf";
+-const INSTALL = "conference-os-demo";
++const INSTALL = "example-demo";
+ const MANIFEST_PATH = "config/homepage/example-conf.json";
+ const MANIFEST_BYTES = Buffer.from(
+   JSON.stringify({
+@@ -53,7 +53,7 @@ const DEMO_TARGET = loadInstallProductionNeonTarget(INSTALL) as {
+   endpointFingerprint: string;
+   databaseName: string;
+ };
+-const OTHER_TARGET = loadInstallProductionNeonTarget("conference-os-vercel") as {
++const OTHER_TARGET = loadInstallProductionNeonTarget("example-canonical") as {
+   endpointFingerprint: string;
+   databaseName: string;
+ };
+diff --git a/tests/unit/apply-production-migrations.test.ts b/tests/unit/apply-production-migrations.test.ts
+index 78a5251dc..07c5daba7 100644
+--- a/tests/unit/apply-production-migrations.test.ts
++++ b/tests/unit/apply-production-migrations.test.ts
+@@ -66,6 +66,7 @@ describe("apply-production-migrations (#1290)", () => {
+           defaultDatabaseName: "fixture-db",
+           installs: {
+             "conference-os-vercel": {
++              slug: "canonical",
+               neon: {
+                 production: {
+                   projectId: "fixture-project",
+@@ -85,6 +86,31 @@ describe("apply-production-migrations (#1290)", () => {
+     });
+   });
+ 
++  it("refuses a canonical load when the slug is missing, duplicated, or the installs set cannot be read", () => {
++    const fsFor = (installs: unknown) => ({
++      readFileSync: () =>
++        JSON.stringify({ defaultDatabaseName: "fixture-db", installs }),
++    });
++    expect(() =>
++      loadCanonicalProductionNeonTarget("fixture-map.json", fsFor(null)),
++    ).toThrow(/missing installs/);
++    expect(() =>
++      loadCanonicalProductionNeonTarget("fixture-map.json", fsFor([])),
++    ).toThrow(/missing installs/);
++    expect(() =>
++      loadCanonicalProductionNeonTarget("fixture-map.json", fsFor({})),
++    ).toThrow(/exactly one install with slug "canonical" \(found 0\)/);
++    expect(() =>
++      loadCanonicalProductionNeonTarget(
++        "fixture-map.json",
++        fsFor({
++          "example-a": { slug: "canonical" },
++          "example-b": { slug: "canonical" },
++        }),
++      ),
++    ).toThrow(/found 2/);
++  });
++
+   it("refuses an install map entry with no production endpoint fingerprint", () => {
+     const fsModule = {
+       readFileSync: () =>
+@@ -121,8 +147,13 @@ describe("apply-production-migrations (#1290)", () => {
+       return found[0];
+     };
+     expect(() => loadCanonicalProductionNeonTarget()).not.toThrow();
++    expect(Object.keys(exampleMap.installs).sort()).toEqual([
++      "example-canonical",
++      "example-demo",
++      "example-pinned",
++    ]);
+     const canonical = loadInstallProductionNeonTarget(
+-      CANONICAL_INSTALL,
++      keyForSlug("canonical"),
+       exampleMapPath
+     );
+     const exampleInstall = loadInstallProductionNeonTarget(
+@@ -175,13 +206,13 @@ describe("apply-production-migrations (#1290)", () => {
+     // Codex #1405 round-4 residual B: expected host comes from the trusted
+     // map for the named install, not a hand-supplied value and not the
+     // resolved URL's own host (that comparison is a tautology).
+-    const mapped = loadInstallProductionNeonTarget(CANONICAL_INSTALL);
++    const mapped = loadInstallProductionNeonTarget("example-canonical");
+     expect(mapped.endpointFingerprint).toBe(PRODUCTION_DATABASE_HOST_MARKER);
+     expect(mapped.endpointFingerprint).not.toBe(EXAMPLE_INSTALL_HOST);
+     const runCommand = vi.fn();
+     const rejection = await applyProductionMigrations({
+       databaseUrl: EXAMPLE_INSTALL_URL,
+-      install: CANONICAL_INSTALL,
++      install: "example-canonical",
+       runCommand,
+       readDiff: async () => ({ stdout: "", stderr: "", code: 0 }),
+     }).then(
+@@ -220,11 +251,33 @@ describe("apply-production-migrations (#1290)", () => {
+           json: async () => ({ uri: mappedUrl }),
+         };
+       });
++      const fsModule = {
++        readFileSync: () =>
++          JSON.stringify({
++            neonOrgId: "org-acme-0001",
++            defaultDatabaseName: "neondb",
++            installs: {
++              "conference-os-vercel": {
++                slug: "canonical",
++                vercelProject: "conference-os-vercel",
++                neon: {
++                  production: {
++                    projectId: "fixture-project",
++                    branch: "main",
++                    endpointFingerprint: "ep-fixture-canonical",
++                  },
++                },
++              },
++            },
++          }),
++      };
+       await expect(
+         resolveProductionDatabaseUrl({
+           apiKey: "test-key",
+           install: CANONICAL_INSTALL,
+           fetchImpl: fetchImpl as unknown as typeof fetch,
++          fsModule: fsModule as never,
++          mapPath: "fixture-map.json",
+         })
+       ).resolves.toBe(PROD_URL);
+       expect(fetchImpl).toHaveBeenCalled();
+@@ -259,7 +312,7 @@ describe("apply-production-migrations (#1290)", () => {
+       await expect(
+         resolveProductionDatabaseUrl({
+           apiKey: "test-key",
+-          install: CANONICAL_INSTALL,
++          install: "example-canonical",
+           fetchImpl: fetchImpl as unknown as typeof fetch,
+         })
+       ).resolves.toBe(PROD_URL);
+@@ -419,6 +472,7 @@ const FIXTURE_MAP = {
+   defaultDatabaseName: "fixture-db",
+   installs: {
+     "conference-os-vercel": {
++      slug: "canonical",
+       pinBranch: "release",
+       controlledApplyBranch: "release",
+       neon: {
+diff --git a/tests/unit/design-md-contract.test.ts b/tests/unit/design-md-contract.test.ts
+index dd52d14ad..49bfd0d9c 100644
+--- a/tests/unit/design-md-contract.test.ts
++++ b/tests/unit/design-md-contract.test.ts
+@@ -168,8 +168,8 @@ describe("DESIGN.md contract (/DESIGN.md)", () => {
+ 
+   it("UNIT-DESIGN-font-sync: typography families are exactly the fonts the app loads", () => {
+     // next/font loads Geist, Geist_Mono, Montserrat, JetBrains_Mono; Verdana
+-    // is the .ata-theme heading system stack (deliberately not a webfont —
+-    // see src/app/ata-fonts.css).
++    // is the .public-theme heading system stack (deliberately not a webfont —
++    // see src/app/public-fonts.css).
+     expect(LAYOUT_TSX).toMatch(/\bGeist\b/);
+     expect(LAYOUT_TSX).toMatch(/\bGeist_Mono\b/);
+     expect(LAYOUT_TSX).toMatch(/\bMontserrat\b/);
+diff --git a/tests/unit/event-hero-ctas.test.ts b/tests/unit/event-hero-ctas.test.ts
+index 6b8baf9a2..f9c8168be 100644
+--- a/tests/unit/event-hero-ctas.test.ts
++++ b/tests/unit/event-hero-ctas.test.ts
+@@ -169,7 +169,7 @@ describe('CompanyMarquee empty-state omission (#322)', () => {
+       })
+     );
+     expect(html).toContain('Acme');
+-    expect(html).toContain('ata-ticker-track');
++    expect(html).toContain('public-ticker-track');
+   });
+ });
+ 
+diff --git a/tests/unit/protected-database-hosts.test.ts b/tests/unit/protected-database-hosts.test.ts
+index 7ef129514..1fa06b10d 100644
+--- a/tests/unit/protected-database-hosts.test.ts
++++ b/tests/unit/protected-database-hosts.test.ts
+@@ -255,10 +255,10 @@ describe("install-map production host parity (#1396)", () => {
+     const resolved = new Set(
+       DEFAULT_PROTECTED_DATABASE_HOSTS.map((host) => host.toLowerCase()),
+     );
+-    expect(installDatabaseMap.installs["conference-os-demo"].pinBranch).toBeNull();
++    expect(installDatabaseMap.installs["example-demo"].pinBranch).toBeNull();
+     expect(resolved.has(DEMO_MARKER)).toBe(false);
+     expect(
+-      installDatabaseMap.installs["conference-os-demo"].neon.production
++      installDatabaseMap.installs["example-demo"].neon.production
+         .endpointFingerprint,
+     ).toBe(DEMO_MARKER);
+   });
+diff --git a/tests/unit/space-jam-logo.test.ts b/tests/unit/space-jam-logo.test.ts
+index c9fec569b..103e8aa78 100644
+--- a/tests/unit/space-jam-logo.test.ts
++++ b/tests/unit/space-jam-logo.test.ts
+@@ -201,7 +201,7 @@ describe("SpaceJamLockup", () => {
+     // Set-type wordmark (not constellation star-chart lines)
+     expect(full).toContain("sj-lockup-wordmark");
+     expect(full).toContain("SPACE JAM");
+-    expect(full).toContain("var(--font-ata-sans)");
++    expect(full).toContain("var(--font-public-sans)");
+     expect(full).toContain("Montserrat");
+     expect(full).toContain("font-weight:800");
+     expect(full).toContain("text-transform:uppercase");

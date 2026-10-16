@@ -1,0 +1,5934 @@
+diff --git a/apps/mcp/app/api/[transport]/route.ts b/apps/mcp/app/api/[transport]/route.ts
+index 11c52dd4..29cdb8bb 100644
+--- a/apps/mcp/app/api/[transport]/route.ts
++++ b/apps/mcp/app/api/[transport]/route.ts
+@@ -37,6 +37,14 @@ import {
+   getSuggestion,
+   formatGetSuggestionResult,
+ } from "@/lib/get-suggestion";
++import {
++  formatPreviewChangeLoadError,
++  GITHUB_OWNER_RE,
++  GITHUB_REPO_RE,
++  previewChange,
++  previewChangeTransportText,
++} from "@/lib/preview-diff";
++import { requireUpdateBotRepoGrant } from "@/lib/update-bot-auth";
+ import {
+   checkSuggestionOverlap,
+   formatCheckSuggestionOverlapResult,
+@@ -1227,6 +1235,69 @@ const handler = createMcpHandler(
+       },
+     );
+ 
++    // --- Private preview of a proposed change (issue #535) ---
++
++    server.registerTool(
++      "preview_change",
++      {
++        title: "Preview a change",
++        description:
++          "PREVIEW ONLY — never publishes, merges, or invents a link. For one pending suggestion (PR number) on a repo connected to this Chatterbuilt account, returns a phone-readable summary of what will differ in business vocabulary (your hours, your services list), a before/after of the wording when that can actually be read, and the draft-site URL only when hosting returned one. A caller-supplied URL is never treated as a verified draft. Closed or merged GitHub suggestions are not offered for approval — merged is not a claim that the change is live. If the diff cannot be computed, or the draft is still building, it says so. Pair with list_suggestions / get_suggestion. Requires Launch or Current.",
++        inputSchema: {
++          owner: z
++            .string()
++            .regex(GITHUB_OWNER_RE)
++            .describe("GitHub owner or org of the customer site repo"),
++          repo: z
++            .string()
++            .regex(GITHUB_REPO_RE)
++            .describe("GitHub repository name of the customer site"),
++          number: z
++            .number()
++            .int()
++            .min(1)
++            .describe("Pull request / suggestion number to preview"),
++          previewUrl: z
++            .string()
++            .optional()
++            .describe(
++              "Ignored for verification — a draft-site link is shown only when hosting returned one. Omit.",
++            ),
++        },
++      },
++      async ({ owner, repo, number, previewUrl }, extra) => {
++        const authInfo = extra.authInfo;
++        const account = resolveAccountId(authInfo);
++        return withTelemetry("preview_change", account, async () => {
++          const denied = requireTier(authInfo, "launch");
++          if (denied) {
++            return textResult(denied);
++          }
++          try {
++            requireUpdateBotRepoGrant({
++              accountId: account,
++              owner,
++              repo,
++            });
++            const result = await previewChange({
++              accountId: account,
++              owner,
++              repo,
++              number,
++              previewUrl,
++            });
++            return textResult(previewChangeTransportText(result));
++          } catch (err) {
++            const message =
++              err instanceof Error ? err.message : "Failed to load the preview.";
++            return textResult(
++              formatPreviewChangeLoadError({ owner, repo, number, message }),
++            );
++          }
++        });
++      },
++    );
++
+     // --- Suggestion queue soft-lock: path overlap with open PRs (issue #18, part 3) ---
+ 
+     server.registerTool(
+diff --git a/apps/mcp/content/platform-manifest.json b/apps/mcp/content/platform-manifest.json
+index a6ac4e43..bc367422 100644
+--- a/apps/mcp/content/platform-manifest.json
++++ b/apps/mcp/content/platform-manifest.json
+@@ -46,14 +46,15 @@
+       "extract_site_skeleton",
+       "list_suggestions",
+       "get_suggestion",
++      "preview_change",
+       "check_suggestion_overlap",
+       "prepare_agent_suggestion"
+     ]
+   },
+   "toolCount": {
+     "free": 27,
+-    "licensed": 15,
+-    "total": 42
++    "licensed": 16,
++    "total": 43
+   },
+   "products": [
+     {
+diff --git a/apps/mcp/lib/entitlements.ts b/apps/mcp/lib/entitlements.ts
+index 3367d109..b6a0bc8a 100644
+--- a/apps/mcp/lib/entitlements.ts
++++ b/apps/mcp/lib/entitlements.ts
+@@ -176,6 +176,7 @@ export function toolsForTier(tier: Tier): string[] {
+     "extract_site_skeleton",
+     "list_suggestions",
+     "get_suggestion",
++    "preview_change",
+     "check_suggestion_overlap",
+     "prepare_agent_suggestion",
+   ];
+diff --git a/apps/mcp/lib/preview-diff.ts b/apps/mcp/lib/preview-diff.ts
+new file mode 100644
+index 00000000..ae363703
+--- /dev/null
++++ b/apps/mcp/lib/preview-diff.ts
+@@ -0,0 +1,5039 @@
++/**
++ * preview_change — owner-facing private preview of a proposed site change.
++ *
++ * Shows what will differ in business vocabulary, plus a before/after when
++ * we can actually read the wording, plus a draft-site link only when
++ * hosting returned a real URL. Never invents a diff or a URL.
++ *
++ * PREVIEW ONLY — never merges, publishes, or applies the change.
++ */
++
++import * as ts from "typescript";
++import { resolvePreviewUrl } from "./preview-url";
++import {
++  flattenOwnerWhitespace,
++  isCustomerSiteCopyPath,
++  isPathLocationLabel,
++  labelForSiteField,
++  labelForSiteObjectKeys,
++  namedFilePaths,
++  plainFileLabel,
++  sectionsFromFiles,
++} from "./site-section-labels";
++import { requireUpdateBotRepoGrant } from "./update-bot-auth";
++
++export const PREVIEW_CHANGE_NOTICE =
++  "PREVIEW ONLY — this shows what the draft would change. It never publishes, and it never invents a link.";
++
++/**
++ * Banner when we are not showing a verified change. The success notice
++ * claims "this shows what the draft would change" — that is false on
++ * unavailable / not-pending results.
++ */
++export const PREVIEW_CHANGE_NO_DIFF_NOTICE =
++  "PREVIEW ONLY — this never publishes or invents a link.";
++
++/**
++ * Banner when the draft includes files or site-copy we cannot classify.
++ * The success notice claims "this shows what the draft would change" —
++ * that is false for the unclassified portion.
++ */
++export const PREVIEW_CHANGE_INCOMPLETE_NOTICE =
++  "PREVIEW ONLY — this does not show everything the draft would change. It never publishes, and it never invents a link.";
++
++/**
++ * Generic unbound invitation. Never returned for a ready preview — the
++ * issued prompt must name the head SHA and merge-base SHA (see
++ * shaBoundApprovalPrompt). Tests use this string as the forbidden form.
++ */
++export const APPROVAL_PROMPT =
++  "Reply yes to publish, no to discard, or tell me what to change.";
++
++/** Owner-facing when the draft exists but hosting has not produced a site. */
++export const NOT_READY_PROMPT =
++  "I won't ask you to publish until the draft site is ready.";
++
++/**
++ * Owner-facing when hosting is ready but at least one changed file could
++ * not be tied to a reviewed site surface. Not the same claim as "the
++ * draft site is not ready".
++ */
++export const UNCLASSIFIED_CHANGES_PROMPT =
++  "I won't ask you to publish while this draft includes files I cannot tie to the live site.";
++
++/**
++ * Owner-facing when the pull request does not target the repository's
++ * default branch. GitHub's default branch is a proxy for where the
++ * site is published — this tool does not read Vercel's production
++ * branch mapping. Merging a `develop` PR while production deploys
++ * from `main` would not update the live site.
++ *
++ * Must not assert that the default branch *is* where the site
++ * publishes. That is unverified without the Vercel project setting.
++ */
++export const NON_PRODUCTION_BASE_PROMPT =
++  "I won't ask you to publish this draft because it does not target the repository's default branch, which is the best signal I have for where the site is published.";
++
++export const NON_PRODUCTION_BASE_REASON =
++  "This draft does not target the repository's default branch, which is the best signal I have for where the site is published.";
++
++/**
++ * Honest limit on the default-branch proxy. This tool never reads
++ * Vercel's Production Branch setting, so a ready invite must not
++ * treat GitHub's default branch as verified production.
++ */
++export const DEFAULT_BRANCH_PRODUCTION_PROXY_CAVEAT =
++  "I used the repository's default branch as the best signal I have for where the site is published. I cannot confirm Vercel's production branch matches it.";
++
++/** Chat-bubble wrap width (phone-first; URLs stay on their own line). */
++export const OWNER_BUBBLE_WIDTH = 60;
++
++/**
++ * GitHub login (user or org): 1–39 characters, alphanumeric or single
++ * hyphens, no leading or trailing hyphen.
++ */
++export const GITHUB_OWNER_RE =
++  /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
++
++/**
++ * GitHub repository name: 1–100 characters of [A-Za-z0-9._-], not `.` or `..`.
++ */
++export const GITHUB_REPO_RE = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
++
++export function isGitHubOwner(value: string): boolean {
++  return GITHUB_OWNER_RE.test(value);
++}
++
++export function isGitHubRepoName(value: string): boolean {
++  return GITHUB_REPO_RE.test(value);
++}
++
++const MAX_PAIRS = 5;
++const MAX_VALUE_CHARS = 200;
++const MAX_FILE_BYTES = 500_000;
++const FILES_PER_PAGE = 100;
++const MAX_FILE_PAGES = 10;
++
++export type PreviewFile = {
++  filename: string;
++  status: string;
++  patch?: string;
++  previousFilename?: string;
++};
++
++export type PreviewDeployStatus =
++  | "ready"
++  | "building"
++  | "failed"
++  | "none"
++  | "unavailable";
++
++export type PreviewDeploy = {
++  /** Platform-returned URL only. May still be rejected as a placeholder. */
++  url: string | null;
++  /**
++   * `none` is verified-absent. `unavailable` is "I could not read
++   * hosting" — never the same claim as "hosting returned no link".
++   */
++  status: PreviewDeployStatus;
++  /**
++   * Why a URL was refused even though GitHub returned deployments.
++   * Shown to the owner; never a ready/success claim.
++   */
++  warning?: string | null;
++};
++
++export type PreviewPull = {
++  number: number;
++  title: string;
++  headSha: string;
++  baseSha: string;
++  headRef: string;
++  baseRef: string;
++  /**
++   * Repository default branch from GitHub. Compared to `baseRef` as a
++   * proxy for "this PR would land where the site is published". Empty
++   * when GitHub did not return one — fail closed, not publishable.
++   */
++  defaultBranch: string;
++  /**
++   * Three-dot merge base of the pull request. File-to-file comparison must
++   * use this SHA, never the current base-branch tip — a later main-side
++   * edit is not part of this suggestion.
++   */
++  mergeBaseSha: string | null;
++  /** GitHub PR state: open | closed. */
++  state: string;
++  /** True when GitHub reports the PR as merged. */
++  merged: boolean;
++  /** GitHub `changed_files` count when present. */
++  changedFiles: number | null;
++  /** True when the file list is known incomplete (no pagination / cap). */
++  filesTruncated: boolean;
++  files: PreviewFile[];
++};
++
++export type PreviewDiffClient = {
++  getPull: (args: {
++    owner: string;
++    repo: string;
++    number: number;
++  }) => Promise<PreviewPull>;
++  getPreviewDeploy: (args: {
++    owner: string;
++    repo: string;
++    sha: string;
++  }) => Promise<PreviewDeploy>;
++  getFileAtRef?: (args: {
++    owner: string;
++    repo: string;
++    path: string;
++    ref: string;
++  }) => Promise<string | null>;
++};
++
++export type VisualPair = {
++  label: string;
++  before: string | null;
++  after: string | null;
++};
++
++export type PreviewChangeResult =
++  | {
++      mode: "ok";
++      notice: string;
++      title: string | null;
++      sections: string[];
++      summary: string;
++      visual: {
++        available: boolean;
++        reason: string | null;
++        pairs: VisualPair[];
++        /** Wording changes not listed because of the display cap. */
++        hiddenCount: number;
++      };
++      preview: {
++        url: string | null;
++        status: PreviewDeployStatus;
++        warning: string | null;
++      };
++      /**
++       * Head SHA this preview described. A later "yes" must re-check this
++       * SHA — the prompt is not a licence to publish whatever the branch
++       * became afterwards.
++       */
++      previewedSha: string;
++      /**
++       * Merge-base SHA this preview compared against. Head alone does
++       * not identify the effective diff: a stacked PR's merge base can
++       * move while HEAD stays put. Empty when GitHub did not give one.
++       */
++      previewedMergeBaseSha: string;
++      /**
++       * True when any changed file could not be tied to a reviewed site
++       * surface (destination and rename source both count), or when
++       * content/site.ts has changes the site-object diff cannot name or
++       * verify (unnamed scalars, helper exports, module-level imports).
++       * Publish approval must fail closed while this is true.
++       */
++      unclassifiedChanges: boolean;
++      /**
++       * True only when this PR's base branch is the repository default
++       * branch (the always-available proxy for where the site publishes).
++       * Not a Vercel production-branch check — false or missing must
++       * not invite publish, and true still carries the proxy caveat.
++       */
++      targetsProductionBase: boolean;
++      approvalPrompt: string;
++    }
++  | {
++      mode: "unavailable";
++      reason: "diff_unavailable";
++      notice: string;
++      message: string;
++      preview: {
++        url: string | null;
++        status: PreviewDeployStatus;
++        warning: string | null;
++      };
++    }
++  | {
++      mode: "not_pending";
++      notice: string;
++      title: string | null;
++      message: string;
++    };
++
++export type PreviewChangeArgs = {
++  /** Authenticated MCP account; required by the live GitHub path. */
++  accountId?: string;
++  owner: string;
++  repo: string;
++  number: number;
++  /** Caller-supplied draft URL. Never treated as hosting verification. */
++  previewUrl?: string;
++  client?: PreviewDiffClient;
++};
++
++/**
++ * Injected clients exist so unit tests can stand in for GitHub without a
++ * network call. Production must never skip the account→repo grant by
++ * supplying its own client — vitest is the only process that sets VITEST.
++ */
++function allowInjectedPreviewClient(): boolean {
++  return process.env.VITEST === "true";
++}
++
++/**
++ * GitHub reports a rename as one file: `filename` is the destination,
++ * `previousFilename` is the source. Classification that only reads the
++ * destination treats "move middleware.ts to public/middleware.txt" as a
++ * classified static-file change and never notices the executable source.
++ */
++function previewFilePaths(file: PreviewFile): string[] {
++  return namedFilePaths(file);
++}
++
++function fileHasUnverifiablePreviewPath(file: PreviewFile): boolean {
++  return previewFilePaths(file).some((p) => plainFileLabel(p) == null);
++}
++
++function fileTouchesCustomerSiteCopy(file: PreviewFile): boolean {
++  return previewFilePaths(file).some((p) => isCustomerSiteCopyPath(p));
++}
++
++/**
++ * Owner-facing preview of a pending suggestion.
++ */
++export async function previewChange(
++  args: PreviewChangeArgs,
++): Promise<PreviewChangeResult> {
++  if (!Number.isInteger(args.number) || args.number < 1) {
++    throw new Error(
++      "Suggestion number must be a positive integer (the PR number).",
++    );
++  }
++  if (!isGitHubOwner(args.owner) || !isGitHubRepoName(args.repo)) {
++    throw new Error("That is not a GitHub repository name.");
++  }
++
++  const injected =
++    args.client && allowInjectedPreviewClient() ? args.client : undefined;
++  if (!injected) {
++    const accountId = String(args.accountId ?? "").trim();
++    if (!accountId) {
++      throw new Error(
++        "An authenticated Chatterbuilt account is required to preview a change on a customer repo.",
++      );
++    }
++    requireUpdateBotRepoGrant({
++      accountId,
++      owner: args.owner,
++      repo: args.repo,
++    });
++  }
++
++  const client = injected ?? createGitHubPreviewDiffClient();
++  const pull = await client.getPull({
++    owner: args.owner,
++    repo: args.repo,
++    number: args.number,
++  });
++
++  const title = pull.title.trim() ? pull.title.trim() : null;
++  const previewedSha = bindablePreviewSha(pull.headSha);
++  const previewedMergeBaseSha = bindablePreviewSha(pull.mergeBaseSha);
++  if (!isPendingSuggestion(pull)) {
++    return notPendingResult(pull);
++  }
++  if (!previewedSha) {
++    return {
++      mode: "unavailable",
++      reason: "diff_unavailable",
++      notice: PREVIEW_CHANGE_NO_DIFF_NOTICE,
++      message:
++        "I couldn't tell which version of the draft this is, so I'm not going to describe it or ask you to publish it.",
++      preview: { url: null, status: "none", warning: null },
++    };
++  }
++
++  const preview = await resolvePreview(client, {
++    owner: args.owner,
++    repo: args.repo,
++    sha: previewedSha,
++    callerUrl: args.previewUrl,
++  });
++
++  if (pull.filesTruncated) {
++    return confirmThenUnavailable(client, {
++      owner: args.owner,
++      repo: args.repo,
++      number: args.number,
++      expectedSha: previewedSha,
++      expectedMergeBaseSha: pull.mergeBaseSha,
++      expectedBaseSha: pull.baseSha,
++      expectedBaseRef: pull.baseRef,
++      expectedFilesFingerprint: diffFilesFingerprint(pull),
++      preview,
++      message:
++        "I couldn't see the full file list for this change, so I'm not going to describe it as complete or ask you to publish it.",
++    });
++  }
++
++  if (pull.files.length === 0) {
++    return confirmThenUnavailable(client, {
++      owner: args.owner,
++      repo: args.repo,
++      number: args.number,
++      expectedSha: previewedSha,
++      expectedMergeBaseSha: pull.mergeBaseSha,
++      expectedBaseSha: pull.baseSha,
++      expectedBaseRef: pull.baseRef,
++      expectedFilesFingerprint: diffFilesFingerprint(pull),
++      preview,
++      message:
++        "I couldn't see what this change would do. The file list came back empty, so I'm not going to describe a change I haven't verified.",
++    });
++  }
++
++  const fileSections = sectionsFromFiles(pull.files);
++  const siteFiles = pull.files.filter((f) =>
++    isCustomerSiteCopyPath(f.filename),
++  );
++  // Nested copies (examples/, tests/, another package) are not the
++  // customer site. Two real site-copy paths — content/site.ts and
++  // src/content/site.ts — is also not a unique file we can describe.
++  const siteFile = siteFiles.length === 1 ? siteFiles[0] : undefined;
++
++  let pairs: VisualPair[] = [];
++  let visualReason: string | null =
++    siteFiles.length > 1
++      ? "This change includes more than one site-copy file, so I won't guess which wording to show you."
++      : null;
++  let unnamedSiteCopyCount = 0;
++  let namedFromParsedSiteCopy = false;
++  // True when we actually retrieved both file versions. A patch of a
++  // comment must not become the visual after a failed parse — that is
++  // how a commented-out example is presented as the real site copy.
++  let hadBothSiteFiles = false;
++  let beforeSrc: string | null = null;
++  let afterSrc: string | null = null;
++
++  // Compare merge-base vs head (what the PR actually introduces). Never
++  // compare the current base-branch tip to a stale head — that reports
++  // later main-side edits as if this suggestion were reverting them.
++  const beforeRef = pull.mergeBaseSha;
++  if (siteFile && client.getFileAtRef && beforeRef) {
++    const [beforeFetched, afterFetched] = await Promise.all([
++      client.getFileAtRef({
++        owner: args.owner,
++        repo: args.repo,
++        path: siteFile.filename,
++        ref: beforeRef,
++      }),
++      client.getFileAtRef({
++        owner: args.owner,
++        repo: args.repo,
++        path: siteFile.filename,
++        ref: previewedSha,
++      }),
++    ]);
++    beforeSrc = beforeFetched;
++    afterSrc = afterFetched;
++    if (beforeSrc != null && afterSrc != null) {
++      hadBothSiteFiles = true;
++      const beforeObj = tryParseSiteSource(beforeSrc);
++      const afterObj = tryParseSiteSource(afterSrc);
++      if (beforeObj && afterObj) {
++        const diff = diffSiteCopy(beforeSrc, afterSrc);
++        pairs = diff.pairs;
++        unnamedSiteCopyCount = diff.unnamedCount;
++        namedFromParsedSiteCopy = true;
++        if (pairs.length === 0) {
++          visualReason =
++            unnamedSiteCopyCount === 0
++              ? SITE_COPY_UNCHANGED_REASON
++              : SITE_COPY_UNNAMED_REASON;
++        }
++      } else {
++        visualReason =
++          "I couldn't read the site copy before and after, so I don't have a side-by-side of the wording.";
++      }
++    } else {
++      visualReason =
++        "I couldn't read the site copy before and after, so I don't have a side-by-side of the wording.";
++    }
++  }
++
++  if (pairs.length === 0 && siteFile?.patch && !hadBothSiteFiles) {
++    // One file version cannot authenticate both halves of a -/+ pair.
++    // visualPairsFromPatch requires both complete sources and places
++    // each side in that side's exported object. Missing either → no
++    // pairs. Do not substitute after ?? before: that is how a helper
++    // object's removed wording is reported as the prior site copy.
++    const fromPatch = visualPairsFromPatch(
++      siteFile.patch,
++      afterSrc,
++      beforeSrc,
++    );
++    if (fromPatch.length > 0) {
++      pairs = fromPatch;
++      visualReason = null;
++    } else if (!visualReason) {
++      visualReason =
++        "The draft includes site copy, but I couldn't read a before-and-after of the wording from the patch.";
++    }
++  }
++
++  if (pairs.length === 0 && !siteFile && !visualReason) {
++    visualReason =
++      "This change is not in the site copy I know how to compare, so I don't have a side-by-side of the wording.";
++  }
++
++  if (pairs.length === 0 && !visualReason) {
++    visualReason =
++      "I can name the parts of the site this touches. I don't have a side-by-side of the wording.";
++  }
++
++  const visualAvailable = pairs.length > 0;
++  const hiddenCount = visualAvailable
++    ? Math.max(0, pairs.length - MAX_PAIRS)
++    : 0;
++  const fieldSections = uniqueLabels(pairs.map((p) => p.label));
++  // A known wording change must not hide other files or unnamed
++  // scalar edits. Keep "your site copy" when we did not fully parse
++  // it, or when parsed copy has changes we cannot name. A verified
++  // semantic no-op (parsed, zero named fields, zero unnamed) is not
++  // a site-copy change — a comment-only edit must not become
++  // "This updates your site copy."
++  // Other top-level exports (getServiceBySlug, etc.), module-level
++  // imports, and top-level statements that run at module evaluation
++  // are not in the site object we diff. A change there is unverified
++  // behaviour.
++  let otherExportsChanged = false;
++  if (beforeSrc != null && afterSrc != null) {
++    otherExportsChanged = otherExportedDeclarationsChanged(
++      beforeSrc,
++      afterSrc,
++    );
++  }
++  const keepSiteCopyLabel =
++    !namedFromParsedSiteCopy ||
++    unnamedSiteCopyCount > 0 ||
++    otherExportsChanged;
++  const extraFileSections = fileSections.filter((section) => {
++    if (section === "your site copy") return keepSiteCopyLabel;
++    return true;
++  });
++  const sections = uniqueLabels([...fieldSections, ...extraFileSections]);
++  const unlabeledFiles = pull.files.some(fileHasUnverifiablePreviewPath);
++  const siteCopyUnchanged =
++    namedFromParsedSiteCopy &&
++    unnamedSiteCopyCount === 0 &&
++    pairs.length === 0 &&
++    !otherExportsChanged;
++  // Site-copy verification succeeds only with exactly one customer
++  // site-copy file, both sides retrieved, a successful parse, and
++  // every changed field named. Two files, a missing side, a failed
++  // parse, or an unnamed scalar are unverified — not a green light
++  // to invite publish. A rename whose source or destination is
++  // content/site.ts still counts as touching site copy.
++  const siteCopyVerified =
++    siteFiles.length === 1 &&
++    hadBothSiteFiles &&
++    namedFromParsedSiteCopy &&
++    unnamedSiteCopyCount === 0;
++  const siteCopyUnverified =
++    pull.files.some(fileTouchesCustomerSiteCopy) && !siteCopyVerified;
++  // The site object can be a semantic no-op while a helper export
++  // or a module-level import changed. That is not "no change in
++  // the wording the site uses".
++  if (otherExportsChanged && visualReason === SITE_COPY_UNCHANGED_REASON) {
++    visualReason = null;
++  }
++
++  const confirmed = await confirmPendingHead(client, {
++    owner: args.owner,
++    repo: args.repo,
++    number: args.number,
++    expectedSha: previewedSha,
++    expectedMergeBaseSha: pull.mergeBaseSha,
++    expectedBaseSha: pull.baseSha,
++    expectedBaseRef: pull.baseRef,
++    expectedFilesFingerprint: diffFilesFingerprint(pull),
++  });
++  if (confirmed.status === "moved") {
++    return draftMovedUnavailable();
++  }
++  if (confirmed.status === "not_pending") {
++    return notPendingResult(confirmed.pull);
++  }
++
++  const unclassifiedChanges =
++    unlabeledFiles || otherExportsChanged || siteCopyUnverified;
++  const targetsProductionBase = pullTargetsDefaultBranch(confirmed.pull);
++  const approvalPrompt = publishApprovalPrompt({
++    preview,
++    boundSha: previewedSha,
++    boundMergeBaseSha: previewedMergeBaseSha,
++    unclassifiedChanges,
++    targetsProductionBase,
++  });
++
++  let summary = buildSummary(sections, pairs, {
++    unlabeledFiles,
++    siteCopyUnchanged,
++  });
++  if (!targetsProductionBase) {
++    summary = summary
++      ? `${summary} ${NON_PRODUCTION_BASE_REASON}`
++      : NON_PRODUCTION_BASE_REASON;
++  } else {
++    const readyInvite = readyPublishApprovalPrompt(
++      previewedSha,
++      previewedMergeBaseSha,
++    );
++    // readyPublishApprovalPrompt returns NOT_READY_PROMPT when a SHA
++    // is not bindable — that must not attach the production-proxy
++    // caveat to a refused invite.
++    if (readyInvite !== NOT_READY_PROMPT && approvalPrompt === readyInvite) {
++      summary = summary
++        ? `${summary} ${DEFAULT_BRANCH_PRODUCTION_PROXY_CAVEAT}`
++        : DEFAULT_BRANCH_PRODUCTION_PROXY_CAVEAT;
++    }
++  }
++
++  return {
++    mode: "ok",
++    notice: unclassifiedChanges
++      ? PREVIEW_CHANGE_INCOMPLETE_NOTICE
++      : PREVIEW_CHANGE_NOTICE,
++    title,
++    sections,
++    summary,
++    visual: {
++      available: visualAvailable,
++      reason: visualAvailable ? null : visualReason,
++      pairs: visualAvailable ? pairs.slice(0, MAX_PAIRS) : [],
++      hiddenCount,
++    },
++    preview,
++    previewedSha,
++    previewedMergeBaseSha,
++    unclassifiedChanges,
++    targetsProductionBase,
++    approvalPrompt,
++  };
++}
++
++function draftMovedUnavailable(): Extract<
++  PreviewChangeResult,
++  { mode: "unavailable" }
++> {
++  return {
++    mode: "unavailable",
++    reason: "diff_unavailable",
++    notice: PREVIEW_CHANGE_NO_DIFF_NOTICE,
++    message:
++      "The draft changed while I was looking at it, so I'm not going to describe a mix of two versions. Ask me to preview again.",
++    preview: { url: null, status: "none", warning: null },
++  };
++}
++
++/**
++ * Re-check the PR snapshot before keeping any hosting state. A truncated
++ * or empty file list that returns a ready URL for head A must not survive
++ * a push of head B or a close.
++ */
++async function confirmThenUnavailable(
++  client: PreviewDiffClient,
++  args: {
++    owner: string;
++    repo: string;
++    number: number;
++    expectedSha: string;
++    expectedMergeBaseSha: string | null;
++    expectedBaseSha: string;
++    expectedBaseRef: string;
++    expectedFilesFingerprint: string;
++    preview: {
++      url: string | null;
++      status: PreviewDeployStatus;
++      warning: string | null;
++    };
++    message: string;
++  },
++): Promise<PreviewChangeResult> {
++  const confirmed = await confirmPendingHead(client, {
++    owner: args.owner,
++    repo: args.repo,
++    number: args.number,
++    expectedSha: args.expectedSha,
++    expectedMergeBaseSha: args.expectedMergeBaseSha,
++    expectedBaseSha: args.expectedBaseSha,
++    expectedBaseRef: args.expectedBaseRef,
++    expectedFilesFingerprint: args.expectedFilesFingerprint,
++  });
++  if (confirmed.status === "moved") {
++    return draftMovedUnavailable();
++  }
++  if (confirmed.status === "not_pending") {
++    return notPendingResult(confirmed.pull);
++  }
++  return {
++    mode: "unavailable",
++    reason: "diff_unavailable",
++    notice: PREVIEW_CHANGE_NO_DIFF_NOTICE,
++    message: args.message,
++    preview: args.preview,
++  };
++}
++
++type ConfirmPending =
++  | { status: "ok"; pull: PreviewPull }
++  | { status: "moved" }
++  | { status: "not_pending"; pull: PreviewPull };
++
++/**
++ * Open and unmerged on GitHub. That is not "published" and not "live" —
++ * only that GitHub still lists it as a pending suggestion.
++ */
++export function isPendingSuggestion(pull: {
++  state: string;
++  merged: boolean;
++}): boolean {
++  if (pull.merged) return false;
++  return String(pull.state ?? "").trim().toLowerCase() === "open";
++}
++
++function notPendingResult(pull: PreviewPull): Extract<
++  PreviewChangeResult,
++  { mode: "not_pending" }
++> {
++  const title = pull.title.trim() ? pull.title.trim() : null;
++  return {
++    mode: "not_pending",
++    notice: PREVIEW_CHANGE_NO_DIFF_NOTICE,
++    title,
++    message: notPendingMessage(pull),
++  };
++}
++
++/** Verified GitHub state only — never infers production publication. */
++export function notPendingMessage(pull: {
++  state: string;
++  merged: boolean;
++}): string {
++  if (pull.merged) {
++    return "This suggestion was merged on GitHub. I have not checked whether it is live on the site, so I am not going to ask you to approve it.";
++  }
++  const state = String(pull.state ?? "").trim().toLowerCase();
++  if (state === "closed") {
++    return "This suggestion is closed on GitHub. I have not checked whether those changes are live, so I am not going to ask you to approve it.";
++  }
++  return "I couldn't confirm this is still a pending suggestion, so I am not going to ask you to publish it.";
++}
++
++function mergeBaseIdentity(sha: string | null | undefined): string {
++  return String(sha ?? "").trim();
++}
++
++/**
++ * Effective-diff identity when a merge-base SHA is missing. Head SHA
++ * alone is not enough: a stacked PR's three-dot file list can shrink
++ * while the head stays put.
++ */
++function diffFilesFingerprint(pull: PreviewPull): string {
++  return JSON.stringify({
++    truncated: pull.filesTruncated === true,
++    changedFiles: pull.changedFiles,
++    files: pull.files.map((f) => ({
++      filename: f.filename,
++      status: f.status,
++      previousFilename: f.previousFilename ?? null,
++      patch: f.patch ?? null,
++    })),
++  });
++}
++
++async function confirmPendingHead(
++  client: PreviewDiffClient,
++  args: {
++    owner: string;
++    repo: string;
++    number: number;
++    expectedSha: string;
++    expectedMergeBaseSha: string | null;
++    expectedBaseSha: string;
++    expectedBaseRef: string;
++    expectedFilesFingerprint: string;
++  },
++): Promise<ConfirmPending> {
++  const latest = await client.getPull({
++    owner: args.owner,
++    repo: args.repo,
++    number: args.number,
++  });
++  const latestSha = bindablePreviewSha(latest.headSha);
++  if (!latestSha || latestSha !== args.expectedSha) {
++    return { status: "moved" };
++  }
++  const expectedBase = String(args.expectedBaseSha ?? "").trim();
++  const latestBase = String(latest.baseSha ?? "").trim();
++  if (!expectedBase || !latestBase || expectedBase !== latestBase) {
++    return { status: "moved" };
++  }
++  const expectedMerge = mergeBaseIdentity(args.expectedMergeBaseSha);
++  const latestMerge = mergeBaseIdentity(latest.mergeBaseSha);
++  if (expectedMerge !== latestMerge) {
++    return { status: "moved" };
++  }
++  // SHA equality is not destination identity: main and develop can
++  // point at the same commit. A retarget must not inherit the earlier
++  // targetsProductionBase snapshot.
++  if (!sameGitBranchIdentity(args.expectedBaseRef, latest.baseRef)) {
++    return { status: "moved" };
++  }
++  // No merge-base SHA means we cannot bind to git identity. The file
++  // list we described must still be the file list GitHub reports.
++  if (!expectedMerge) {
++    if (diffFilesFingerprint(latest) !== args.expectedFilesFingerprint) {
++      return { status: "moved" };
++    }
++  }
++  if (!isPendingSuggestion(latest)) {
++    return { status: "not_pending", pull: latest };
++  }
++  return { status: "ok", pull: latest };
++}
++
++/** True only when hosting returned a real draft URL for this SHA. */
++export function isDraftSiteReady(preview: {
++  url: string | null;
++  status: PreviewDeploy["status"];
++}): boolean {
++  return (
++    preview.status === "ready" &&
++    typeof preview.url === "string" &&
++    preview.url.length > 0
++  );
++}
++
++/**
++ * SHA that can appear in owner-facing text. Whitespace would wrap into
++ * a forged column-0 line, so it is not bindable.
++ */
++export function bindablePreviewSha(
++  value: string | null | undefined,
++): string {
++  const sha = typeof value === "string" ? value.trim() : "";
++  if (!sha || /\s/.test(sha)) return "";
++  return sha;
++}
++
++/**
++ * Invitation that names the previewed head SHA and the merge-base SHA
++ * it was compared against. This module never publishes; a later "yes"
++ * is handled by the owner (or their AI) on GitHub. Both SHAs are the
++ * identity that action must revalidate — head alone is not the
++ * effective diff.
++ */
++export function shaBoundApprovalPrompt(
++  sha: string,
++  mergeBaseSha: string,
++): string {
++  const id = bindablePreviewSha(sha);
++  const merge = bindablePreviewSha(mergeBaseSha);
++  if (!id || !merge) return NOT_READY_PROMPT;
++  return `Reply yes to publish this exact draft (${id} from ${merge}), no to discard, or tell me what to change.`;
++}
++
++/**
++ * Single decision for "Reply yes to publish". Both the result builder
++ * and the owner-facing formatter call this — they must not recompute
++ * the invitation independently and drift.
++ *
++ * This tool never publishes. There is no merge path here. The
++ * invitation therefore names the previewed head SHA and merge-base SHA
++ * rather than issuing a generic "Reply yes". Fail closed when either
++ * SHA is missing or not bindable, hosting is not ready, or any changed
++ * file could not be classified as a reviewed site surface.
++ */
++export function publishApprovalPrompt(args: {
++  preview: {
++    url: string | null;
++    status: PreviewDeploy["status"];
++  };
++  boundSha: string | null | undefined;
++  boundMergeBaseSha: string | null | undefined;
++  unclassifiedChanges: boolean;
++  /**
++   * Required. Missing or not-true is fail-closed: this draft is not
++   * verified to target the repository default branch (the proxy this
++   * tool has for where the site publishes). That is not a Vercel
++   * production-branch check.
++   */
++  targetsProductionBase: boolean;
++}): string {
++  const sha = bindablePreviewSha(args.boundSha);
++  const merge = bindablePreviewSha(args.boundMergeBaseSha);
++  if (!sha || !merge || !isDraftSiteReady(args.preview)) {
++    return NOT_READY_PROMPT;
++  }
++  if (args.targetsProductionBase !== true) {
++    return NON_PRODUCTION_BASE_PROMPT;
++  }
++  if (args.unclassifiedChanges !== false) {
++    return UNCLASSIFIED_CHANGES_PROMPT;
++  }
++  return readyPublishApprovalPrompt(sha, merge);
++}
++
++/**
++ * SHA-bound publish invite plus the default-branch / Vercel proxy
++ * caveat. The invite itself must not upgrade GitHub's default branch
++ * into a verified production target.
++ */
++export function readyPublishApprovalPrompt(
++  sha: string,
++  mergeBaseSha: string,
++): string {
++  const bound = shaBoundApprovalPrompt(sha, mergeBaseSha);
++  if (bound === NOT_READY_PROMPT) return bound;
++  return `${bound} ${DEFAULT_BRANCH_PRODUCTION_PROXY_CAVEAT}`;
++}
++
++/**
++ * Last-mile notice. Recomputed from the result, never trusted from
++ * `result.notice` alone — a classified-looking banner on an
++ * unclassified result would contradict the body.
++ */
++function ownerFacingNotice(result: PreviewChangeResult): string {
++  if (result.mode !== "ok") return PREVIEW_CHANGE_NO_DIFF_NOTICE;
++  if (result.unclassifiedChanges) return PREVIEW_CHANGE_INCOMPLETE_NOTICE;
++  return PREVIEW_CHANGE_NOTICE;
++}
++
++/**
++ * True when this PR's base is the repository default branch.
++ * GitHub's default branch is a proxy for production, not a Vercel
++ * production-branch mapping. Empty names fail closed.
++ */
++export function pullTargetsDefaultBranch(pull: {
++  baseRef: string;
++  defaultBranch: string;
++}): boolean {
++  const base = gitBranchName(pull.baseRef);
++  const def = gitBranchName(pull.defaultBranch);
++  if (!base || !def) return false;
++  return base === def;
++}
++
++function gitBranchName(value: string | null | undefined): string {
++  const raw = String(value ?? "").trim();
++  if (!raw) return "";
++  return raw.replace(/^refs\/heads\//i, "");
++}
++
++function sameGitBranchIdentity(
++  a: string | null | undefined,
++  b: string | null | undefined,
++): boolean {
++  return gitBranchName(a) === gitBranchName(b);
++}
++
++export function formatPreviewChangeResult(result: PreviewChangeResult): string {
++  if (result.mode === "unavailable") {
++    const lines = [ownerFacingNotice(result), "", result.message];
++    // An unavailable result carries no previewedSha. A leftover ready
++    // URL would be labeled "Draft ready" with no way to name the version,
++    // including a stale head A after a later push. Other hosting
++    // statuses (building, failed, none, unread) are still true.
++    if (result.preview.status !== "ready") {
++      lines.push("", formatPreviewBlock(result.preview));
++    }
++    return wrapOwnerText(lines.join("\n"));
++  }
++
++  if (result.mode === "not_pending") {
++    // PR titles are collaborator-controlled. Do not print them as a
++    // heading — a title can impersonate "Draft ready" and smuggle a URL.
++    const lines = [ownerFacingNotice(result), "", result.message];
++    return wrapOwnerText(lines.join("\n"));
++  }
++
++  const lines: string[] = [];
++  lines.push(ownerFacingNotice(result));
++  lines.push("");
++  // Same rule on the pending path: never interpolate the PR title into
++  // owner-facing text. "Draft ready" is emitted only inside the verified
++  // Draft site block, never as `Draft ready: ${title}`.
++  lines.push("What changes");
++  if (result.sections.length > 0) {
++    for (const s of result.sections) {
++      lines.push(`• ${flattenOwnerWhitespace(s)}`);
++    }
++  }
++  lines.push("");
++  lines.push(flattenOwnerWhitespace(result.summary));
++  lines.push("");
++
++  if (result.visual.available && result.visual.pairs.length > 0) {
++    for (const pair of result.visual.pairs) {
++      lines.push(flattenOwnerWhitespace(pair.label));
++      lines.push("Before");
++      lines.push(formatVisualValue(pair.before, "(not there yet)"));
++      lines.push("After");
++      lines.push(formatVisualValue(pair.after, "(removed)"));
++      lines.push("");
++    }
++    if (result.visual.hiddenCount > 0) {
++      const n = result.visual.hiddenCount;
++      lines.push(
++        n === 1
++          ? "There is 1 more wording change I haven't listed here."
++          : `There are ${n} more wording changes I haven't listed here.`,
++      );
++      lines.push("");
++    }
++  } else {
++    const reason = flattenOwnerWhitespace(
++      result.visual.reason ??
++        "I can name the parts of the site this touches. I don't have a side-by-side of the wording.",
++    );
++    const summary = flattenOwnerWhitespace(result.summary);
++    // The summary already said the honest thing (no wording change,
++    // unlabeled files). Repeating it as a "visual unavailable" line
++    // is a second copy of the same claim, not a second fact. A
++    // default-branch note appended to the same summary must not
++    // re-open the duplicate.
++    const summaryCore = flattenOwnerWhitespace(
++      summary
++        .replace(DEFAULT_BRANCH_PRODUCTION_PROXY_CAVEAT, " ")
++        .replace(NON_PRODUCTION_BASE_REASON, " "),
++    );
++    if (reason && reason !== summary && reason !== summaryCore) {
++      lines.push(reason);
++      lines.push("");
++    }
++  }
++
++  lines.push(formatPreviewBlock(result.preview));
++  lines.push("");
++  // The live MCP transport returns only this formatted text. A later
++  // "yes" cannot bind to a SHA the caller never received. Only invite
++  // publish after that identity is actually in the string, and the
++  // invitation itself must name both the head and the merge base — a
++  // generic "Reply yes" is not a bound approval.
++  const previewedSha = bindablePreviewSha(result.previewedSha);
++  const previewedMergeBaseSha = bindablePreviewSha(
++    result.previewedMergeBaseSha,
++  );
++  let boundSha: string | null = null;
++  let boundMergeBaseSha: string | null = null;
++  if (previewedSha) {
++    lines.push("This preview is of this exact draft:");
++    lines.push(previewedSha);
++    lines.push("");
++    boundSha = previewedSha;
++  }
++  if (previewedMergeBaseSha) {
++    lines.push("from");
++    lines.push(previewedMergeBaseSha);
++    lines.push("");
++    boundMergeBaseSha = previewedMergeBaseSha;
++  }
++  // Same function as the result builder. Hosting, SHA-in-the-text, and
++  // unclassified files each independently refuse — the formatter must
++  // not upgrade a NOT_READY / unclassified result into "Reply yes",
++  // and must not issue APPROVAL_PROMPT (the unbound form).
++  lines.push(
++    publishApprovalPrompt({
++      preview: result.preview,
++      boundSha,
++      boundMergeBaseSha,
++      unclassifiedChanges: result.unclassifiedChanges,
++      targetsProductionBase: result.targetsProductionBase === true,
++    }),
++  );
++  return wrapOwnerText(lines.join("\n"));
++}
++
++/**
++ * Text the live MCP transport returns. The formatted preview must carry
++ * the SHA — a later yes cannot bind to an identity the caller never saw.
++ */
++export function previewChangeTransportText(result: PreviewChangeResult): string {
++  const text = formatPreviewChangeResult(result);
++  if (result.mode !== "ok") return text;
++  const sha = bindablePreviewSha(result.previewedSha);
++  const merge = bindablePreviewSha(result.previewedMergeBaseSha);
++  if (sha && !text.includes(sha)) {
++    return wrapOwnerText(
++      `${PREVIEW_CHANGE_NO_DIFF_NOTICE}\n\nI couldn't keep this preview tied to one exact draft, so I am not going to ask you to publish it.`,
++    );
++  }
++  // An invitation that names "this exact draft" must carry both halves
++  // of the effective-diff identity. Head in the body and merge-base
++  // missing is the stacked-PR TOCTOU: the later "yes" would re-check
++  // the wrong diff.
++  if (/reply yes to publish this exact draft/i.test(text)) {
++    if (!sha || !merge || !text.includes(sha) || !text.includes(merge)) {
++      return wrapOwnerText(
++        `${PREVIEW_CHANGE_NO_DIFF_NOTICE}\n\nI couldn't keep this preview tied to one exact draft, so I am not going to ask you to publish it.`,
++      );
++    }
++  }
++  return text;
++}
++
++/**
++ * Owner-facing error from the preview_change transport. Invalid GitHub
++ * identifiers are omitted rather than echoed — a newline-laden `owner`
++ * must not become a column-0 "Draft ready." / URL / approval line.
++ * Exception text is flattened and hang-indented for the same reason.
++ */
++export function formatPreviewChangeLoadError(args: {
++  number: number;
++  owner: string;
++  repo: string;
++  message: string;
++}): string {
++  const n =
++    Number.isInteger(args.number) && args.number >= 1 ? args.number : 0;
++  const identity =
++    isGitHubOwner(args.owner) && isGitHubRepoName(args.repo)
++      ? ` on ${args.owner}/${args.repo}`
++      : "";
++  const detail = flattenOwnerWhitespace(args.message);
++  const lines = [`I couldn't load a preview of suggestion #${n}${identity}.`];
++  if (detail) {
++    lines.push(`  ${detail}`);
++  }
++  lines.push("");
++  lines.push(
++    "Check the number with list_suggestions. This account must be connected to that customer repo. I will not describe a change I have not seen.",
++  );
++  return wrapOwnerText(lines.join("\n"));
++}
++
++/**
++ * Owner-facing before/after cell. `null` means the field was absent;
++ * `""` is a real empty value and must not be shown as both missing and
++ * removed. Untrusted copy is flattened and indented so it cannot open a
++ * new line that impersonates "Draft ready", a draft URL, or the
++ * approval prompt.
++ */
++function formatVisualValue(
++  value: string | null,
++  absentLabel: string,
++): string {
++  if (value == null) return absentLabel;
++  if (value === "") return "(blank)";
++  const flat = flattenOwnerWhitespace(value);
++  if (!flat) return "(blank)";
++  return `  ${flat}`;
++}
++
++function formatPreviewBlock(preview: {
++  url: string | null;
++  status: PreviewDeploy["status"];
++  warning: string | null;
++}): string {
++  const lines = ["Draft site"];
++  if (preview.status === "building") {
++    lines.push(
++      "Still building. I don't have a real preview link yet — I won't make one up.",
++    );
++    if (preview.warning) lines.push(preview.warning);
++  } else if (preview.status === "failed") {
++    lines.push(
++      "The draft site did not build. I don't have a link to show you.",
++    );
++    if (preview.warning) lines.push(preview.warning);
++  } else if (preview.status === "ready" && preview.url) {
++    // Verified readiness only — never concatenated with a PR title.
++    lines.push("Draft ready.");
++    lines.push(preview.url);
++    if (preview.warning) lines.push(preview.warning);
++  } else if (preview.status === "unavailable") {
++    lines.push(preview.warning?.trim() || HOSTING_UNAVAILABLE_WARNING);
++  } else if (preview.warning) {
++    // The warning is the honest reason there is no URL. Do not also
++    // claim hosting returned nothing — that is false when it returned
++    // several drafts we refused to pick between.
++    lines.push(preview.warning);
++  } else {
++    lines.push(
++      "No draft-site link yet. Hosting did not return one, and I will not invent a URL.",
++    );
++  }
++  return lines.join("\n");
++}
++
++function namedUpdateSentence(sections: string[]): string | null {
++  if (sections.length === 0) return null;
++  // Path-based labels are file location, not verified wording. "updates"
++  // claims a business-section change we have not parsed.
++  const verb = sections.some((section) => isPathLocationLabel(section))
++    ? "changes"
++    : "updates";
++  if (sections.length === 1) {
++    return `This ${verb} ${sections[0]}.`;
++  }
++  if (sections.length === 2) {
++    return `This ${verb} ${sections[0]} and ${sections[1]}.`;
++  }
++  const rest = sections.slice(0, -1).join(", ");
++  return `This ${verb} ${rest}, and ${sections[sections.length - 1]}.`;
++}
++
++function buildSummary(
++  sections: string[],
++  pairs: VisualPair[],
++  extras: { unlabeledFiles: boolean; siteCopyUnchanged: boolean },
++): string {
++  const added = pairs.filter((p) => p.before == null && p.after != null);
++  const removed = pairs.filter((p) => p.after == null && p.before != null);
++  // A single add OR a single remove — never one when both happened.
++  // Picking the add and dropping the remove (or the reverse) names
++  // the wrong service when the list shifted. Also never when another
++  // named section exists — "This adds heating" must not hide hours
++  // or a reorder of the rest of the list.
++  const onlyServicesList =
++    sections.length > 0 &&
++    sections.every((section) => section === "your services list");
++  if (
++    onlyServicesList &&
++    added.length === 1 &&
++    removed.length === 0 &&
++    added[0] &&
++    added[0].label === "your services list"
++  ) {
++    return `This adds ${flattenOwnerWhitespace(added[0].after ?? "")} to your services list.`;
++  }
++  if (
++    onlyServicesList &&
++    removed.length === 1 &&
++    added.length === 0 &&
++    removed[0] &&
++    removed[0].label === "your services list"
++  ) {
++    return `This removes ${flattenOwnerWhitespace(removed[0].before ?? "")} from your services list.`;
++  }
++  const parts: string[] = [];
++  const named = namedUpdateSentence(sections);
++  if (named) {
++    parts.push(named);
++  } else if (extras.siteCopyUnchanged) {
++    parts.push(SITE_COPY_UNCHANGED_REASON);
++  }
++  if (extras.unlabeledFiles) {
++    parts.push(
++      parts.length === 0
++        ? UNLABELED_FILES_ONLY_REASON
++        : UNLABELED_FILES_ALSO_REASON,
++    );
++  }
++  if (parts.length === 0) {
++    return "This touches the site, but I cannot name the business section yet.";
++  }
++  return parts.join(" ");
++}
++
++function uniqueLabels(labels: string[]): string[] {
++  const seen = new Set<string>();
++  const out: string[] = [];
++  for (const l of labels) {
++    if (!seen.has(l)) {
++      seen.add(l);
++      out.push(l);
++    }
++  }
++  return out;
++}
++
++async function resolvePreview(
++  client: PreviewDiffClient,
++  args: {
++    owner: string;
++    repo: string;
++    sha: string;
++    callerUrl?: string;
++  },
++): Promise<{
++  url: string | null;
++  status: PreviewDeploy["status"];
++  warning: string | null;
++}> {
++  let platform: PreviewDeploy;
++  try {
++    platform = await client.getPreviewDeploy({
++      owner: args.owner,
++      repo: args.repo,
++      sha: args.sha,
++    });
++  } catch {
++    return {
++      url: null,
++      status: "unavailable",
++      warning: HOSTING_UNAVAILABLE_WARNING,
++    };
++  }
++
++  if (platform.status === "building") {
++    return {
++      url: null,
++      status: "building",
++      warning: null,
++    };
++  }
++  if (platform.status === "failed") {
++    return {
++      url: null,
++      status: "failed",
++      warning: null,
++    };
++  }
++  if (platform.status === "unavailable") {
++    return {
++      url: null,
++      status: "unavailable",
++      warning:
++        platform.warning && platform.warning.trim()
++          ? platform.warning.trim()
++          : HOSTING_UNAVAILABLE_WARNING,
++    };
++  }
++
++  if (platform.status === "ready") {
++    const resolved = resolvePreviewUrl(platform.url);
++    if (resolved.url) {
++      if (isAuxiliaryDraftUrl(resolved.url)) {
++        return {
++          url: null,
++          status: "none",
++          warning: AUXILIARY_DRAFT_WARNING,
++        };
++      }
++      return { url: resolved.url, status: "ready", warning: null };
++    }
++    return {
++      url: null,
++      status: "none",
++      warning:
++        "Hosting said the draft was ready, but the link was not a real deploy URL, so I dropped it.",
++    };
++  }
++
++  // Platform none. A caller-supplied URL is not hosting verification —
++  // never promote it to ready / Draft site.
++  const warningParts: string[] = [];
++  if (platform.warning && platform.warning.trim()) {
++    warningParts.push(platform.warning.trim());
++  }
++  if (args.callerUrl && String(args.callerUrl).trim()) {
++    warningParts.push(
++      "A link was passed in with the request, but hosting did not return its own, so I am not showing it as the draft site.",
++    );
++  }
++  return {
++    url: null,
++    status: "none",
++    warning: warningParts.length > 0 ? warningParts.join(" ") : null,
++  };
++}
++
++// ---------------------------------------------------------------------------
++// Site copy parse + field diff (fail closed — never invent values)
++// ---------------------------------------------------------------------------
++
++type Token =
++  | { kind: "lbrace" }
++  | { kind: "rbrace" }
++  | { kind: "lbracket" }
++  | { kind: "rbracket" }
++  | { kind: "colon" }
++  | { kind: "comma" }
++  | { kind: "string"; value: string }
++  | { kind: "number"; value: number }
++  | { kind: "ident"; value: string };
++
++/**
++ * Parse content/site.ts (or JSON) into a plain object. Returns null when the
++ * source is not a JSON-like object literal — never evals, never guesses.
++ */
++export function tryParseSiteSource(source: string): Record<string, unknown> | null {
++  const trimmed = source.trim();
++  if (!trimmed) return null;
++  try {
++    const json = JSON.parse(trimmed);
++    if (json && typeof json === "object" && !Array.isArray(json)) {
++      if (recordHasOwnProtoKey(json)) return null;
++      return asOwnRecord(json);
++    }
++  } catch {
++    // not JSON — try the site.ts object literal
++  }
++
++  const extracted = extractSiteObjectLiteral(source);
++  if (extracted === "fail" || extracted == null) return null;
++  const tokens = tokenizeObjectLiteral(extracted);
++  if (!tokens) return null;
++  const parsed = parseTokens(tokens);
++  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
++    return null;
++  }
++  return asOwnRecord(parsed);
++}
++
++/**
++ * Copy parsed data onto null-prototype objects with defineProperty so a
++ * copied `__proto__` key cannot become a prototype setter. Literal
++ * `__proto__:` in object-literal syntax is rejected before we get here
++ * (it is a prototype setter, not own data). Bracket assignment and
++ * JSON own keys named `__proto__` are also rejected — walking them as
++ * nested site copy fabricates wording changes that never win at
++ * runtime over a real own property of the same name.
++ */
++function asOwnRecord(value: object): Record<string, unknown> {
++  return asOwnData(value) as Record<string, unknown>;
++}
++
++/**
++ * True when any object in the tree has an own `__proto__` key. Used to
++ * fail closed on JSON that would otherwise be walked as site copy.
++ */
++function recordHasOwnProtoKey(
++  value: unknown,
++  seen: Set<object> = new Set(),
++): boolean {
++  if (!value || typeof value !== "object") return false;
++  if (seen.has(value)) return false;
++  seen.add(value);
++  if (Array.isArray(value)) {
++    return value.some((item) => recordHasOwnProtoKey(item, seen));
++  }
++  if (Object.getOwnPropertyNames(value).includes("__proto__")) return true;
++  return Object.getOwnPropertyNames(value).some((key) =>
++    recordHasOwnProtoKey(
++      (value as Record<string, unknown>)[key],
++      seen,
++    ),
++  );
++}
++
++function asOwnData(value: unknown): unknown {
++  if (Array.isArray(value)) {
++    return value.map(asOwnData);
++  }
++  if (value && typeof value === "object") {
++    const obj = Object.create(null) as Record<string, unknown>;
++    for (const key of Object.getOwnPropertyNames(value)) {
++      setOwn(obj, key, asOwnData((value as Record<string, unknown>)[key]));
++    }
++    return obj;
++  }
++  return value;
++}
++
++function setOwn(
++  obj: Record<string, unknown>,
++  key: string,
++  value: unknown,
++): void {
++  Object.defineProperty(obj, key, {
++    value,
++    enumerable: true,
++    writable: true,
++    configurable: true,
++  });
++}
++
++function extractSiteObjectLiteral(source: string): string | null | "fail" {
++  const resolved = resolveExportedSiteObject(source);
++  if (resolved.kind === "fail") return "fail";
++  if (resolved.kind === "none") {
++    // JSON / object-literal tests have no export. A non-exported
++    // `const site =` is not the value the site imports.
++    const t = source.trim();
++    return t.startsWith("{") ? t : null;
++  }
++  return resolved.text;
++}
++
++type ResolvedSiteObject =
++  | { kind: "object"; text: string; start: number; end: number }
++  | { kind: "none" }
++  | { kind: "fail" };
++
++function parseSiteSourceFile(source: string): ts.SourceFile {
++  return ts.createSourceFile(
++    "content/site.ts",
++    source,
++    ts.ScriptTarget.Latest,
++    true,
++    ts.ScriptKind.TS,
++  );
++}
++
++function hasExportKeyword(node: ts.Node): boolean {
++  if (!ts.canHaveModifiers(node)) return false;
++  return Boolean(
++    ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword),
++  );
++}
++
++function identText(
++  node: ts.ModuleExportName | ts.BindingName | undefined,
++): string | null {
++  if (!node) return null;
++  if (ts.isIdentifier(node) || ts.isStringLiteral(node)) return node.text;
++  return null;
++}
++
++function collectBindingNames(name: ts.BindingName): string[] {
++  if (ts.isIdentifier(name)) return [name.text];
++  const out: string[] = [];
++  for (const el of name.elements) {
++    if (ts.isOmittedExpression(el) || !ts.isBindingElement(el)) continue;
++    out.push(...collectBindingNames(el.name));
++  }
++  return out;
++}
++
++function unwrapDataExpression(expr: ts.Expression): ts.Expression {
++  while (true) {
++    if (ts.isParenthesizedExpression(expr)) {
++      expr = expr.expression;
++      continue;
++    }
++    if (
++      ts.isAsExpression(expr) ||
++      ts.isTypeAssertionExpression(expr) ||
++      ts.isSatisfiesExpression(expr) ||
++      ts.isNonNullExpression(expr)
++    ) {
++      expr = expr.expression;
++      continue;
++    }
++    break;
++  }
++  return expr;
++}
++
++function isConstDeclarationList(list: ts.VariableDeclarationList): boolean {
++  return (list.flags & ts.NodeFlags.Const) !== 0;
++}
++
++/**
++ * Module-level exported `site` object literal, using the TypeScript
++ * compiler's real scopes. Function-local, comment, string, and regex
++ * decoys are not declarations. Fail closed on re-exports, `export *`,
++ * imports, and competing bindings.
++ */
++function resolveExportedSiteObject(source: string): ResolvedSiteObject {
++  const sf = parseSiteSourceFile(source);
++  const siteLocals: string[] = [];
++  let unparseable = false;
++  let sawStarExport = false;
++  const moduleLevelVars = new Map<string, ts.VariableDeclaration[]>();
++  const nonConstBindings = new Set<string>();
++
++  function recordVar(name: string, decl: ts.VariableDeclaration) {
++    const list = moduleLevelVars.get(name) ?? [];
++    list.push(decl);
++    moduleLevelVars.set(name, list);
++  }
++
++  for (const stmt of sf.statements) {
++    if (ts.isImportDeclaration(stmt)) {
++      const clause = stmt.importClause;
++      if (!clause || clause.isTypeOnly) continue;
++      if (clause.name) nonConstBindings.add(clause.name.text);
++      const bindings = clause.namedBindings;
++      if (bindings && ts.isNamespaceImport(bindings)) {
++        nonConstBindings.add(bindings.name.text);
++      } else if (bindings && ts.isNamedImports(bindings)) {
++        for (const el of bindings.elements) {
++          if (el.isTypeOnly) continue;
++          nonConstBindings.add(el.name.text);
++        }
++      }
++      continue;
++    }
++
++    if (ts.isImportEqualsDeclaration(stmt)) {
++      if (!stmt.isTypeOnly) nonConstBindings.add(stmt.name.text);
++      continue;
++    }
++
++    if (ts.isExportDeclaration(stmt)) {
++      if (stmt.isTypeOnly) continue;
++      if (!stmt.exportClause) {
++        if (stmt.moduleSpecifier) sawStarExport = true;
++        continue;
++      }
++      if (ts.isNamespaceExport(stmt.exportClause)) {
++        if (identText(stmt.exportClause.name) === "site") unparseable = true;
++        continue;
++      }
++      if (!ts.isNamedExports(stmt.exportClause)) continue;
++      for (const spec of stmt.exportClause.elements) {
++        if (spec.isTypeOnly) continue;
++        if (identText(spec.name) !== "site") continue;
++        if (stmt.moduleSpecifier) {
++          unparseable = true;
++          continue;
++        }
++        const local = identText(spec.propertyName ?? spec.name);
++        if (!local) {
++          unparseable = true;
++          continue;
++        }
++        siteLocals.push(local);
++      }
++      continue;
++    }
++
++    if (ts.isVariableStatement(stmt)) {
++      const exported = hasExportKeyword(stmt);
++      const isConst = isConstDeclarationList(stmt.declarationList);
++      for (const decl of stmt.declarationList.declarations) {
++        if (!ts.isIdentifier(decl.name)) {
++          if (exported && collectBindingNames(decl.name).includes("site")) {
++            unparseable = true;
++          }
++          continue;
++        }
++        recordVar(decl.name.text, decl);
++        if (!isConst) nonConstBindings.add(decl.name.text);
++        if (exported && decl.name.text === "site") {
++          if (!isConst) unparseable = true;
++          else siteLocals.push("site");
++        }
++      }
++      continue;
++    }
++
++    if (
++      ts.isFunctionDeclaration(stmt) ||
++      ts.isClassDeclaration(stmt) ||
++      ts.isEnumDeclaration(stmt)
++    ) {
++      const name = stmt.name?.text;
++      if (name) nonConstBindings.add(name);
++      if (hasExportKeyword(stmt) && name === "site") unparseable = true;
++      continue;
++    }
++
++    if (ts.isModuleDeclaration(stmt) && ts.isIdentifier(stmt.name)) {
++      nonConstBindings.add(stmt.name.text);
++      if (hasExportKeyword(stmt) && stmt.name.text === "site") {
++        unparseable = true;
++      }
++    }
++  }
++
++  if (sawStarExport || unparseable) return { kind: "fail" };
++  if (siteLocals.length === 0) return { kind: "none" };
++  if (new Set(siteLocals).size !== 1 || siteLocals.length !== 1) {
++    return { kind: "fail" };
++  }
++  const local = siteLocals[0]!;
++  if (nonConstBindings.has(local)) return { kind: "fail" };
++
++  const decls = moduleLevelVars.get(local) ?? [];
++  if (decls.length !== 1) return { kind: "fail" };
++  const decl = decls[0]!;
++  if (!ts.isVariableDeclarationList(decl.parent)) return { kind: "fail" };
++  if (!isConstDeclarationList(decl.parent) || !decl.initializer) {
++    return { kind: "fail" };
++  }
++  const expr = unwrapDataExpression(decl.initializer);
++  if (!ts.isObjectLiteralExpression(expr)) return { kind: "fail" };
++
++  const start = expr.getStart(sf);
++  const end = expr.end;
++  if (start < 0 || end <= start) return { kind: "fail" };
++  // Static initializer text is not the runtime value if the module later
++  // mutates that object (Object.assign, property assignment, etc.).
++  if (exportedSiteLooksMutated(sf, decl)) return { kind: "fail" };
++  // A literal `__proto__:` key in object-literal syntax sets the
++  // prototype; it is not an own property. Modeling it as own data
++  // fabricates wording changes that never appear at runtime.
++  if (objectLiteralHasProtoSetter(expr)) return { kind: "fail" };
++  return { kind: "object", text: source.slice(start, end), start, end };
++}
++
++/**
++ * True when an object literal uses the grammar-level `__proto__`
++ * prototype setter (identifier or string name, not a computed key).
++ */
++function isLiteralProtoPropertyName(name: ts.PropertyName): boolean {
++  if (ts.isComputedPropertyName(name)) return false;
++  if (
++    ts.isIdentifier(name) ||
++    ts.isStringLiteral(name) ||
++    ts.isNoSubstitutionTemplateLiteral(name)
++  ) {
++    return name.text === "__proto__";
++  }
++  return false;
++}
++
++function objectLiteralHasProtoSetter(node: ts.Node): boolean {
++  if (ts.isObjectLiteralExpression(node)) {
++    for (const prop of node.properties) {
++      if (ts.isSpreadAssignment(prop)) continue;
++      if (isLiteralProtoPropertyName(prop.name)) return true;
++    }
++  }
++  let found = false;
++  ts.forEachChild(node, (child) => {
++    if (found) return;
++    if (objectLiteralHasProtoSetter(child)) found = true;
++  });
++  return found;
++}
++
++/**
++ * Top-level runtime declarations keyed by local name. An `export { foo }`
++ * list is not the implementation — the function/class/const it names is.
++ */
++function topLevelRuntimeDeclarationsByName(
++  sf: ts.SourceFile,
++): Map<string, string[]> {
++  const map = new Map<string, string[]>();
++  const add = (name: string, text: string) => {
++    const list = map.get(name);
++    if (list) list.push(text);
++    else map.set(name, [text]);
++  };
++  for (const stmt of sf.statements) {
++    const text = stmt.getText(sf);
++    if (
++      (ts.isFunctionDeclaration(stmt) ||
++        ts.isClassDeclaration(stmt) ||
++        ts.isEnumDeclaration(stmt) ||
++        ts.isModuleDeclaration(stmt)) &&
++      stmt.name &&
++      ts.isIdentifier(stmt.name)
++    ) {
++      add(stmt.name.text, text);
++      continue;
++    }
++    if (ts.isVariableStatement(stmt)) {
++      for (const decl of stmt.declarationList.declarations) {
++        for (const name of collectBindingNames(decl.name)) {
++          add(name, text);
++        }
++      }
++    }
++  }
++  return map;
++}
++
++/**
++ * AST nodes for those same locals, so a fingerprint can walk from an
++ * exported wrapper into the unexported helpers it calls.
++ */
++function topLevelRuntimeDeclarationNodesByName(
++  sf: ts.SourceFile,
++): Map<string, ts.Node[]> {
++  const map = new Map<string, ts.Node[]>();
++  const add = (name: string, node: ts.Node) => {
++    const list = map.get(name);
++    if (list) list.push(node);
++    else map.set(name, [node]);
++  };
++  for (const stmt of sf.statements) {
++    if (
++      (ts.isFunctionDeclaration(stmt) ||
++        ts.isClassDeclaration(stmt) ||
++        ts.isEnumDeclaration(stmt) ||
++        ts.isModuleDeclaration(stmt)) &&
++      stmt.name &&
++      ts.isIdentifier(stmt.name)
++    ) {
++      add(stmt.name.text, stmt);
++      continue;
++    }
++    if (ts.isVariableStatement(stmt)) {
++      for (const decl of stmt.declarationList.declarations) {
++        for (const name of collectBindingNames(decl.name)) {
++          add(name, decl);
++        }
++      }
++    }
++  }
++  return map;
++}
++
++function appendNamedRuntimeDeclarations(
++  parts: string[],
++  declsByName: Map<string, string[]>,
++  name: string,
++): void {
++  if (name === "site") return;
++  const texts = declsByName.get(name);
++  if (!texts) return;
++  for (const text of texts) parts.push(text);
++}
++
++/**
++ * Value-position identifiers in a declaration. Property names, type
++ * positions, and labels are not runtime dependencies.
++ */
++function collectValueIdentifierReferences(node: ts.Node): Set<string> {
++  const names = new Set<string>();
++
++  const visit = (n: ts.Node, inType: boolean): void => {
++    if (inType) {
++      ts.forEachChild(n, (child) => visit(child, true));
++      return;
++    }
++    if (
++      ts.isTypeNode(n) ||
++      ts.isTypeParameterDeclaration(n) ||
++      ts.isHeritageClause(n) ||
++      ts.isImportTypeNode(n)
++    ) {
++      ts.forEachChild(n, (child) => visit(child, true));
++      return;
++    }
++    if (
++      ts.isAsExpression(n) ||
++      ts.isTypeAssertionExpression(n) ||
++      ts.isSatisfiesExpression(n)
++    ) {
++      visit(n.expression, false);
++      visit(n.type, true);
++      return;
++    }
++    if (ts.isPropertyAccessExpression(n)) {
++      visit(n.expression, false);
++      return;
++    }
++    if (ts.isElementAccessExpression(n)) {
++      visit(n.expression, false);
++      visit(n.argumentExpression, false);
++      return;
++    }
++    if (ts.isQualifiedName(n) || ts.isMetaProperty(n)) {
++      return;
++    }
++    if (ts.isIdentifier(n)) {
++      names.add(n.text);
++      return;
++    }
++    ts.forEachChild(n, (child) => visit(child, false));
++  };
++
++  visit(node, false);
++  return names;
++}
++
++/**
++ * Transitive closure of module-level declarations reachable from
++ * exported roots. An unexported helper that an exported wrapper calls
++ * is unverified behaviour even when the wrapper's own text is identical.
++ * `site` is excluded — that object is diffed separately.
++ */
++function appendTransitiveRuntimeDeclarations(
++  parts: string[],
++  declsByName: Map<string, string[]>,
++  nodesByName: Map<string, ts.Node[]>,
++  roots: Iterable<string>,
++  extraRootNodes: readonly ts.Node[] = [],
++): void {
++  const visited = new Set<string>(["site"]);
++  const queue: string[] = [];
++  const enqueueRefs = (node: ts.Node) => {
++    for (const ref of collectValueIdentifierReferences(node)) {
++      if (visited.has(ref) || !declsByName.has(ref)) continue;
++      queue.push(ref);
++    }
++  };
++  for (const name of roots) {
++    if (name && !visited.has(name) && declsByName.has(name)) queue.push(name);
++  }
++  for (const node of extraRootNodes) enqueueRefs(node);
++  while (queue.length > 0) {
++    const name = queue.pop()!;
++    if (visited.has(name)) continue;
++    visited.add(name);
++    appendNamedRuntimeDeclarations(parts, declsByName, name);
++    const nodes = nodesByName.get(name);
++    if (!nodes) continue;
++    for (const node of nodes) enqueueRefs(node);
++  }
++}
++
++/**
++ * Module-level imports run at load even when they bind nothing.
++ * A side-effect `import "./tracker"` is not an export, so the
++ * export walk would skip it while the site object stays
++ * byte-identical — a false "no wording change". Type-only
++ * imports are erased and have no runtime effect.
++ */
++function isRuntimeImportStatement(stmt: ts.Statement): boolean {
++  if (ts.isImportDeclaration(stmt)) {
++    const clause = stmt.importClause;
++    if (!clause) return true;
++    return !clause.isTypeOnly;
++  }
++  if (ts.isImportEqualsDeclaration(stmt)) {
++    return !stmt.isTypeOnly;
++  }
++  return false;
++}
++
++function hasDeclareKeyword(node: ts.Node): boolean {
++  if (!ts.canHaveModifiers(node)) return false;
++  return Boolean(
++    ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword),
++  );
++}
++
++/**
++ * Type-only and ambient top-level statements are erased. They do not
++ * run at module evaluation.
++ */
++function isErasedTopLevelStatement(stmt: ts.Statement): boolean {
++  if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) {
++    return true;
++  }
++  if (ts.isEmptyStatement(stmt)) return true;
++  if (hasDeclareKeyword(stmt)) return true;
++  // Type-only imports are erased. Runtime imports are handled
++  // before this helper runs; anything still matching here is not
++  // a load-time effect.
++  if (ts.isImportDeclaration(stmt) || ts.isImportEqualsDeclaration(stmt)) {
++    return !isRuntimeImportStatement(stmt);
++  }
++  return false;
++}
++
++/**
++ * True when the whole file is a JSON object/array. That form is the
++ * site copy itself (tryParseSiteSource JSON path). Fingerprinting
++ * the literal as "other runtime" would refuse every wording change.
++ */
++function sourceIsJsonSiteCopy(source: string): boolean {
++  const trimmed = source.trim();
++  if (!trimmed) return false;
++  try {
++    const json = JSON.parse(trimmed);
++    return json !== null && typeof json === "object";
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * The `site` object is AST-diffed separately. Including it here would
++ * refuse a wording-only publish because the object text changed.
++ */
++function isSiteOnlyVariableStatement(stmt: ts.Statement): boolean {
++  if (!ts.isVariableStatement(stmt)) return false;
++  const names: string[] = [];
++  for (const decl of stmt.declarationList.declarations) {
++    names.push(...collectBindingNames(decl.name));
++  }
++  return names.length > 0 && names.every((n) => n === "site");
++}
++
++/**
++ * Runtime surface other than the `site` object. The preview only diffs
++ * that object's data; a changed helper — including an unexported
++ * function an exported wrapper calls — a changed module-level import,
++ * or any other top-level statement that runs at module evaluation
++ * is unverified behaviour.
++ */
++function otherRuntimeExportFingerprint(source: string): string {
++  if (sourceIsJsonSiteCopy(source)) return "[]";
++  const sf = parseSiteSourceFile(source);
++  const declsByName = topLevelRuntimeDeclarationsByName(sf);
++  const nodesByName = topLevelRuntimeDeclarationNodesByName(sf);
++  const parts: string[] = [];
++  const seedNames: string[] = [];
++  const seedNodes: ts.Node[] = [];
++  for (const stmt of sf.statements) {
++    const text = stmt.getText(sf);
++    if (isRuntimeImportStatement(stmt)) {
++      parts.push(text);
++      continue;
++    }
++    if (ts.isImportDeclaration(stmt) || ts.isImportEqualsDeclaration(stmt)) {
++      continue;
++    }
++    if (ts.isExportDeclaration(stmt)) {
++      if (stmt.isTypeOnly) continue;
++      // `export * from`, `export { x } from`, and `export {} from`
++      // all evaluate the target module. An empty export list is
++      // still a side-effect import, not a verified no-op.
++      if (stmt.moduleSpecifier) {
++        parts.push(text);
++        continue;
++      }
++      if (!stmt.exportClause) {
++        parts.push(text);
++        continue;
++      }
++      if (ts.isNamespaceExport(stmt.exportClause)) {
++        parts.push(text);
++        continue;
++      }
++      if (!ts.isNamedExports(stmt.exportClause)) {
++        parts.push(text);
++        continue;
++      }
++      const otherSpecs = stmt.exportClause.elements.filter((el) => {
++        if (el.isTypeOnly) return false;
++        return identText(el.name) !== "site";
++      });
++      if (otherSpecs.length === 0) continue;
++      parts.push(text);
++      // A local `export { foo }` names a declaration elsewhere in
++      // this file — the export line itself does not change when
++      // that body does.
++      for (const el of otherSpecs) {
++        const local = identText(el.propertyName ?? el.name);
++        if (local) seedNames.push(local);
++      }
++      continue;
++    }
++    if (ts.isExportAssignment(stmt)) {
++      parts.push(text);
++      seedNodes.push(stmt);
++      const expr = unwrapDataExpression(stmt.expression);
++      if (ts.isIdentifier(expr)) {
++        seedNames.push(expr.text);
++      }
++      continue;
++    }
++    // Export-ness is not "does this run at module evaluation". A
++    // top-level `if (prod) throw` has no export keyword and still
++    // crashes the production build next to an unchanged site object.
++    if (!hasExportKeyword(stmt)) {
++      if (isErasedTopLevelStatement(stmt)) continue;
++      if (isSiteOnlyVariableStatement(stmt)) continue;
++      // Function bodies do not run until called. A later call or
++      // export list still seeds the transitive walk.
++      if (ts.isFunctionDeclaration(stmt)) continue;
++      parts.push(text);
++      seedNodes.push(stmt);
++      continue;
++    }
++    if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) {
++      continue;
++    }
++    if (ts.isVariableStatement(stmt)) {
++      const names: string[] = [];
++      for (const decl of stmt.declarationList.declarations) {
++        names.push(...collectBindingNames(decl.name));
++      }
++      if (names.length > 0 && names.every((n) => n === "site")) continue;
++      parts.push(text);
++      for (const name of names) {
++        if (name !== "site") seedNames.push(name);
++      }
++      continue;
++    }
++    if (
++      ts.isFunctionDeclaration(stmt) ||
++      ts.isClassDeclaration(stmt) ||
++      ts.isEnumDeclaration(stmt)
++    ) {
++      if (stmt.name?.text === "site") continue;
++      parts.push(text);
++      if (stmt.name) seedNames.push(stmt.name.text);
++      else seedNodes.push(stmt);
++      continue;
++    }
++    if (ts.isModuleDeclaration(stmt)) {
++      const name = ts.isIdentifier(stmt.name) ? stmt.name.text : null;
++      if (name === "site") continue;
++      parts.push(text);
++      if (name) seedNames.push(name);
++      else seedNodes.push(stmt);
++    }
++  }
++  appendTransitiveRuntimeDeclarations(
++    parts,
++    declsByName,
++    nodesByName,
++    seedNames,
++    seedNodes,
++  );
++  return JSON.stringify(parts);
++}
++
++function otherExportedDeclarationsChanged(
++  beforeSrc: string,
++  afterSrc: string,
++): boolean {
++  return (
++    otherRuntimeExportFingerprint(beforeSrc) !==
++    otherRuntimeExportFingerprint(afterSrc)
++  );
++}
++
++const ASSIGNMENT_OPERATORS = new Set<ts.SyntaxKind>([
++  ts.SyntaxKind.EqualsToken,
++  ts.SyntaxKind.PlusEqualsToken,
++  ts.SyntaxKind.MinusEqualsToken,
++  ts.SyntaxKind.AsteriskEqualsToken,
++  ts.SyntaxKind.AsteriskAsteriskEqualsToken,
++  ts.SyntaxKind.SlashEqualsToken,
++  ts.SyntaxKind.PercentEqualsToken,
++  ts.SyntaxKind.AmpersandEqualsToken,
++  ts.SyntaxKind.BarEqualsToken,
++  ts.SyntaxKind.CaretEqualsToken,
++  ts.SyntaxKind.LessThanLessThanEqualsToken,
++  ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
++  ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
++  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
++  ts.SyntaxKind.BarBarEqualsToken,
++  ts.SyntaxKind.QuestionQuestionEqualsToken,
++]);
++
++const OBJECT_MUTATOR_METHODS = new Set([
++  "assign",
++  "defineProperty",
++  "defineProperties",
++]);
++
++const REFLECT_MUTATOR_METHODS = new Set(["set", "deleteProperty"]);
++
++const ARRAY_MUTATOR_METHODS = new Set([
++  "push",
++  "pop",
++  "shift",
++  "unshift",
++  "splice",
++  "sort",
++  "reverse",
++  "fill",
++  "copyWithin",
++]);
++
++function nodeIsInside(node: ts.Node, ancestor: ts.Node): boolean {
++  for (let n: ts.Node | undefined = node; n; n = n.parent) {
++    if (n === ancestor) return true;
++  }
++  return false;
++}
++
++/**
++ * Function-like scopes whose bodies do not run during module
++ * evaluation (unless the function itself is invoked — that Call /
++ * New is a separate node). Class static fields and static blocks
++ * do run at evaluation and are not deferred.
++ */
++function isDeferredExecutionScope(node: ts.Node): boolean {
++  return (
++    ts.isFunctionDeclaration(node) ||
++    ts.isFunctionExpression(node) ||
++    ts.isArrowFunction(node) ||
++    ts.isMethodDeclaration(node) ||
++    ts.isConstructorDeclaration(node) ||
++    ts.isGetAccessorDeclaration(node) ||
++    ts.isSetAccessorDeclaration(node)
++  );
++}
++
++/**
++ * True when this expression runs during module evaluation: it is
++ * reachable from a top-level statement and is not nested inside a
++ * function/method body. Unparented nodes fail closed.
++ */
++function isModuleEvaluationExpression(
++  node: ts.Node,
++  sf: ts.SourceFile,
++): boolean {
++  for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
++    if (isDeferredExecutionScope(n)) return false;
++    if (n === sf) return true;
++  }
++  return true;
++}
++
++/**
++ * A property call on a regex / string / number / boolean / null
++ * literal cannot mutate the exported site. Other module-evaluation
++ * calls are unproven and fail closed.
++ */
++function isProvenIrrelevantCall(node: ts.CallExpression): boolean {
++  const expr = node.expression;
++  const obj = ts.isPropertyAccessExpression(expr)
++    ? expr.expression
++    : ts.isElementAccessExpression(expr)
++      ? expr.expression
++      : undefined;
++  if (!obj) return false;
++  const root = unwrapDataExpression(obj);
++  return (
++    ts.isRegularExpressionLiteral(root) ||
++    ts.isStringLiteral(root) ||
++    ts.isNoSubstitutionTemplateLiteral(root) ||
++    ts.isNumericLiteral(root) ||
++    ts.isBigIntLiteral(root) ||
++    root.kind === ts.SyntaxKind.TrueKeyword ||
++    root.kind === ts.SyntaxKind.FalseKeyword ||
++    root.kind === ts.SyntaxKind.NullKeyword
++  );
++}
++
++function isModuleLevelCall(
++  node: ts.CallExpression,
++  sf: ts.SourceFile,
++): boolean {
++  if (isProvenIrrelevantCall(node)) return false;
++  return isModuleEvaluationExpression(node, sf);
++}
++
++function propertyCallee(
++  expr: ts.Expression,
++): { object: string | null; name: string | null } {
++  if (ts.isPropertyAccessExpression(expr) && ts.isIdentifier(expr.expression)) {
++    return { object: expr.expression.text, name: expr.name.text };
++  }
++  if (
++    ts.isElementAccessExpression(expr) &&
++    ts.isIdentifier(expr.expression) &&
++    ts.isStringLiteral(expr.argumentExpression)
++  ) {
++    return {
++      object: expr.expression.text,
++      name: expr.argumentExpression.text,
++    };
++  }
++  return { object: null, name: null };
++}
++
++function isAssignmentLike(node: ts.Node): boolean {
++  if (
++    ts.isBinaryExpression(node) &&
++    ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)
++  ) {
++    return true;
++  }
++  if (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) {
++    return (
++      node.operator === ts.SyntaxKind.PlusPlusToken ||
++      node.operator === ts.SyntaxKind.MinusMinusToken
++    );
++  }
++  if (ts.isDeleteExpression(node)) return true;
++  // `for (site.x of arr)` / `for (site.x in obj)` assign into the
++  // initializer. That is not a BinaryExpression `=`, so the walk
++  // above would miss it and treat the static initializer as the
++  // runtime value. `for (const x of arr)` is a fresh binding, not
++  // an assignment into an existing path.
++  if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
++    return !ts.isVariableDeclarationList(node.initializer);
++  }
++  return false;
++}
++
++function isWellKnownMutatorCall(node: ts.CallExpression): boolean {
++  const { object, name } = propertyCallee(node.expression);
++  if (!name) return false;
++  if (object === "Object" && OBJECT_MUTATOR_METHODS.has(name)) return true;
++  if (object === "Reflect" && REFLECT_MUTATOR_METHODS.has(name)) return true;
++  return false;
++}
++
++function isArrayMutatorCall(node: ts.CallExpression): boolean {
++  const expr = node.expression;
++  if (ts.isPropertyAccessExpression(expr)) {
++    return ARRAY_MUTATOR_METHODS.has(expr.name.text);
++  }
++  if (
++    ts.isElementAccessExpression(expr) &&
++    ts.isStringLiteral(expr.argumentExpression)
++  ) {
++    return ARRAY_MUTATOR_METHODS.has(expr.argumentExpression.text);
++  }
++  return false;
++}
++
++function hasUnknownModuleEvaluationEffect(
++  node: ts.Node,
++  sf: ts.SourceFile,
++): boolean {
++  if (ts.isCallExpression(node)) {
++    return (
++      isWellKnownMutatorCall(node) ||
++      isArrayMutatorCall(node) ||
++      isModuleLevelCall(node, sf)
++    );
++  }
++  // `new Foo(site)` and tagged templates at module evaluation have
++  // unproven effects, same as a custom call.
++  if (ts.isNewExpression(node) || ts.isTaggedTemplateExpression(node)) {
++    return isModuleEvaluationExpression(node, sf);
++  }
++  return false;
++}
++
++/**
++ * Conservative static stopgap, not general data-flow. Fail closed when
++ * the module, outside the exported declaration's initializer, contains
++ * an assignment (including `for…of` / `for…in` assignment targets), a
++ * well-known mutator call, a mutating array method, or a
++ * module-evaluation call / `new` / tagged template — any of which can
++ * change the runtime value of the exported object after the initializer
++ * we verify. A call inside a function body is deferred; a call inside
++ * an `export const` initializer is not.
++ */
++function exportedSiteLooksMutated(
++  sf: ts.SourceFile,
++  decl: ts.VariableDeclaration,
++): boolean {
++  let mutated = false;
++  function visit(node: ts.Node): void {
++    if (mutated) return;
++    if (node === decl || nodeIsInside(node, decl)) return;
++    if (isAssignmentLike(node) || hasUnknownModuleEvaluationEffect(node, sf)) {
++      mutated = true;
++      return;
++    }
++    ts.forEachChild(node, visit);
++  }
++  visit(sf);
++  return mutated;
++}
++
++function exportedSiteObjectLineRange(
++  source: string,
++): { startLine: number; endLine: number } | null {
++  const resolved = resolveExportedSiteObject(source);
++  if (resolved.kind !== "object") return null;
++  const sf = parseSiteSourceFile(source);
++  const start = sf.getLineAndCharacterOfPosition(resolved.start);
++  const last = Math.max(resolved.start, resolved.end - 1);
++  const end = sf.getLineAndCharacterOfPosition(last);
++  return { startLine: start.line + 1, endLine: end.line + 1 };
++}
++
++function parsePatchHunkHeader(
++  line: string,
++): { oldStart: number; newStart: number } | null {
++  const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
++  if (!m) return null;
++  const oldStart = Number(m[1]);
++  const newStart = Number(m[2]);
++  if (!Number.isInteger(oldStart) || !Number.isInteger(newStart)) return null;
++  if (oldStart < 0 || newStart < 0) return null;
++  return { oldStart, newStart };
++}
++
++function isWordChar(c: string | undefined): boolean {
++  return Boolean(c && /[A-Za-z0-9_$]/.test(c));
++}
++
++/**
++ * Previous significant token for `/` disambiguation (regex vs division).
++ * `start` is beginning of input; `value` means a value just ended;
++ * `operator` means an expression may start.
++ */
++type SlashContext = "start" | "value" | "operator";
++
++/**
++ * Keywords after which `/` starts a regex, not division.
++ */
++const REGEX_PREFIX_KEYWORDS = new Set([
++  "return",
++  "throw",
++  "case",
++  "new",
++  "typeof",
++  "void",
++  "delete",
++  "await",
++  "yield",
++  "else",
++  "do",
++  "in",
++  "of",
++  "instanceof",
++  "export",
++  "const",
++  "let",
++  "var",
++  "function",
++  "class",
++  "default",
++  "import",
++  "extends",
++]);
++
++/**
++ * Keywords whose `(...)` is a condition, not a value-producing grouping.
++ * The `)` that closes `if (x)` does not make the next `/` division —
++ * `if (enabled) /re/.test(x)` is a regex statement.
++ */
++const CONTROL_FLOW_BEFORE_PAREN = new Set([
++  "if",
++  "while",
++  "for",
++  "switch",
++  "catch",
++  "with",
++]);
++
++type ParenKind = "control" | "grouping";
++
++type SlashScanState = {
++  lastWord: string;
++  parens: ParenKind[];
++};
++
++function freshSlashScan(): SlashScanState {
++  return { lastWord: "", parens: [] };
++}
++
++function slashRole(prev: SlashContext): "regex" | "div" {
++  if (prev === "value") return "div";
++  return "regex";
++}
++
++function prevAfterConsuming(
++  source: string,
++  i: number,
++  prev: SlashContext,
++  scan: SlashScanState,
++): SlashContext {
++  const c = source[i];
++  if (!c || /\s/.test(c)) return prev;
++  if (isWordChar(c)) {
++    const next = source[i + 1];
++    if (isWordChar(next)) return "value";
++    let start = i;
++    while (start > 0 && isWordChar(source[start - 1])) start -= 1;
++    const word = source.slice(start, i + 1);
++    scan.lastWord = word;
++    if (
++      REGEX_PREFIX_KEYWORDS.has(word) ||
++      CONTROL_FLOW_BEFORE_PAREN.has(word)
++    ) {
++      return "operator";
++    }
++    return "value";
++  }
++  if (c >= "0" && c <= "9") {
++    scan.lastWord = "";
++    return "value";
++  }
++  if (c === "(") {
++    scan.parens.push(
++      CONTROL_FLOW_BEFORE_PAREN.has(scan.lastWord) ? "control" : "grouping",
++    );
++    scan.lastWord = "";
++    return "operator";
++  }
++  if (c === ")") {
++    const kind = scan.parens.pop();
++    scan.lastWord = "";
++    return kind === "control" ? "operator" : "value";
++  }
++  if (c === "]") {
++    scan.lastWord = "";
++    return "value";
++  }
++  if ((c === "+" || c === "-") && source[i - 1] === c) {
++    scan.lastWord = "";
++    return "value";
++  }
++  scan.lastWord = "";
++  return "operator";
++}
++
++/**
++ * Skip a regex literal starting at `/`. Character classes may contain
++ * `/`. Returns -1 when the literal is unclosed or contains a line break.
++ */
++function skipRegexLiteral(source: string, start: number): number {
++  if (source[start] !== "/") return -1;
++  let i = start + 1;
++  let inClass = false;
++  while (i < source.length) {
++    const c = source[i]!;
++    if (c === "\\") {
++      const n = source[i + 1];
++      if (n == null || n === "\n" || n === "\r") return -1;
++      i += 2;
++      continue;
++    }
++    if (c === "\n" || c === "\r") return -1;
++    if (c === "[" && !inClass) {
++      inClass = true;
++      i += 1;
++      continue;
++    }
++    if (c === "]" && inClass) {
++      inClass = false;
++      i += 1;
++      continue;
++    }
++    if (c === "/" && !inClass) {
++      i += 1;
++      while (i < source.length && /[A-Za-z]/.test(source[i]!)) i += 1;
++      return i;
++    }
++    i += 1;
++  }
++  return -1;
++}
++
++/**
++ * Skip a comment, string, template, or regex starting at `i`. Returns `i`
++ * when that position is code (including `/` that is division). Unclosed
++ * strings/comments consume the rest of the file so we never parse inside
++ * them. Returns -1 when a regex is unclosed — callers must treat the
++ * surrounding export/assignment as unparseable rather than scanning the
++ * body as code.
++ */
++function skipNonCode(
++  source: string,
++  i: number,
++  prev: SlashContext,
++): number {
++  const c = source[i];
++  if (c === "/" && source[i + 1] === "/") {
++    const nl = source.indexOf("\n", i);
++    return nl < 0 ? source.length : nl + 1;
++  }
++  if (c === "/" && source[i + 1] === "*") {
++    const end = source.indexOf("*/", i + 2);
++    return end < 0 ? source.length : end + 2;
++  }
++  if (c === '"' || c === "'") {
++    const closed = skipString(source, i);
++    return closed < 0 ? source.length : closed + 1;
++  }
++  if (c === "`") {
++    const closed = skipTemplate(source, i);
++    return closed < 0 ? source.length : closed + 1;
++  }
++  if (c === "/") {
++    if (slashRole(prev) === "div") return i;
++    const end = skipRegexLiteral(source, i);
++    return end < 0 ? -1 : end;
++  }
++  return i;
++}
++
++function skipTemplate(source: string, start: number): number {
++  let i = start + 1;
++  while (i < source.length) {
++    const c = source[i];
++    if (c === "\\") {
++      i += 2;
++      continue;
++    }
++    if (c === "`") return i;
++    i += 1;
++  }
++  return -1;
++}
++
++
++function skipString(source: string, start: number): number {
++  const quote = source[start];
++  let i = start + 1;
++  while (i < source.length) {
++    const c = source[i];
++    if (c === "\\") {
++      i += 2;
++      continue;
++    }
++    if (c === quote) return i;
++    i++;
++  }
++  return -1;
++}
++
++function tokenizeObjectLiteral(src: string): Token[] | null {
++  const tokens: Token[] = [];
++  let i = 0;
++  while (i < src.length) {
++    const c = src[i]!;
++    if (/\s/.test(c)) {
++      i++;
++      continue;
++    }
++    if (c === "/" && src[i + 1] === "/") {
++      const nl = src.indexOf("\n", i);
++      i = nl < 0 ? src.length : nl + 1;
++      continue;
++    }
++    if (c === "/" && src[i + 1] === "*") {
++      const end = src.indexOf("*/", i + 2);
++      if (end < 0) return null;
++      i = end + 2;
++      continue;
++    }
++    if (c === "`" || c === "\\" ) return null;
++    if (c === "{") {
++      tokens.push({ kind: "lbrace" });
++      i++;
++      continue;
++    }
++    if (c === "}") {
++      tokens.push({ kind: "rbrace" });
++      i++;
++      continue;
++    }
++    if (c === "[") {
++      tokens.push({ kind: "lbracket" });
++      i++;
++      continue;
++    }
++    if (c === "]") {
++      tokens.push({ kind: "rbracket" });
++      i++;
++      continue;
++    }
++    if (c === ":") {
++      tokens.push({ kind: "colon" });
++      i++;
++      continue;
++    }
++    if (c === ",") {
++      tokens.push({ kind: "comma" });
++      i++;
++      continue;
++    }
++    if (c === '"' || c === "'") {
++      const end = skipString(src, i);
++      if (end < 0) return null;
++      const raw = src.slice(i + 1, end);
++      const value = unquote(raw, c);
++      if (value == null) return null;
++      tokens.push({ kind: "string", value });
++      i = end + 1;
++      continue;
++    }
++    if (c === "-" || (c >= "0" && c <= "9")) {
++      const m = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(src.slice(i));
++      if (!m) return null;
++      tokens.push({ kind: "number", value: Number(m[0]) });
++      i += m[0].length;
++      continue;
++    }
++    if (/[A-Za-z_$]/.test(c)) {
++      const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
++      if (!m) return null;
++      if (m[0] === "undefined" || m[0] === "function" || m[0] === "new") {
++        return null;
++      }
++      tokens.push({ kind: "ident", value: m[0] });
++      i += m[0].length;
++      continue;
++    }
++    return null;
++  }
++  return tokens;
++}
++
++function parseExactHex(hex: string, length: number): number | null {
++  if (hex.length !== length || !/^[0-9a-fA-F]+$/.test(hex)) return null;
++  const code = Number.parseInt(hex, 16);
++  if (!Number.isInteger(code)) return null;
++  return code;
++}
++
++/**
++ * Decode JavaScript string escapes. Unsupported sequences fail closed
++ * rather than dropping the backslash (`\x26` is `&`, not `x26`).
++ */
++function unquote(raw: string, quote: string): string | null {
++  if (quote !== '"' && quote !== "'") return null;
++  let out = "";
++  for (let i = 0; i < raw.length; i++) {
++    const c = raw[i]!;
++    if (c !== "\\") {
++      out += c;
++      continue;
++    }
++    const n = raw[i + 1];
++    if (n == null) return null;
++
++    if (n === "\n" || n === "\u2028" || n === "\u2029") {
++      i += 1;
++      continue;
++    }
++    if (n === "\r") {
++      i += 1;
++      if (raw[i + 1] === "\n") i += 1;
++      continue;
++    }
++
++    if (n === "x") {
++      const code = parseExactHex(raw.slice(i + 2, i + 4), 2);
++      if (code == null) return null;
++      out += String.fromCharCode(code);
++      i += 3;
++      continue;
++    }
++
++    if (n === "u") {
++      if (raw[i + 2] === "{") {
++        const close = raw.indexOf("}", i + 3);
++        if (close < 0) return null;
++        const hex = raw.slice(i + 3, close);
++        if (!hex || hex.length > 6 || !/^[0-9a-fA-F]+$/.test(hex)) {
++          return null;
++        }
++        const code = Number.parseInt(hex, 16);
++        if (!Number.isInteger(code) || code > 0x10ffff) return null;
++        out += String.fromCodePoint(code);
++        i = close;
++        continue;
++      }
++      const code = parseExactHex(raw.slice(i + 2, i + 6), 4);
++      if (code == null) return null;
++      out += String.fromCharCode(code);
++      i += 5;
++      continue;
++    }
++
++    if (n === "0") {
++      const next = raw[i + 2];
++      if (next !== undefined && next >= "0" && next <= "7") return null;
++      out += "\0";
++      i += 1;
++      continue;
++    }
++
++    let decoded: string | undefined;
++    switch (n) {
++      case "b":
++        decoded = "\b";
++        break;
++      case "f":
++        decoded = "\f";
++        break;
++      case "n":
++        decoded = "\n";
++        break;
++      case "r":
++        decoded = "\r";
++        break;
++      case "t":
++        decoded = "\t";
++        break;
++      case "v":
++        decoded = "\v";
++        break;
++      case "'":
++      case '"':
++      case "\\":
++        decoded = n;
++        break;
++      default:
++        decoded = undefined;
++    }
++    if (decoded == null) return null;
++    out += decoded;
++    i += 1;
++  }
++  return out;
++}
++
++type ParseResult =
++  | { ok: true; value: unknown }
++  | { ok: false };
++
++function parseTokens(tokens: Token[]): unknown | null {
++  let i = 0;
++  function peek(): Token | undefined {
++    return tokens[i];
++  }
++  function eat(): Token | undefined {
++    return tokens[i++];
++  }
++
++  function parseValue(): ParseResult {
++    const t = peek();
++    if (!t) return { ok: false };
++    if (t.kind === "lbrace") return parseObject();
++    if (t.kind === "lbracket") return parseArray();
++    if (t.kind === "string") {
++      eat();
++      return { ok: true, value: t.value };
++    }
++    if (t.kind === "number") {
++      eat();
++      return { ok: true, value: t.value };
++    }
++    if (t.kind === "ident") {
++      eat();
++      if (t.value === "true") return { ok: true, value: true };
++      if (t.value === "false") return { ok: true, value: false };
++      if (t.value === "null") return { ok: true, value: null };
++      return { ok: false };
++    }
++    return { ok: false };
++  }
++
++  function parseObject(): ParseResult {
++    if (eat()?.kind !== "lbrace") return { ok: false };
++    const obj = Object.create(null) as Record<string, unknown>;
++    if (peek()?.kind === "rbrace") {
++      eat();
++      return { ok: true, value: obj };
++    }
++    while (i < tokens.length) {
++      const keyTok = eat();
++      if (!keyTok) return { ok: false };
++      let key: string;
++      if (keyTok.kind === "string" || keyTok.kind === "ident") {
++        key = keyTok.value;
++      } else if (keyTok.kind === "rbrace") {
++        return { ok: true, value: obj };
++      } else {
++        return { ok: false };
++      }
++      if (eat()?.kind !== "colon") return { ok: false };
++      const parsed = parseValue();
++      if (!parsed.ok) return { ok: false };
++      // Object-literal `__proto__:` is a prototype setter, not an own
++      // property. Do not model it as data — that fabricates a change.
++      if (key === "__proto__") return { ok: false };
++      setOwn(obj, key, parsed.value);
++      const sep = peek();
++      if (sep?.kind === "comma") {
++        eat();
++        if (peek()?.kind === "rbrace") {
++          eat();
++          return { ok: true, value: obj };
++        }
++        continue;
++      }
++      if (sep?.kind === "rbrace") {
++        eat();
++        return { ok: true, value: obj };
++      }
++      return { ok: false };
++    }
++    return { ok: false };
++  }
++
++  function parseArray(): ParseResult {
++    if (eat()?.kind !== "lbracket") return { ok: false };
++    const arr: unknown[] = [];
++    if (peek()?.kind === "rbracket") {
++      eat();
++      return { ok: true, value: arr };
++    }
++    while (i < tokens.length) {
++      const parsed = parseValue();
++      if (!parsed.ok) return { ok: false };
++      arr.push(parsed.value);
++      const sep = peek();
++      if (sep?.kind === "comma") {
++        eat();
++        if (peek()?.kind === "rbracket") {
++          eat();
++          return { ok: true, value: arr };
++        }
++        continue;
++      }
++      if (sep?.kind === "rbracket") {
++        eat();
++        return { ok: true, value: arr };
++      }
++      return { ok: false };
++    }
++    return { ok: false };
++  }
++
++  const parsed = parseValue();
++  if (!parsed.ok || i !== tokens.length) return null;
++  return parsed.value;
++}
++
++/**
++ * One step of a flatten path. Object keys and array identities are
++ * different kinds, so a literal key `services[plumbing]` can never
++ * collide with an array item whose slug is `plumbing` — Map lookup
++ * uses JSON.stringify of this tagged list, not a joined string.
++ */
++type EmptyContainerShape = "null" | "array" | "object";
++
++type PathSegment =
++  | { kind: "object-key"; name: string }
++  | { kind: "array-item-id"; id: string }
++  | { kind: "array-item-value"; id: string }
++  | { kind: "array-item-index"; index: number }
++  | { kind: "array-equal"; seq: number }
++  | { kind: "array-pair"; seq: number }
++  | { kind: "array-before"; seq: number }
++  | { kind: "array-after"; seq: number }
++  | { kind: "array-items" }
++  | { kind: "array-order" }
++  /**
++   * Presence of a null / empty array / empty object at this path.
++   * Leaf flattening used to skip these, so `{ services: [] }` vs `{}`
++   * produced zero entries and looked fully reviewed.
++   */
++  | { kind: "empty-container"; shape: EmptyContainerShape };
++
++type FlatEntry = {
++  path: PathSegment[];
++  value: string;
++  serviceName?: string;
++  /**
++   * Verified scalar change that must not be shown as a named wording
++   * pair — used when an array reordered but items cannot be named.
++   */
++  unnamed?: boolean;
++};
++
++function pathMapKey(path: PathSegment[]): string {
++  return JSON.stringify(
++    path.map((seg) => {
++      switch (seg.kind) {
++        case "object-key":
++          return ["k", seg.name];
++        case "array-item-id":
++          return ["a", seg.id];
++        case "array-item-value":
++          return ["v", seg.id];
++        case "array-item-index":
++          return ["i", seg.index];
++        case "array-equal":
++          return ["eq", seg.seq];
++        case "array-pair":
++          return ["p", seg.seq];
++        case "array-before":
++          return ["b", seg.seq];
++        case "array-after":
++          return ["af", seg.seq];
++        case "array-items":
++          return ["items"];
++        case "array-order":
++          return ["order"];
++        case "empty-container":
++          return ["empty", seg.shape];
++      }
++    }),
++  );
++}
++
++function appendPath(path: PathSegment[], seg: PathSegment): PathSegment[] {
++  return [...path, seg];
++}
++
++function segmentKey(seg: PathSegment): string {
++  return pathMapKey([seg]);
++}
++
++/**
++ * Object-key names only. Array identities are never keys — a slug like
++ * `x].hours[` must not participate in hours/services labeling.
++ */
++function objectKeyNames(path: PathSegment[]): string[] {
++  const keys: string[] = [];
++  for (const seg of path) {
++    if (seg.kind === "object-key") keys.push(seg.name);
++  }
++  return keys;
++}
++
++/**
++ * Flatten an array of objects. Prefer a unique slug/name so a reorder is
++ * not reported as every item changing. Always fall back to the index —
++ * never reuse the parent path, which collapses FAQ/process items onto
++ * one before/after and fabricates (or hides) the change.
++ */
++function flattenNamedObjectArray(
++  value: unknown[],
++  path: PathSegment[],
++  out: FlatEntry[],
++  serviceName?: string,
++): void {
++  const ids = value.map((item) => namedItemId(item));
++  const counts = new Map<string, number>();
++  for (const id of ids) {
++    if (!id) continue;
++    counts.set(id, (counts.get(id) ?? 0) + 1);
++  }
++  value.forEach((item, idx) => {
++    const rec = item as Record<string, unknown>;
++    const id = ids[idx] ?? "";
++    const childName =
++      typeof rec.name === "string" ? rec.name : serviceName;
++    const unique = Boolean(id && counts.get(id) === 1);
++    const childPath = unique
++      ? appendPath(path, { kind: "array-item-id", id })
++      : appendPath(path, { kind: "array-item-index", index: idx });
++    flattenStrings(rec, childPath, out, childName);
++  });
++}
++
++/**
++ * Match primitive list items by value when the value is unique, so
++ * removing the first service is not reported as changing it into the
++ * second and then removing the second.
++ */
++function flattenPrimitiveArray(
++  value: unknown[],
++  path: PathSegment[],
++  out: FlatEntry[],
++  serviceName?: string,
++): void {
++  const ids = value.map((item) => JSON.stringify(item));
++  const counts = new Map<string, number>();
++  for (const id of ids) {
++    counts.set(id, (counts.get(id) ?? 0) + 1);
++  }
++  value.forEach((item, idx) => {
++    const id = ids[idx] ?? "";
++    const unique = Boolean(id && counts.get(id) === 1);
++    const childPath = unique
++      ? appendPath(path, { kind: "array-item-value", id })
++      : appendPath(path, { kind: "array-item-index", index: idx });
++    flattenStrings(item, childPath, out, serviceName);
++  });
++}
++
++function isPlainObject(value: unknown): value is Record<string, unknown> {
++  return Boolean(value && typeof value === "object" && !Array.isArray(value));
++}
++
++function isNamedObjectArray(value: unknown): value is unknown[] {
++  return (
++    Array.isArray(value) &&
++    value.length > 0 &&
++    value.every(
++      (item) => item && typeof item === "object" && !Array.isArray(item),
++    )
++  );
++}
++
++function isPrimitiveArray(value: unknown): value is unknown[] {
++  return (
++    Array.isArray(value) &&
++    value.length > 0 &&
++    value.every(
++      (item) =>
++        typeof item === "string" ||
++        (typeof item === "number" && Number.isFinite(item)) ||
++        typeof item === "boolean",
++    )
++  );
++}
++
++function namedItemId(item: unknown): string {
++  if (!isPlainObject(item)) return "";
++  for (const key of ["slug", "name", "title", "question"] as const) {
++    const raw = item[key];
++    if (typeof raw === "string" && raw) return raw;
++  }
++  return "";
++}
++
++function countIds(ids: string[]): Map<string, number> {
++  const counts = new Map<string, number>();
++  for (const id of ids) {
++    if (!id) continue;
++    counts.set(id, (counts.get(id) ?? 0) + 1);
++  }
++  return counts;
++}
++
++/**
++ * Identities that are stable across both versions. Computing uniqueness
++ * independently is how deleting one duplicate service fabricates a
++ * remove+add of the unchanged duplicate (indexed path on one side,
++ * named path on the other).
++ */
++function assignPairedArrayKeys(
++  before: unknown[],
++  after: unknown[],
++  idOf: (item: unknown) => string,
++  uniqueSeg: (id: string) => PathSegment,
++  allowUniqueLeftover: boolean,
++): {
++  beforeKeys: Array<PathSegment | null>;
++  afterKeys: Array<PathSegment | null>;
++  ambiguousUnmatched: boolean;
++} {
++  const beforeKeys: Array<PathSegment | null> = before.map(() => null);
++  const afterKeys: Array<PathSegment | null> = after.map(() => null);
++  const beforeIds = before.map(idOf);
++  const afterIds = after.map(idOf);
++  const beforeCounts = countIds(beforeIds);
++  const afterCounts = countIds(afterIds);
++
++  for (let i = 0; i < before.length; i++) {
++    const id = beforeIds[i];
++    if (!id) continue;
++    if (beforeCounts.get(id) !== 1 || afterCounts.get(id) !== 1) continue;
++    const j = afterIds.indexOf(id);
++    if (j < 0 || afterKeys[j]) continue;
++    const key = uniqueSeg(id);
++    beforeKeys[i] = key;
++    afterKeys[j] = key;
++  }
++
++  let seq = 0;
++  for (let i = 0; i < before.length; i++) {
++    if (beforeKeys[i]) continue;
++    const sig = JSON.stringify(before[i]);
++    for (let j = 0; j < after.length; j++) {
++      if (afterKeys[j]) continue;
++      if (JSON.stringify(after[j]) === sig) {
++        seq += 1;
++        const key: PathSegment = { kind: "array-equal", seq };
++        beforeKeys[i] = key;
++        afterKeys[j] = key;
++        break;
++      }
++    }
++  }
++
++  const beforeRest: number[] = [];
++  const afterRest: number[] = [];
++  for (let i = 0; i < before.length; i++) {
++    if (!beforeKeys[i]) beforeRest.push(i);
++  }
++  for (let j = 0; j < after.length; j++) {
++    if (!afterKeys[j]) afterRest.push(j);
++  }
++
++  const uniqueLeftover =
++    allowUniqueLeftover &&
++    beforeRest.length === 1 &&
++    afterRest.length === 1;
++  if (uniqueLeftover) {
++    seq += 1;
++    const key: PathSegment = { kind: "array-pair", seq };
++    beforeKeys[beforeRest[0]!] = key;
++    afterKeys[afterRest[0]!] = key;
++    return { beforeKeys, afterKeys, ambiguousUnmatched: false };
++  }
++
++  // Named leftovers on both sides cannot be uniquely paired — pairing
++  // by position fabricates "Q1 → edited Q2" after a reorder. Primitive
++  // leftovers, and named pure add/remove, are not a correspondence.
++  if (
++    allowUniqueLeftover &&
++    beforeRest.length > 0 &&
++    afterRest.length > 0
++  ) {
++    return { beforeKeys, afterKeys, ambiguousUnmatched: true };
++  }
++
++  for (const i of beforeRest) {
++    seq += 1;
++    beforeKeys[i] = { kind: "array-before", seq };
++  }
++  for (const j of afterRest) {
++    seq += 1;
++    afterKeys[j] = { kind: "array-after", seq };
++  }
++  return { beforeKeys, afterKeys, ambiguousUnmatched: false };
++}
++
++/**
++ * Shared items in a different sequence is a real change. Pairing by
++ * identity hides it — the owner still sees a different service order.
++ */
++function sharedKeyOrderChanged(
++  beforeKeys: Array<PathSegment | null>,
++  afterKeys: Array<PathSegment | null>,
++): boolean {
++  const before = beforeKeys
++    .filter((k): k is PathSegment => Boolean(k))
++    .map(segmentKey);
++  const after = afterKeys
++    .filter((k): k is PathSegment => Boolean(k))
++    .map(segmentKey);
++  const afterSet = new Set(after);
++  const beforeShared = before.filter((k) => afterSet.has(k));
++  if (beforeShared.length < 2) return false;
++  const beforeSet = new Set(before);
++  const afterShared = after.filter((k) => beforeSet.has(k));
++  return beforeShared.some((k, i) => k !== afterShared[i]);
++}
++
++function arrayItemOwnerLabel(item: unknown): string | null {
++  if (typeof item === "string") {
++    const t = flattenOwnerWhitespace(item);
++    return t.length > 0 ? t : null;
++  }
++  if (typeof item === "number" && Number.isFinite(item)) {
++    return String(item);
++  }
++  if (typeof item === "boolean") {
++    return item ? "true" : "false";
++  }
++  if (!isPlainObject(item)) return null;
++  for (const key of ["name", "slug", "title", "question"] as const) {
++    const raw = item[key];
++    if (typeof raw !== "string") continue;
++    const t = flattenOwnerWhitespace(raw);
++    if (t) return t;
++  }
++  return null;
++}
++
++function flattenPairedArrays(
++  before: unknown[],
++  after: unknown[],
++  path: PathSegment[],
++  beforeOut: FlatEntry[],
++  afterOut: FlatEntry[],
++  serviceName: string | undefined,
++  kind: "named" | "primitive",
++): void {
++  const idOf =
++    kind === "named" ? namedItemId : (item: unknown) => JSON.stringify(item);
++  const uniqueSeg =
++    kind === "named"
++      ? (id: string): PathSegment => ({ kind: "array-item-id", id })
++      : (id: string): PathSegment => ({ kind: "array-item-value", id });
++  const { beforeKeys, afterKeys, ambiguousUnmatched } = assignPairedArrayKeys(
++    before,
++    after,
++    idOf,
++    uniqueSeg,
++    kind === "named",
++  );
++  const beforeByKey = new Map<string, unknown>();
++  const afterByKey = new Map<string, unknown>();
++  const segByKey = new Map<string, PathSegment>();
++  before.forEach((item, i) => {
++    const key = beforeKeys[i];
++    if (!key) return;
++    const mapKey = segmentKey(key);
++    beforeByKey.set(mapKey, item);
++    segByKey.set(mapKey, key);
++  });
++  after.forEach((item, j) => {
++    const key = afterKeys[j];
++    if (!key) return;
++    const mapKey = segmentKey(key);
++    afterByKey.set(mapKey, item);
++    segByKey.set(mapKey, key);
++  });
++  const keys = new Set([...beforeByKey.keys(), ...afterByKey.keys()]);
++  for (const mapKey of keys) {
++    const b = beforeByKey.get(mapKey);
++    const a = afterByKey.get(mapKey);
++    const seg = segByKey.get(mapKey);
++    if (!seg) continue;
++    const childPath = appendPath(path, seg);
++    const rec = (isPlainObject(a) ? a : isPlainObject(b) ? b : null);
++    const childName =
++      kind === "named" && rec && typeof rec.name === "string"
++        ? rec.name
++        : serviceName;
++    if (b !== undefined && a !== undefined) {
++      flattenPaired(b, a, childPath, beforeOut, afterOut, childName);
++    } else if (b !== undefined) {
++      flattenStrings(b, childPath, beforeOut, childName);
++    } else if (a !== undefined) {
++      flattenStrings(a, childPath, afterOut, childName);
++    }
++  }
++
++  if (ambiguousUnmatched) {
++    const itemsPath = appendPath(path, { kind: "array-items" });
++    beforeOut.push({
++      path: itemsPath,
++      value: "0",
++      serviceName,
++      unnamed: true,
++    });
++    afterOut.push({
++      path: itemsPath,
++      value: "1",
++      serviceName,
++      unnamed: true,
++    });
++  }
++
++  if (!sharedKeyOrderChanged(beforeKeys, afterKeys)) return;
++  const beforeLabels = before.map(arrayItemOwnerLabel);
++  const afterLabels = after.map(arrayItemOwnerLabel);
++  const orderPath = appendPath(path, { kind: "array-order" });
++  if (beforeLabels.every(Boolean) && afterLabels.every(Boolean)) {
++    beforeOut.push({
++      path: orderPath,
++      value: beforeLabels.join(", "),
++      serviceName,
++    });
++    afterOut.push({
++      path: orderPath,
++      value: afterLabels.join(", "),
++      serviceName,
++    });
++    return;
++  }
++  // Order changed, but we cannot name every item. Count it as an
++  // unnamed verified change so a named scalar cannot hide it.
++  beforeOut.push({
++    path: orderPath,
++    value: "0",
++    serviceName,
++    unnamed: true,
++  });
++  afterOut.push({
++    path: orderPath,
++    value: "1",
++    serviceName,
++    unnamed: true,
++  });
++}
++
++function flattenPaired(
++  before: unknown,
++  after: unknown,
++  path: PathSegment[],
++  beforeOut: FlatEntry[],
++  afterOut: FlatEntry[],
++  serviceName?: string,
++): void {
++  const beforeNamed = isNamedObjectArray(before);
++  const afterNamed = isNamedObjectArray(after);
++  if (
++    (beforeNamed || (afterNamed && Array.isArray(before) && before.length === 0)) &&
++    (afterNamed || (beforeNamed && Array.isArray(after) && after.length === 0))
++  ) {
++    flattenPairedArrays(
++      before as unknown[],
++      after as unknown[],
++      path,
++      beforeOut,
++      afterOut,
++      serviceName,
++      "named",
++    );
++    return;
++  }
++
++  const beforePrim = isPrimitiveArray(before);
++  const afterPrim = isPrimitiveArray(after);
++  if (
++    (beforePrim || (afterPrim && Array.isArray(before) && before.length === 0)) &&
++    (afterPrim || (beforePrim && Array.isArray(after) && after.length === 0))
++  ) {
++    flattenPairedArrays(
++      before as unknown[],
++      after as unknown[],
++      path,
++      beforeOut,
++      afterOut,
++      serviceName,
++      "primitive",
++    );
++    return;
++  }
++
++  if (isPlainObject(before) && isPlainObject(after)) {
++    const keySet = new Set([...Object.keys(before), ...Object.keys(after)]);
++    for (const k of keySet) {
++      const next = appendPath(path, { kind: "object-key", name: k });
++      const hasB = Object.prototype.hasOwnProperty.call(before, k);
++      const hasA = Object.prototype.hasOwnProperty.call(after, k);
++      if (hasB && hasA) {
++        flattenPaired(
++          before[k],
++          after[k],
++          next,
++          beforeOut,
++          afterOut,
++          serviceName,
++        );
++      } else if (hasB) {
++        flattenStrings(before[k], next, beforeOut, serviceName);
++      } else {
++        flattenStrings(after[k], next, afterOut, serviceName);
++      }
++    }
++    return;
++  }
++
++  flattenStrings(before, path, beforeOut, serviceName);
++  flattenStrings(after, path, afterOut, serviceName);
++}
++
++function pushEmptyContainer(
++  path: PathSegment[],
++  out: FlatEntry[],
++  shape: EmptyContainerShape,
++  serviceName?: string,
++): void {
++  out.push({
++    path: appendPath(path, { kind: "empty-container", shape }),
++    value: shape,
++    serviceName,
++    unnamed: true,
++  });
++}
++
++function flattenStrings(
++  value: unknown,
++  path: PathSegment[],
++  out: FlatEntry[],
++  serviceName?: string,
++): void {
++  if (typeof value === "string") {
++    out.push({ path, value, serviceName });
++    return;
++  }
++  if (typeof value === "number" && Number.isFinite(value)) {
++    out.push({ path, value: String(value), serviceName });
++    return;
++  }
++  if (typeof value === "boolean") {
++    out.push({ path, value: value ? "true" : "false", serviceName });
++    return;
++  }
++  if (value === null) {
++    pushEmptyContainer(path, out, "null", serviceName);
++    return;
++  }
++  if (Array.isArray(value)) {
++    if (value.length === 0) {
++      pushEmptyContainer(path, out, "array", serviceName);
++      return;
++    }
++    const named = value.every(
++      (item) => item && typeof item === "object" && !Array.isArray(item),
++    );
++    if (named) {
++      flattenNamedObjectArray(value, path, out, serviceName);
++      return;
++    }
++    const primitive = value.every(
++      (item) =>
++        typeof item === "string" ||
++        (typeof item === "number" && Number.isFinite(item)) ||
++        typeof item === "boolean",
++    );
++    if (primitive) {
++      flattenPrimitiveArray(value, path, out, serviceName);
++      return;
++    }
++    value.forEach((item, idx) => {
++      flattenStrings(
++        item,
++        appendPath(path, { kind: "array-item-index", index: idx }),
++        out,
++        serviceName,
++      );
++    });
++    return;
++  }
++  if (value && typeof value === "object") {
++    const entries = Object.entries(value as Record<string, unknown>);
++    if (entries.length === 0) {
++      pushEmptyContainer(path, out, "object", serviceName);
++      return;
++    }
++    for (const [k, v] of entries) {
++      flattenStrings(
++        v,
++        appendPath(path, { kind: "object-key", name: k }),
++        out,
++        serviceName,
++      );
++    }
++  }
++}
++
++export function visualPairsFromSiteSources(
++  beforeSrc: string,
++  afterSrc: string,
++): VisualPair[] {
++  return diffSiteCopy(beforeSrc, afterSrc).pairs;
++}
++
++/**
++ * Diff two site.ts sources. `pairs` are labeled wording changes.
++ * `unnamedCount` is every other verified scalar change (unknown string
++ * fields, booleans, numbers) — callers must not drop those surfaces.
++ */
++export function diffSiteCopy(
++  beforeSrc: string,
++  afterSrc: string,
++): { pairs: VisualPair[]; unnamedCount: number } {
++  const before = tryParseSiteSource(beforeSrc);
++  const after = tryParseSiteSource(afterSrc);
++  if (!before || !after) return { pairs: [], unnamedCount: 0 };
++
++  const beforeFlat: FlatEntry[] = [];
++  const afterFlat: FlatEntry[] = [];
++  flattenPaired(before, after, [], beforeFlat, afterFlat);
++
++  const beforeMap = new Map(beforeFlat.map((e) => [pathMapKey(e.path), e]));
++  const afterMap = new Map(afterFlat.map((e) => [pathMapKey(e.path), e]));
++  const keys = new Set([...beforeMap.keys(), ...afterMap.keys()]);
++
++  const pairs: VisualPair[] = [];
++  let unnamedCount = 0;
++  for (const key of keys) {
++    const b = beforeMap.get(key);
++    const a = afterMap.get(key);
++    if ((b?.value ?? null) === (a?.value ?? null)) continue;
++    if (b?.unnamed || a?.unnamed) {
++      unnamedCount += 1;
++      continue;
++    }
++    const label = labelForSiteObjectKeys(objectKeyNames((a ?? b)!.path), {
++      serviceName: a?.serviceName ?? b?.serviceName,
++    });
++    if (!label) {
++      unnamedCount += 1;
++      continue;
++    }
++    const clipped = clipChangedValues(
++      b ? b.value : null,
++      a ? a.value : null,
++    );
++    if (
++      clipped.before != null &&
++      clipped.after != null &&
++      clipped.before === clipped.after
++    ) {
++      // Truncation hid the only difference — do not show a fake no-op,
++      // and do not count it as "no change" either.
++      unnamedCount += 1;
++      continue;
++    }
++    pairs.push({
++      label,
++      before: clipped.before,
++      after: clipped.after,
++    });
++  }
++  return { pairs: dedupePairs(pairs), unnamedCount };
++}
++
++function clipValue(value: string): string {
++  const t = value.trim();
++  if (t.length <= MAX_VALUE_CHARS) return t;
++  return `${t.slice(0, MAX_VALUE_CHARS)}…`;
++}
++
++/**
++ * Clip before/after around the first actual difference so a long shared
++ * prefix cannot hide the changed text. Independent head-truncation of each
++ * side is how two 200-character-identical prefixes become a fake no-op.
++ */
++export function clipChangedValues(
++  before: string | null,
++  after: string | null,
++): { before: string | null; after: string | null } {
++  if (before == null && after == null) {
++    return { before: null, after: null };
++  }
++  // Empty string is a real value. Truthiness would turn absent→"" into
++  // {null,null}, which the formatter then shows as both missing and removed.
++  if (before == null) {
++    return { before: null, after: after == null ? null : clipValue(after) };
++  }
++  if (after == null) {
++    return { before: clipValue(before), after: null };
++  }
++  const b = before.trim();
++  const a = after.trim();
++  if (b.length <= MAX_VALUE_CHARS && a.length <= MAX_VALUE_CHARS) {
++    return { before: b, after: a };
++  }
++
++  let diff = 0;
++  const min = Math.min(b.length, a.length);
++  while (diff < min && b[diff] === a[diff]) diff++;
++
++  const context = 32;
++  const start = Math.max(0, diff - context);
++
++  function windowOf(s: string): string {
++    const slice = s.slice(start, start + MAX_VALUE_CHARS);
++    const prefix = start > 0 ? "…" : "";
++    const suffix = start + MAX_VALUE_CHARS < s.length ? "…" : "";
++    return `${prefix}${slice}${suffix}`;
++  }
++
++  return { before: windowOf(b), after: windowOf(a) };
++}
++
++function dedupePairs(pairs: VisualPair[]): VisualPair[] {
++  const seen = new Set<string>();
++  const out: VisualPair[] = [];
++  for (const p of pairs) {
++    // JSON so null (absent) and "" (blank) stay distinct identities.
++    const id = JSON.stringify([p.label, p.before, p.after]);
++    if (seen.has(id)) continue;
++    seen.add(id);
++    out.push(p);
++  }
++  return out;
++}
++
++/**
++ * Last-resort visual from a unified diff patch. Only emits pairs whose
++ * before/after strings were actually present on -/+ lines.
++ */
++const PATCH_BLOCK_KEY =
++  /^(hours|services|hero|faq|contact|nav|process|gallery|scheduleSection|contactSection|reviews|trustBar)$/;
++
++function patchLineBody(line: string): string {
++  if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
++    return line.slice(1);
++  }
++  return line;
++}
++
++/**
++ * Close an already-open template literal starting at `from` (inside
++ * the template, not at the opening backtick). Escaped backticks do
++ * not close. Returns -1 when the close is not on this line.
++ */
++function findTemplateClose(source: string, from: number): number {
++  let i = from;
++  while (i < source.length) {
++    const c = source[i];
++    if (c === "\\") {
++      i += 2;
++      continue;
++    }
++    if (c === "`") return i;
++    i += 1;
++  }
++  return -1;
++}
++
++type PatchLineScan = {
++  code: string;
++  inBlockComment: boolean;
++  inTemplate: boolean;
++};
++
++/**
++ * Non-comment, non-template code on one patch line, carrying `/*`
++ * and backtick state across lines the same way `skipNonCode` does
++ * for the site.ts parser. Template text is not site copy.
++ */
++function takePatchLineCode(
++  body: string,
++  inBlockComment: boolean,
++  inTemplate: boolean,
++): PatchLineScan {
++  let i = 0;
++  let code = "";
++  let prev: SlashContext = "start";
++  const scan = freshSlashScan();
++  if (inTemplate) {
++    const close = findTemplateClose(body, 0);
++    if (close < 0) {
++      return { code: "", inBlockComment: false, inTemplate: true };
++    }
++    i = close + 1;
++    prev = "value";
++    inTemplate = false;
++  }
++  if (inBlockComment) {
++    const end = body.indexOf("*/");
++    if (end < 0) {
++      return { code: "", inBlockComment: true, inTemplate: false };
++    }
++    i = end + 2;
++  }
++  while (i < body.length) {
++    const skipped = skipNonCode(body, i, prev);
++    if (skipped < 0) {
++      // Ambiguous or unclosed `/` — do not guess at values on this line.
++      return { code: "", inBlockComment: false, inTemplate: false };
++    }
++    if (skipped !== i) {
++      const c = body[i];
++      const next = body[i + 1];
++      if (c === "`") {
++        const closed = skipTemplate(body, i);
++        if (closed < 0) {
++          return { code, inBlockComment: false, inTemplate: true };
++        }
++        prev = "value";
++        scan.lastWord = "";
++        i = skipped;
++        continue;
++      }
++      if (c === "/" && next === "*") {
++        const closed = body.indexOf("*/", i + 2);
++        if (closed < 0) {
++          return { code, inBlockComment: true, inTemplate: false };
++        }
++        i = skipped;
++        continue;
++      }
++      if (c === "/" && next === "/") {
++        break;
++      }
++      if (c === "/" && next !== "/" && next !== "*") {
++        // Regex literal — not site copy. Do not keep the body.
++        prev = "value";
++        scan.lastWord = "";
++        i = skipped;
++        continue;
++      }
++      // Quoted string — keep it; `/*` inside a string is not a comment.
++      code += body.slice(i, skipped);
++      prev = "value";
++      scan.lastWord = "";
++      i = skipped;
++      continue;
++    }
++    code += body[i]!;
++    prev = prevAfterConsuming(body, i, prev, scan);
++    i += 1;
++  }
++  return { code, inBlockComment: false, inTemplate: false };
++}
++
++function codeIndent(code: string): number {
++  const m = /^(\s*)/.exec(code);
++  return m ? m[1].length : 0;
++}
++
++/** Nesting delta of `{` `[` `}` `]` outside strings. */
++function nestDelta(code: string): number {
++  let delta = 0;
++  let i = 0;
++  while (i < code.length) {
++    const c = code[i];
++    if (c === '"' || c === "'") {
++      const closed = skipString(code, i);
++      if (closed < 0) return delta;
++      i = closed + 1;
++      continue;
++    }
++    if (c === "{" || c === "[") delta++;
++    else if (c === "}" || c === "]") delta--;
++    i++;
++  }
++  return delta;
++}
++
++function patchPropertyKey(code: string): string | null {
++  const m = /^\s*([A-Za-z_$][\w$]*)\s*:/.exec(code);
++  return m?.[1] ?? null;
++}
++
++type PatchSideState = {
++  lastBlock: string | undefined;
++  lastBlockIndent: number;
++  lastBlockOpenedAt: number;
++  nestDepth: number;
++  lastServiceName: string | undefined;
++  inBlockComment: boolean;
++  inTemplate: boolean;
++};
++
++function freshPatchSide(): PatchSideState {
++  return {
++    lastBlock: undefined,
++    lastBlockIndent: 0,
++    lastBlockOpenedAt: 0,
++    nestDepth: 0,
++    lastServiceName: undefined,
++    inBlockComment: false,
++    inTemplate: false,
++  };
++}
++
++function clonePatchSide(state: PatchSideState): PatchSideState {
++  return { ...state };
++}
++
++function applyPatchStructure(state: PatchSideState, code: string): void {
++  // A new object in the same hunk is a new service (or hours block).
++  // Carrying plumbing's name into the next `{` is how a heater
++  // description gets labeled as plumbing.
++  if (/^\s*\{/.test(code)) {
++    state.lastServiceName = undefined;
++  }
++
++  const indent = codeIndent(code);
++  const propKey = patchPropertyKey(code);
++  if (propKey && PATCH_BLOCK_KEY.test(propKey)) {
++    state.lastBlock = propKey;
++    state.lastBlockIndent = indent;
++    state.lastBlockOpenedAt = state.nestDepth;
++    if (state.lastBlock !== "services") state.lastServiceName = undefined;
++  } else if (
++    state.lastBlock !== undefined &&
++    propKey &&
++    indent <= state.lastBlockIndent
++  ) {
++    // Sibling/top-level key — not a child of the remembered block.
++    state.lastBlock = undefined;
++    state.lastServiceName = undefined;
++  }
++
++  state.nestDepth += nestDelta(code);
++  if (
++    state.lastBlock !== undefined &&
++    state.nestDepth <= state.lastBlockOpenedAt
++  ) {
++    state.lastBlock = undefined;
++    state.lastServiceName = undefined;
++  }
++
++  const nameMatch = /^\s*name\s*:\s*(["'])((?:\\.|(?!\1).)*)\1/.exec(code);
++  if (nameMatch?.[2]) {
++    state.lastServiceName = nameMatch[2];
++  }
++}
++
++function fieldPathFor(state: PatchSideState, key: string): string {
++  return state.lastBlock ? `${state.lastBlock}.${key}` : key;
++}
++
++/**
++ * Identity used to decide whether a -/+ pair is the same field.
++ * Same key name is not enough — `scheduleSection.title` is not
++ * `contactSection.title`. A service `name` change is the identity
++ * itself, so it pairs on path alone.
++ */
++function semanticFieldId(state: PatchSideState, key: string): string {
++  const fieldPath = fieldPathFor(state, key);
++  if (key === "name") return fieldPath;
++  if (state.lastServiceName) return `${fieldPath}::${state.lastServiceName}`;
++  return fieldPath;
++}
++
++function lineInRange(
++  line: number,
++  range: { startLine: number; endLine: number },
++): boolean {
++  return line >= range.startLine && line <= range.endLine;
++}
++
++/**
++ * Last-resort visual from a unified diff. Requires BOTH complete file
++ * versions so the AST can place the exported `site` object on each
++ * side independently: a - line must fall inside the old export, a +
++ * line inside the new export. One side's range cannot authenticate
++ * the other half of a pair — that is how a helper object's removed
++ * wording is reported as the prior site copy. No source, no export,
++ * or no hunk header → no pairs. Key-name matching alone is not
++ * verification.
++ */
++export function visualPairsFromPatch(
++  patch: string,
++  afterSource?: string | null,
++  beforeSource?: string | null,
++): VisualPair[] {
++  if (afterSource == null || afterSource === "") return [];
++  if (beforeSource == null || beforeSource === "") return [];
++  const afterRange = exportedSiteObjectLineRange(afterSource);
++  const beforeRange = exportedSiteObjectLineRange(beforeSource);
++  if (!afterRange || !beforeRange) return [];
++
++  const lines = patch.split(/\r?\n/);
++  const pairs: VisualPair[] = [];
++  // Old and new sides of a unified diff are separate files. Sharing
++  // lastBlock / nestDepth / lastServiceName lets a removed block name
++  // the added block's values, or a removed `*/` "uncomment" added lines.
++  let oldSide = freshPatchSide();
++  let newSide = freshPatchSide();
++  let oldLine = 0;
++  let newLine = 0;
++  let hunkActive = false;
++
++  const keyLine = /^\s*([A-Za-z_$][\w$]*)\s*:\s*(["'])([\s\S]*)$/;
++
++  for (let i = 0; i < lines.length; i++) {
++    const line = lines[i]!;
++    // A new hunk is a new context. Carrying a previous service name across
++    // @@ headers is how a later unnamed change gets labeled as plumbing.
++    if (/^@@ /.test(line)) {
++      oldSide = freshPatchSide();
++      newSide = freshPatchSide();
++      const hunk = parsePatchHunkHeader(line);
++      if (!hunk || hunk.oldStart < 1 || hunk.newStart < 1) {
++        hunkActive = false;
++        continue;
++      }
++      oldLine = hunk.oldStart;
++      newLine = hunk.newStart;
++      hunkActive = true;
++      continue;
++    }
++    if (line.startsWith("---") || line.startsWith("+++")) continue;
++    if (line.startsWith("\\")) continue;
++    if (!hunkActive) continue;
++
++    const isMinus = line.startsWith("-");
++    const isPlus = line.startsWith("+");
++    const thisOldLine = oldLine;
++    const thisNewLine = newLine;
++    if (isMinus) {
++      oldLine += 1;
++    } else if (isPlus) {
++      newLine += 1;
++    } else {
++      oldLine += 1;
++      newLine += 1;
++    }
++    const inOldRange = lineInRange(thisOldLine, beforeRange);
++    const inNewRange = lineInRange(thisNewLine, afterRange);
++
++    const body = patchLineBody(line);
++    if (isMinus) {
++      const scanned = takePatchLineCode(
++        body,
++        oldSide.inBlockComment,
++        oldSide.inTemplate,
++      );
++      oldSide.inBlockComment = scanned.inBlockComment;
++      oldSide.inTemplate = scanned.inTemplate;
++      const code = scanned.code;
++      if (!inOldRange || !code.trim()) continue;
++      applyPatchStructure(oldSide, code);
++
++      const minus = keyLine.exec(code);
++      if (!minus) continue;
++      const key = minus[1]!;
++      const quote = minus[2]!;
++      const minusRest = minus[3]!;
++      const before = extractQuotedTail(minusRest, quote);
++      if (before == null) continue;
++
++      const plusLine = lines[i + 1];
++      if (!plusLine?.startsWith("+")) continue;
++      // Lookahead only — the + iteration owns newSide comment/template state.
++      const plusScan = takePatchLineCode(
++        patchLineBody(plusLine),
++        newSide.inBlockComment,
++        newSide.inTemplate,
++      );
++      const plus = keyLine.exec(plusScan.code);
++      if (!plus || plus[1] !== key) continue;
++      const after = extractQuotedTail(plus[3]!, plus[2]!);
++      if (after == null) continue;
++      if (before === after) continue;
++      // The + line has not been consumed yet; it sits at thisNewLine.
++      if (!inNewRange) continue;
++
++      const newAtPlus = clonePatchSide(newSide);
++      applyPatchStructure(newAtPlus, plusScan.code);
++      if (semanticFieldId(oldSide, key) !== semanticFieldId(newAtPlus, key)) {
++        continue;
++      }
++
++      const fieldPath = fieldPathFor(oldSide, key);
++      const label = labelForSiteField(fieldPath, {
++        serviceName:
++          oldSide.lastBlock && oldSide.lastBlock !== "services"
++            ? undefined
++            : oldSide.lastServiceName,
++      });
++      if (!label) continue;
++      const clipped = clipChangedValues(before, after);
++      if (
++        clipped.before != null &&
++        clipped.after != null &&
++        clipped.before === clipped.after
++      ) {
++        continue;
++      }
++      pairs.push({
++        label,
++        before: clipped.before,
++        after: clipped.after,
++      });
++      continue;
++    }
++
++    if (isPlus) {
++      const scanned = takePatchLineCode(
++        body,
++        newSide.inBlockComment,
++        newSide.inTemplate,
++      );
++      newSide.inBlockComment = scanned.inBlockComment;
++      newSide.inTemplate = scanned.inTemplate;
++      if (!inNewRange || !scanned.code.trim()) continue;
++      applyPatchStructure(newSide, scanned.code);
++      continue;
++    }
++
++    const oldScan = takePatchLineCode(
++      body,
++      oldSide.inBlockComment,
++      oldSide.inTemplate,
++    );
++    oldSide.inBlockComment = oldScan.inBlockComment;
++    oldSide.inTemplate = oldScan.inTemplate;
++    const newScan = takePatchLineCode(
++      body,
++      newSide.inBlockComment,
++      newSide.inTemplate,
++    );
++    newSide.inBlockComment = newScan.inBlockComment;
++    newSide.inTemplate = newScan.inTemplate;
++    // Context exists on both sides. If comment structure has already
++    // diverged, the two "code" views disagree — do not guess which
++    // one is the site copy for labeling. Apply each side only when
++    // that side's line is inside its own export.
++    if (oldScan.code !== newScan.code) {
++      continue;
++    }
++    if (!oldScan.code.trim()) continue;
++    if (inOldRange) applyPatchStructure(oldSide, oldScan.code);
++    if (inNewRange) applyPatchStructure(newSide, newScan.code);
++  }
++  return dedupePairs(pairs);
++}
++
++function extractQuotedTail(rest: string, quote: string): string | null {
++  // rest is the inside of the string plus the closing quote and trailing comma.
++  let raw = "";
++  for (let i = 0; i < rest.length; i++) {
++    const c = rest[i]!;
++    if (c === "\\") {
++      const n = rest[i + 1];
++      if (n == null) return null;
++      raw += c + n;
++      i++;
++      continue;
++    }
++    if (c === quote) return unquote(raw, quote);
++    raw += c;
++  }
++  return null;
++}
++
++export function wrapOwnerText(
++  text: string,
++  width: number = OWNER_BUBBLE_WIDTH,
++): string {
++  return text
++    .split("\n")
++    .map((line) => wrapLine(line, width))
++    .join("\n");
++}
++
++function wrapLine(line: string, width: number): string {
++  if (line.length <= width) return line;
++  // Column-0 only. An indented untrusted URL or SHA must not be
++  // promoted to a verified identity line.
++  if (/^https?:\/\//i.test(line)) return line;
++  if (/^[0-9a-f]{40,64}$/i.test(line)) return line;
++  const bullet = line.match(/^(\s*•\s)/);
++  const indent = line.match(/^(\s+)/)?.[1] ?? "";
++  const prefix = bullet?.[1] ?? indent;
++  const rest = line.slice(prefix.length);
++  const words = rest.split(/\s+/).filter(Boolean);
++  if (words.length === 0) return line;
++  const out: string[] = [];
++  let cur = prefix;
++  // Always hang-indent continuations. A column-0 wrap of untrusted
++  // copy is how `https://…` or `Draft ready.` impersonates a status line.
++  const cont = bullet ? "  " : prefix || "  ";
++  for (const w of words) {
++    if (!cur.trim()) {
++      cur = (cur.startsWith(prefix) ? prefix : cont) + w;
++      continue;
++    }
++    if (`${cur} ${w}`.length <= width) {
++      cur = `${cur} ${w}`;
++    } else {
++      out.push(cur);
++      cur = cont + w;
++    }
++  }
++  if (cur) out.push(cur);
++  return out.join("\n");
++}
++
++/**
++ * GitHub environment identity for a deployment. Prefer the original
++ * name so a later rename does not split one project into two.
++ */
++export function draftEnvironmentIdentity(dep: {
++  environment?: string;
++  original_environment?: string;
++}): string {
++  const original = (dep.original_environment ?? "").trim().toLowerCase();
++  if (original) return original;
++  return (dep.environment ?? "").trim().toLowerCase();
++}
++
++/**
++ * GitHub-reported Vercel Git integration. A paid tier, a repo grant, and
++ * an environment named "Preview" are not a Vercel project binding — Chromatic,
++ * Storybook, and docs apps also create successful Preview deployments.
++ */
++export function isVercelHostingDeployment(dep: {
++  creator?: { login?: string } | null;
++  performed_via_github_app?: { slug?: string } | null;
++}): boolean {
++  const slug = String(dep.performed_via_github_app?.slug ?? "")
++    .trim()
++    .toLowerCase();
++  if (slug === "vercel") return true;
++  const login = String(dep.creator?.login ?? "").trim().toLowerCase();
++  return login === "vercel[bot]";
++}
++
++type GitHubDeploymentStatusJson = {
++  state?: string;
++  created_at?: string;
++  environment_url?: string | null;
++  log_url?: string | null;
++  target_url?: string | null;
++  creator?: { login?: string } | null;
++  performed_via_github_app?: { slug?: string } | null;
++};
++
++type GitHubDeploymentJson = {
++  id: number;
++  created_at?: string;
++  environment?: string;
++  original_environment?: string;
++  production_environment?: boolean;
++  transient_environment?: boolean;
++  creator?: { login?: string } | null;
++  performed_via_github_app?: { slug?: string } | null;
++};
++
++/**
++ * A successful Production record older than this is not proof of the
++ * CURRENT live-site project. A repo can move hosting and leave old
++ * Vercel records behind. 90 days covers "moved away months ago"
++ * without treating a quiet site that shipped last month as unbound.
++ * A site with no production deploy inside the window is not bound
++ * to history — fail closed.
++ */
++export const PRODUCTION_IDENTITY_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
++
++/** GitHub/Vercel clocks can lead local time by a few minutes. */
++const PRODUCTION_IDENTITY_CLOCK_SKEW_MS = 5 * 60 * 1000;
++
++/**
++ * True when `timestampMs` is a parseable instant inside the production
++ * identity window relative to `nowMs`. Missing, NaN, or too-far-future
++ * values are not current evidence.
++ */
++export function isRecentProductionEvidence(
++  timestampMs: number | null | undefined,
++  nowMs: number = Date.now(),
++): boolean {
++  if (timestampMs == null || !Number.isFinite(timestampMs)) return false;
++  const age = nowMs - timestampMs;
++  if (age < -PRODUCTION_IDENTITY_CLOCK_SKEW_MS) return false;
++  return age <= PRODUCTION_IDENTITY_MAX_AGE_MS;
++}
++
++function parseIsoTimestampMs(value: unknown): number | null {
++  if (typeof value !== "string" || !value.trim()) return null;
++  const t = Date.parse(value);
++  return Number.isFinite(t) ? t : null;
++}
++
++function vercelStatusProvenance(status: GitHubDeploymentStatusJson): boolean {
++  return isVercelHostingDeployment(status);
++}
++
++/**
++ * GitHub deployment-status `state` that is actual live-site evidence.
++ * `failure`, `error`, `pending`, `inactive`, `queued`, `waiting`, and
++ * `in_progress` are not a successful production identity.
++ */
++function isSuccessfulDeploymentStatus(state: unknown): boolean {
++  return String(state ?? "").trim().toLowerCase() === "success";
++}
++
++/**
++ * GitHub returns statuses newest-first. A workflow with
++ * `deployments: write` can append a forged status after Vercel's.
++ * Only a status Vercel itself authored can speak for that deployment.
++ */
++function latestVercelAuthoredStatus(
++  statuses: GitHubDeploymentStatusJson[],
++): GitHubDeploymentStatusJson | undefined {
++  return statuses.find((status) => vercelStatusProvenance(status));
++}
++
++const STATUS_PAGE_SIZE = 100;
++
++const AUXILIARY_DRAFT_TOKEN_RE =
++  /(storybook|chromatic|styleguide|documentation|\bdocs\b)/i;
++
++/**
++ * Only GitHub deployments from the Vercel hosting integration whose
++ * environment name is actually a customer-site draft may be labeled
++ * "Draft site". Production, staging, unnamed successes, and auxiliary
++ * apps (Storybook, docs, Chromatic) are not the customer site.
++ * `transient_environment` alone is not provenance.
++ */
++export function isDraftPreviewEnvironment(dep: {
++  environment?: string;
++  original_environment?: string;
++  production_environment?: boolean;
++  transient_environment?: boolean;
++  creator?: { login?: string } | null;
++  performed_via_github_app?: { slug?: string } | null;
++}): boolean {
++  if (!isVercelHostingDeployment(dep)) return false;
++  if (dep.production_environment === true) return false;
++  const env = draftEnvironmentIdentity(dep);
++  if (!env) return false;
++  // Denylist, not a live-site binder. Broader than exact
++  // LIVE_ENVIRONMENT_NAMES so `pre-production` / `staging-preview`
++  // cannot qualify as the customer draft. Exact-matching here would
++  // let those names fall through to the `preview` substring check.
++  if (/(^|[^a-z])(production|prod|live|staging)([^a-z]|$)/.test(env)) {
++    return false;
++  }
++  if (AUXILIARY_DRAFT_TOKEN_RE.test(env)) return false;
++  if (env.includes("preview")) return true;
++  if (/(^|[^a-z])pr[-_ ]?\d+/.test(env)) return true;
++  return false;
++}
++
++/**
++ * Exact GitHub/Vercel live-environment names after lowercasing.
++ * A substring match treats `pre-production` (and `production-canary`,
++ * `live-preview`, …) as production even when GitHub set
++ * `production_environment: false`.
++ */
++const LIVE_ENVIRONMENT_NAMES = new Set(["production", "prod", "live"]);
++
++/**
++ * Vercel-authored production on this GitHub repo. That is this
++ * repository's live hosting — a Preview from any other Vercel project
++ * is not. It is not proof the customer owns that Vercel project.
++ */
++export function isCustomerSiteProductionDeployment(dep: {
++  environment?: string;
++  original_environment?: string;
++  production_environment?: boolean;
++  creator?: { login?: string } | null;
++  performed_via_github_app?: { slug?: string } | null;
++}): boolean {
++  if (!isVercelHostingDeployment(dep)) return false;
++  const env = draftEnvironmentIdentity(dep);
++  if (AUXILIARY_DRAFT_TOKEN_RE.test(env)) return false;
++  if (dep.production_environment === true) return true;
++  if (!env) return false;
++  return LIVE_ENVIRONMENT_NAMES.has(env);
++}
++
++/**
++ * Hostnames that are a Vercel (or other) Preview of Storybook / Chromatic /
++ * docs, not the customer site. Unparseable URLs are not verified sites.
++ */
++export function isAuxiliaryDraftUrl(url: string): boolean {
++  let hostname: string;
++  try {
++    hostname = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
++  } catch {
++    return true;
++  }
++  const tokens = hostname.split(".").flatMap((label) => label.split("-"));
++  return tokens.some(
++    (token) =>
++      token === "storybook" ||
++      token === "chromatic" ||
++      token === "styleguide" ||
++      token === "documentation" ||
++      token === "docs",
++  );
++}
++
++export const HOSTING_UNAVAILABLE_WARNING =
++  "I couldn't read hosting status, so I have no draft-site link from the platform.";
++
++export const AMBIGUOUS_DRAFT_WARNING =
++  "Hosting returned more than one draft for this version. I won't pick one and call it your site.";
++
++export const TRUNCATED_DRAFT_WARNING =
++  "I couldn't see every draft for this version, so I am not going to pick a link and call it your site.";
++
++export const AUXILIARY_DRAFT_WARNING =
++  "Hosting returned a draft link that was not your site, so I am not showing it.";
++
++export const UNVERIFIED_DRAFT_STATUS_WARNING =
++  "Hosting returned a draft status I cannot verify came from Vercel, so I am not showing it.";
++
++export const UNRECOGNIZED_DRAFT_STATUS_WARNING =
++  "Hosting returned a status I'm not treating as ready, so I'm not showing that link.";
++
++export const UNBOUND_DRAFT_PROJECT_WARNING =
++  "Hosting returned a draft, but I cannot verify it is your site, so I am not showing it.";
++
++export const FOREIGN_DRAFT_PROJECT_WARNING =
++  "Hosting returned a draft that is not your live site, so I am not showing it.";
++
++/**
++ * Owner-facing when the inspect-URL team slug is one of the known
++ * Chatterbuilt values below. This is a name match, not a proof that
++ * the customer owns the hosting — we only catch those known names.
++ */
++export const COMPANY_OWNED_PROJECT_WARNING =
++  "This draft is on a Chatterbuilt hosting account we know by name, not yours, so I am not showing it as your site. I only catch those known names, not whether you own the hosting.";
++
++export const SITE_COPY_UNCHANGED_REASON =
++  "I compared both versions of the site copy and found no change in the wording the site uses.";
++
++export const SITE_COPY_UNNAMED_REASON =
++  "I read both versions of the site copy and did not find a change in hours, services, the homepage headline, or other wording I know how to name. I won't guess which line it is.";
++
++export const UNLABELED_FILES_ONLY_REASON =
++  "I can see files in this draft, but I cannot tell whether they change the live site.";
++
++export const UNLABELED_FILES_ALSO_REASON =
++  "This draft also includes files I cannot tie to the live site.";
++
++export const AMBIGUOUS_LIVE_PROJECT_WARNING =
++  "Hosting has more than one live site on this repository, so I am not going to pick a draft and call it your site.";
++
++export const TRUNCATED_LIVE_PROJECT_WARNING =
++  "I couldn't see every live site for this repository, so I am not going to pick a draft and call it your site.";
++
++export const UNRESOLVED_LIVE_PROJECT_WARNING =
++  "I found a live site on this repository that I cannot identify, so I am not going to pick a draft and call it your site.";
++
++/**
++ * Vercel dashboard team + project as observed on an inspect URL.
++ * Not a `prj_` id — GitHub never sends those — but enough to tell two
++ * Vercel projects on the same repo apart.
++ */
++export type VercelProjectIdentity = {
++  team: string;
++  project: string;
++};
++
++/**
++ * Known Chatterbuilt-operated Vercel team slugs. STOPGAP, not ownership.
++ *
++ * Matching a draft inspect URL to this repo's unique production inspect
++ * URL only proves the two deploys share a team/project slug. It does
++ * not prove the requesting customer owns that Vercel project. A paid
++ * MCP account and a GitHub App repo grant are repository access, not
++ * Vercel ownership (spec §2.1: installation alone is not Vercel linkage).
++ *
++ * apps/mcp cannot close that gap today:
++ * - No customer Vercel Integration token, and no Vercel API client.
++ * - Dashboard's association resolver (PR #529) is the live repo↔project
++ *   authority, but apps/mcp and apps/dashboard are separate apps with
++ *   no workspace and no build-time import path.
++ * - update-bot installation tokens authorize the GitHub repo, not a
++ *   Vercel team. Vercel team-members / integration-configuration owner
++ *   fields require a Vercel bearer we do not have.
++ *
++ * This denylist therefore rejects two known company slugs only. A slug
++ * not in the set is not proven customer-owned. A renamed or new
++ * Chatterbuilt team is not caught. Do not treat a miss as ownership.
++ */
++const COMPANY_VERCEL_TEAM_SLUGS = new Set(["chatterbuilt", "the-aie"]);
++
++/**
++ * True when the inspect-URL team slug is a *known* Chatterbuilt value.
++ * False means "not one of those names", not "the customer owns this".
++ */
++export function isCompanyVercelTeamSlug(team: string): boolean {
++  return COMPANY_VERCEL_TEAM_SLUGS.has(team.trim().toLowerCase());
++}
++
++/**
++ * First path segments that are Vercel product pages, not a team slug.
++ * `docs/foo` must never parse as team `docs`.
++ */
++const VERCEL_RESERVED_TEAM_SLUGS = new Set([
++  "docs",
++  "new",
++  "account",
++  "integrations",
++  "deployments",
++  "login",
++  "signup",
++  "pricing",
++  "blog",
++  "templates",
++  "support",
++  "contact",
++  "about",
++  "dashboard",
++  "oss",
++  "security",
++  "legal",
++  "guides",
++  "help",
++  "cli",
++  "api",
++  "github",
++  "teams",
++  "home",
++  "design",
++  "enterprise",
++  "changelog",
++  "customers",
++  "partners",
++  "download",
++  "status",
++]);
++
++const VERCEL_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/;
++
++/**
++ * Parse team/project from a Vercel inspect URL. Unparseable, reserved,
++ * or auxiliary project slugs are not a customer-site identity.
++ */
++export function vercelProjectIdentityFromInspectUrl(
++  raw: string,
++): VercelProjectIdentity | null {
++  let parsed: URL;
++  try {
++    parsed = new URL(raw.trim());
++  } catch {
++    return null;
++  }
++  if (parsed.protocol !== "https:") return null;
++  const host = parsed.hostname.toLowerCase().replace(/\.$/, "");
++  if (host !== "vercel.com" && host !== "www.vercel.com") return null;
++  const parts = parsed.pathname.split("/").filter(Boolean);
++  if (parts.length < 2) return null;
++
++  let team: string;
++  let project: string;
++  const first = parts[0]?.toLowerCase() ?? "";
++  if (
++    first === "teams" &&
++    parts.length >= 4 &&
++    parts[2]?.toLowerCase() === "projects"
++  ) {
++    team = (parts[1] ?? "").toLowerCase();
++    project = (parts[3] ?? "").toLowerCase();
++  } else {
++    team = first;
++    project = (parts[1] ?? "").toLowerCase();
++    if (VERCEL_RESERVED_TEAM_SLUGS.has(team)) return null;
++  }
++  if (!VERCEL_SLUG_RE.test(team) || !VERCEL_SLUG_RE.test(project)) return null;
++  if (AUXILIARY_DRAFT_TOKEN_RE.test(project)) return null;
++  return { team, project };
++}
++
++export function vercelProjectIdentitiesEqual(
++  a: VercelProjectIdentity,
++  b: VercelProjectIdentity,
++): boolean {
++  return a.team === b.team && a.project === b.project;
++}
++
++function vercelProjectIdentityFromStatus(
++  status: GitHubDeploymentStatusJson,
++): VercelProjectIdentity | null {
++  if (!vercelStatusProvenance(status)) return null;
++  for (const candidate of [status.log_url, status.target_url]) {
++    if (typeof candidate !== "string" || !candidate.trim()) continue;
++    const identity = vercelProjectIdentityFromInspectUrl(candidate);
++    if (identity) return identity;
++  }
++  return null;
++}
++
++function uniqueVercelProjectIdentity(
++  identities: VercelProjectIdentity[],
++):
++  | { status: "unique"; identity: VercelProjectIdentity }
++  | { status: "none" }
++  | { status: "ambiguous" } {
++  const seen = new Map<string, VercelProjectIdentity>();
++  for (const identity of identities) {
++    seen.set(`${identity.team}/${identity.project}`, identity);
++  }
++  if (seen.size === 0) return { status: "none" };
++  if (seen.size !== 1) return { status: "ambiguous" };
++  const identity = [...seen.values()][0];
++  if (!identity) return { status: "none" };
++  return { status: "unique", identity };
++}
++
++export type DraftDeploymentPick<T> =
++  | { status: "picked"; deployment: T }
++  | { status: "none" }
++  | { status: "ambiguous" }
++  | { status: "truncated" };
++
++/**
++ * Filter SHA deployments down to at most one Preview-shaped candidate.
++ * Uniqueness is not a Vercel project binding — a lone Preview can still
++ * belong to a different project than this repository's unique production
++ * project. `getPreviewDeploy` binds the candidate by matching Vercel
++ * inspect URLs against that production identity. That match is not
++ * customer ownership of the Vercel project.
++ */
++export function pickCustomerDraftDeployment<
++  T extends {
++    environment?: string;
++    original_environment?: string;
++    production_environment?: boolean;
++    transient_environment?: boolean;
++    creator?: { login?: string } | null;
++    performed_via_github_app?: { slug?: string } | null;
++  },
++>(
++  deployments: T[],
++  options?: { listMayBeTruncated?: boolean },
++): DraftDeploymentPick<T> {
++  if (options?.listMayBeTruncated) return { status: "truncated" };
++  const candidates = deployments.filter(isDraftPreviewEnvironment);
++  if (candidates.length === 0) return { status: "none" };
++  if (candidates.length !== 1) return { status: "ambiguous" };
++  const deployment = candidates[0];
++  if (!deployment) return { status: "none" };
++  return { status: "picked", deployment };
++}
++
++const REPO_DEPLOY_PAGE_SIZE = 20;
++const REPO_DEPLOY_MAX_PAGES = 5;
++const MAX_PRODUCTION_STATUS_FETCHES = 10;
++
++type GhGet = (path: string) => Promise<{
++  ok: boolean;
++  status: number;
++  json: unknown;
++  text: string;
++}>;
++
++type ProductionProjectResolution =
++  | { status: "bound"; identity: VercelProjectIdentity }
++  | { status: "none" }
++  | { status: "ambiguous" }
++  | { status: "unavailable" }
++  | { status: "truncated" }
++  | { status: "unresolved" };
++
++/**
++ * The unique Vercel production project observed on this GitHub
++ * repository. That is not customer ownership of the project — only
++ * that production deploys on this repo share one inspect-URL identity.
++ * GitHub deployments carry no `projectId`; inspect URLs do
++ * (`vercel.com/{team}/{project}/...`). A truncated or multi-project
++ * production history is not a binding.
++ */
++async function resolveRepoProductionProjectIdentity(
++  ghGet: GhGet,
++  owner: string,
++  repo: string,
++): Promise<ProductionProjectResolution> {
++  const production: GitHubDeploymentJson[] = [];
++  let truncated = false;
++  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/deployments`;
++  for (let page = 1; page <= REPO_DEPLOY_MAX_PAGES; page++) {
++    const res = await ghGet(
++      `${repoPath}?per_page=${REPO_DEPLOY_PAGE_SIZE}&page=${page}`,
++    );
++    if (!res.ok || !Array.isArray(res.json)) {
++      return { status: "unavailable" };
++    }
++    const batch = res.json as GitHubDeploymentJson[];
++    for (const dep of batch) {
++      if (isCustomerSiteProductionDeployment(dep)) {
++        production.push(dep);
++      }
++    }
++    if (batch.length < REPO_DEPLOY_PAGE_SIZE) break;
++    if (page === REPO_DEPLOY_MAX_PAGES) truncated = true;
++  }
++  if (truncated) return { status: "truncated" };
++  if (production.length === 0) return { status: "none" };
++
++  const identities: VercelProjectIdentity[] = [];
++  const seen = new Set<number>();
++  let fetched = 0;
++  let unresolved = false;
++  for (const dep of production) {
++    if (seen.has(dep.id)) continue;
++    seen.add(dep.id);
++    if (!Number.isInteger(dep.id)) {
++      unresolved = true;
++      continue;
++    }
++    if (fetched >= MAX_PRODUCTION_STATUS_FETCHES) {
++      return { status: "truncated" };
++    }
++    fetched += 1;
++    const stRes = await ghGet(
++      `${repoPath}/${dep.id}/statuses?per_page=${STATUS_PAGE_SIZE}`,
++    );
++    if (!stRes.ok || !Array.isArray(stRes.json)) {
++      return { status: "unavailable" };
++    }
++    const statuses = stRes.json as GitHubDeploymentStatusJson[];
++    const latestVercel = latestVercelAuthoredStatus(statuses);
++    if (!latestVercel) {
++      if (statuses.length >= STATUS_PAGE_SIZE) {
++        return { status: "unavailable" };
++      }
++      unresolved = true;
++      continue;
++    }
++    // failure / error / pending / inactive / queued are not live-site
++    // evidence. A failed Production inspect URL must not become this
++    // repository's bound project so a later Preview from that same
++    // project can be called "Draft ready".
++    if (!isSuccessfulDeploymentStatus(latestVercel.state)) {
++      continue;
++    }
++    // Prefer the successful status's time (when it last succeeded),
++    // then the deployment's created_at. A timestamp we cannot read
++    // is not skippable — ignoring it would let a remaining identity
++    // look unique.
++    const evidenceMs = parseIsoTimestampMs(latestVercel.created_at)
++      ?? parseIsoTimestampMs(dep.created_at);
++    if (evidenceMs == null) {
++      unresolved = true;
++      continue;
++    }
++    if (!isRecentProductionEvidence(evidenceMs)) {
++      continue;
++    }
++    const identity = vercelProjectIdentityFromStatus(latestVercel);
++    if (!identity) {
++      unresolved = true;
++      continue;
++    }
++    identities.push(identity);
++  }
++
++  const unique = uniqueVercelProjectIdentity(identities);
++  // Two verified projects beat "also unresolved" — we already know the
++  // live-site identity is not unique.
++  if (unique.status === "ambiguous") return { status: "ambiguous" };
++  // A production deploy whose project we could not read is not evidence
++  // that the remaining identity is this repo's unique live project.
++  if (unresolved) return { status: "unresolved" };
++  if (unique.status === "unique") {
++    return { status: "bound", identity: unique.identity };
++  }
++  return { status: "none" };
++}
++
++function productionResolutionToDeploy(
++  resolution: Exclude<ProductionProjectResolution, { status: "bound" }>,
++): PreviewDeploy {
++  if (resolution.status === "unavailable") {
++    return {
++      url: null,
++      status: "unavailable",
++      warning: HOSTING_UNAVAILABLE_WARNING,
++    };
++  }
++  if (resolution.status === "truncated") {
++    return {
++      url: null,
++      status: "none",
++      warning: TRUNCATED_LIVE_PROJECT_WARNING,
++    };
++  }
++  if (resolution.status === "ambiguous") {
++    return {
++      url: null,
++      status: "none",
++      warning: AMBIGUOUS_LIVE_PROJECT_WARNING,
++    };
++  }
++  if (resolution.status === "unresolved") {
++    return {
++      url: null,
++      status: "none",
++      warning: UNRESOLVED_LIVE_PROJECT_WARNING,
++    };
++  }
++  return {
++    url: null,
++    status: "none",
++    warning: UNBOUND_DRAFT_PROJECT_WARNING,
++  };
++}
++
++// ---------------------------------------------------------------------------
++// Default GitHub REST client (read-only; injected in tests)
++// ---------------------------------------------------------------------------
++
++export function createGitHubPreviewDiffClient(
++  fetchImpl: typeof fetch = fetch,
++): PreviewDiffClient {
++  const token =
++    process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim() || "";
++
++  function headers(): Record<string, string> {
++    const h: Record<string, string> = {
++      Accept: "application/vnd.github+json",
++      "User-Agent": "ChatterbuiltPreviewDiff/1.0",
++      "X-GitHub-Api-Version": "2022-11-28",
++    };
++    if (token) h.Authorization = `Bearer ${token}`;
++    return h;
++  }
++
++  async function ghGet(path: string): Promise<{ ok: boolean; status: number; json: unknown; text: string }> {
++    const res = await fetchImpl(`https://api.github.com${path}`, {
++      method: "GET",
++      headers: headers(),
++    });
++    const text = await res.text().catch(() => "");
++    let json: unknown = null;
++    try {
++      json = text ? JSON.parse(text) : null;
++    } catch {
++      json = null;
++    }
++    return { ok: res.ok, status: res.status, json, text };
++  }
++
++  return {
++    async getPull({ owner, repo, number }) {
++      const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
++      const prPath = `${repoPath}/pulls/${number}`;
++      const [prRes, repoRes] = await Promise.all([
++        ghGet(prPath),
++        ghGet(repoPath),
++      ]);
++      if (!prRes.ok) {
++        throw new Error(
++          `GitHub API ${prRes.status} for pull #${number}: ${prRes.text.slice(0, 200) || "error"}`,
++        );
++      }
++      const pr = prRes.json as {
++        number: number;
++        title?: string;
++        state?: string;
++        merged?: boolean;
++        merged_at?: string | null;
++        changed_files?: number;
++        head?: { sha?: string; ref?: string };
++        base?: { sha?: string; ref?: string };
++      };
++      // Default branch is a proxy for production, not a Vercel mapping.
++      // A missing or unreadable value stays empty — publish fails closed.
++      let defaultBranch = "";
++      if (repoRes.ok && repoRes.json && typeof repoRes.json === "object") {
++        const name = (repoRes.json as { default_branch?: unknown })
++          .default_branch;
++        if (typeof name === "string") defaultBranch = name.trim();
++      }
++      const files: PreviewFile[] = [];
++      let filesTruncated = false;
++      for (let page = 1; page <= MAX_FILE_PAGES; page++) {
++        const filesRes = await ghGet(
++          `${prPath}/files?per_page=${FILES_PER_PAGE}&page=${page}`,
++        );
++        if (!filesRes.ok) {
++          throw new Error(
++            `GitHub API ${filesRes.status} for pull #${number} files: ${filesRes.text.slice(0, 200) || "error"}`,
++          );
++        }
++        if (!Array.isArray(filesRes.json)) {
++          throw new Error("Unexpected GitHub pull files response.");
++        }
++        const pageFiles = (
++          filesRes.json as Array<{
++            filename: string;
++            status?: string;
++            patch?: string;
++            previous_filename?: string;
++          }>
++        ).map((f) => ({
++          filename: f.filename,
++          status: f.status ?? "modified",
++          patch: typeof f.patch === "string" ? f.patch : undefined,
++          previousFilename: f.previous_filename,
++        }));
++        files.push(...pageFiles);
++        if (pageFiles.length < FILES_PER_PAGE) break;
++        if (page === MAX_FILE_PAGES) filesTruncated = true;
++      }
++
++      const changedFiles =
++        typeof pr.changed_files === "number" ? pr.changed_files : null;
++      if (changedFiles != null && files.length < changedFiles) {
++        filesTruncated = true;
++      }
++
++      const headSha = pr.head?.sha;
++      const baseSha = pr.base?.sha;
++      if (!headSha || !baseSha) {
++        throw new Error(
++          `GitHub pull #${number} is missing head or base SHA — cannot verify a diff.`,
++        );
++      }
++
++      let mergeBaseSha: string | null = null;
++      const compareRes = await ghGet(
++        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/compare/${encodeURIComponent(baseSha)}...${encodeURIComponent(headSha)}`,
++      );
++      if (compareRes.ok && compareRes.json && typeof compareRes.json === "object") {
++        const mergeSha = (
++          compareRes.json as { merge_base_commit?: { sha?: string } }
++        ).merge_base_commit?.sha;
++        if (typeof mergeSha === "string" && mergeSha) {
++          mergeBaseSha = mergeSha;
++        }
++      }
++
++      // PR metadata and /files are separate reads. Re-read the head SHA
++      // after both so a push between them cannot mix version A metadata
++      // with version B files. State and merged come from this same
++      // final read — a merge does not change the head SHA, so SHA-only
++      // confirmation would still treat a just-merged PR as pending.
++      const prAgain = await ghGet(prPath);
++      if (!prAgain.ok) {
++        throw new Error(
++          `GitHub API ${prAgain.status} for pull #${number}: ${prAgain.text.slice(0, 200) || "error"}`,
++        );
++      }
++      const latest = prAgain.json as {
++        state?: string;
++        merged?: boolean;
++        merged_at?: string | null;
++        head?: { sha?: string };
++        base?: { sha?: string; ref?: string };
++      } | null;
++      const headAgain = latest?.head?.sha;
++      const baseAgain = latest?.base?.sha;
++      const baseRefAgain = latest?.base?.ref;
++      // Head staying put is not enough: a stacked lower PR can land
++      // and advance the base while HEAD is unchanged. The merge base
++      // we just computed would then be stale. Base SHA staying put is
++      // also not enough: main and develop can share a tip, so a
++      // retarget would keep every SHA and still change the destination.
++      if (
++        !latest ||
++        !headAgain ||
++        headAgain !== headSha ||
++        !baseAgain ||
++        baseAgain !== baseSha ||
++        !sameGitBranchIdentity(pr.base?.ref, baseRefAgain)
++      ) {
++        throw new Error(
++          "The draft changed while I was reading it, so I am not going to describe a mix of two versions. Ask me to preview again.",
++        );
++      }
++
++      const merged = Boolean(latest.merged) || Boolean(latest.merged_at);
++      // Missing state is not "open". Inventing open is how a closed
++      // suggestion gets presented as a pending draft.
++      const state = typeof latest.state === "string" ? latest.state : "";
++
++      return {
++        number: pr.number,
++        title: typeof pr.title === "string" ? pr.title : "",
++        headSha,
++        baseSha,
++        headRef: pr.head?.ref ?? "",
++        baseRef:
++          typeof latest.base?.ref === "string"
++            ? latest.base.ref
++            : (pr.base?.ref ?? ""),
++        defaultBranch,
++        mergeBaseSha,
++        state,
++        merged,
++        changedFiles,
++        filesTruncated,
++        files,
++      };
++    },
++
++    async getFileAtRef({ owner, repo, path, ref }) {
++      const encodedPath = path
++        .split("/")
++        .filter(Boolean)
++        .map(encodeURIComponent)
++        .join("/");
++      const res = await ghGet(
++        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
++      );
++      if (!res.ok) return null;
++      const body = res.json as {
++        type?: string;
++        encoding?: string;
++        content?: string;
++        size?: number;
++      };
++      if (body.type !== "file") return null;
++      if (typeof body.size === "number" && body.size > MAX_FILE_BYTES) {
++        return null;
++      }
++      if (body.encoding !== "base64" || typeof body.content !== "string") {
++        return null;
++      }
++      try {
++        return Buffer.from(body.content.replace(/\s/g, ""), "base64").toString(
++          "utf8",
++        );
++      } catch {
++        return null;
++      }
++    },
++
++    async getPreviewDeploy({ owner, repo, sha }) {
++      const unavailable = (): PreviewDeploy => ({
++        url: null,
++        status: "unavailable",
++        warning: HOSTING_UNAVAILABLE_WARNING,
++      });
++      const res = await ghGet(
++        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/deployments?sha=${encodeURIComponent(sha)}&per_page=20`,
++      );
++      if (!res.ok) {
++        return unavailable();
++      }
++      if (!Array.isArray(res.json)) {
++        return unavailable();
++      }
++      if (res.json.length === 0) {
++        return { url: null, status: "none" };
++      }
++
++      const deployments = res.json as GitHubDeploymentJson[];
++      // GitHub returns newest-first. A full page may hide another
++      // preview environment — that would make "the draft" a guess.
++      const pick = pickCustomerDraftDeployment(deployments, {
++        listMayBeTruncated: deployments.length >= 20,
++      });
++      if (pick.status === "truncated") {
++        return { url: null, status: "none", warning: TRUNCATED_DRAFT_WARNING };
++      }
++      if (pick.status === "ambiguous") {
++        return { url: null, status: "none", warning: AMBIGUOUS_DRAFT_WARNING };
++      }
++      if (pick.status !== "picked" || !Number.isInteger(pick.deployment.id)) {
++        return { url: null, status: "none" };
++      }
++      const dep = pick.deployment;
++      const stRes = await ghGet(
++        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/deployments/${dep.id}/statuses?per_page=${STATUS_PAGE_SIZE}`,
++      );
++      if (!stRes.ok || !Array.isArray(stRes.json) || stRes.json.length === 0) {
++        return unavailable();
++      }
++      const statuses = stRes.json as GitHubDeploymentStatusJson[];
++      const latestVercel = latestVercelAuthoredStatus(statuses);
++      if (!latestVercel) {
++        if (statuses.length >= STATUS_PAGE_SIZE) {
++          return unavailable();
++        }
++        return {
++          url: null,
++          status: "none",
++          warning: UNVERIFIED_DRAFT_STATUS_WARNING,
++        };
++      }
++
++      // Bind the Preview to this repo's unique production Vercel
++      // identity. `{ ok: true }` means those identities match and the
++      // team slug is not a known Chatterbuilt value. It is not a
++      // verification that the requesting customer owns the project.
++      const bindToRepoProductionProject = async (): Promise<
++        { ok: true } | { ok: false; deploy: PreviewDeploy }
++      > => {
++        const draftIdentity = vercelProjectIdentityFromStatus(latestVercel);
++        if (!draftIdentity) {
++          return {
++            ok: false,
++            deploy: {
++              url: null,
++              status: "none",
++              warning: UNBOUND_DRAFT_PROJECT_WARNING,
++            },
++          };
++        }
++        if (isCompanyVercelTeamSlug(draftIdentity.team)) {
++          return {
++            ok: false,
++            deploy: {
++              url: null,
++              status: "none",
++              warning: COMPANY_OWNED_PROJECT_WARNING,
++            },
++          };
++        }
++        const production = await resolveRepoProductionProjectIdentity(
++          ghGet,
++          owner,
++          repo,
++        );
++        if (production.status !== "bound") {
++          return { ok: false, deploy: productionResolutionToDeploy(production) };
++        }
++        if (isCompanyVercelTeamSlug(production.identity.team)) {
++          return {
++            ok: false,
++            deploy: {
++              url: null,
++              status: "none",
++              warning: COMPANY_OWNED_PROJECT_WARNING,
++            },
++          };
++        }
++        if (!vercelProjectIdentitiesEqual(draftIdentity, production.identity)) {
++          return {
++            ok: false,
++            deploy: {
++              url: null,
++              status: "none",
++              warning: FOREIGN_DRAFT_PROJECT_WARNING,
++            },
++          };
++        }
++        return { ok: true };
++      };
++
++      const state = (latestVercel.state ?? "").toLowerCase();
++      if (state === "success") {
++        const url =
++          typeof latestVercel.environment_url === "string" &&
++          latestVercel.environment_url.trim()
++            ? latestVercel.environment_url.trim()
++            : null;
++        if (!url) return { url: null, status: "none" };
++        if (isAuxiliaryDraftUrl(url)) {
++          return {
++            url: null,
++            status: "none",
++            warning: AUXILIARY_DRAFT_WARNING,
++          };
++        }
++        const bound = await bindToRepoProductionProject();
++        if (!bound.ok) return bound.deploy;
++        return { url, status: "ready" };
++      }
++      if (state === "pending" || state === "in_progress" || state === "queued") {
++        const bound = await bindToRepoProductionProject();
++        if (!bound.ok) return bound.deploy;
++        return { url: null, status: "building" };
++      }
++      if (state === "failure" || state === "error") {
++        const bound = await bindToRepoProductionProject();
++        if (!bound.ok) return bound.deploy;
++        return { url: null, status: "failed" };
++      }
++      // inactive / waiting / anything else is not verified-absent. A URL
++      // on that status is withheld; saying hosting returned no link is false.
++      return {
++        url: null,
++        status: "none",
++        warning: UNRECOGNIZED_DRAFT_STATUS_WARNING,
++      };
++    },
++  };
++}
+diff --git a/apps/mcp/lib/rewind.ts b/apps/mcp/lib/rewind.ts
+index 2b75e47b..e67340a0 100644
+--- a/apps/mcp/lib/rewind.ts
++++ b/apps/mcp/lib/rewind.ts
+@@ -6,6 +6,14 @@
+  * after the owner approves the preview.
+  */
+ 
++import {
++  UNLABELED_FILE_LABEL,
++  plainFileLabel,
++  sectionsFromFiles,
++} from "./site-section-labels";
++
++export { plainFileLabel, sectionsFromFiles };
++
+ export type GitCommit = {
+   sha: string;
+   message: string;
+@@ -19,6 +27,8 @@ export type CompareFile = {
+   status: string;
+   additions?: number;
+   deletions?: number;
++  /** GitHub rename source. Omitted when the file is not a rename. */
++  previousFilename?: string | null;
+ };
+ 
+ export type GitHubCommitsClient = {
+@@ -204,71 +214,6 @@ export function firstLine(message: string): string {
+   return message.split(/\r?\n/)[0]?.trim() || "(no message)";
+ }
+ 
+-/**
+- * Map a changed file path to a plain-language site section label.
+- */
+-export function plainFileLabel(path: string): string {
+-  if (path === "content/site.ts" || path.endsWith("/content/site.ts")) {
+-    return "Site copy (content/site.ts)";
+-  }
+-  if (path.startsWith("content/kb") || path.includes("/content/kb")) {
+-    return "Knowledge base";
+-  }
+-  if (path.startsWith("content/") || path.includes("/content/")) {
+-    return `Content: ${path}`;
+-  }
+-  if (
+-    path.startsWith("app/") ||
+-    path.includes("/app/") ||
+-    path.startsWith("pages/")
+-  ) {
+-    return "App pages / layout";
+-  }
+-  if (path.startsWith("public/") || path.includes("/public/")) {
+-    return "Public assets (images, icons)";
+-  }
+-  if (
+-    path.startsWith("components/") ||
+-    path.includes("/components/") ||
+-    path.endsWith(".tsx") ||
+-    path.endsWith(".jsx")
+-  ) {
+-    return "UI components";
+-  }
+-  if (
+-    path === "package.json" ||
+-    path === "package-lock.json" ||
+-    path.endsWith("/package.json")
+-  ) {
+-    return "Dependencies";
+-  }
+-  if (path.includes("vercel") || path.includes("next.config")) {
+-    return "Deploy / Next config";
+-  }
+-  return path;
+-}
+-
+-/**
+- * Unique plain-language sections from a file list.
+- */
+-export function sectionsFromFiles(files: CompareFile[]): string[] {
+-  const seen = new Set<string>();
+-  const out: string[] = [];
+-  for (const f of files) {
+-    const label = plainFileLabel(f.filename);
+-    // Prefer short section labels without full paths when possible
+-    const section =
+-      label.startsWith("Content: ") || label === f.filename
+-        ? label
+-        : label;
+-    if (!seen.has(section)) {
+-      seen.add(section);
+-      out.push(section);
+-    }
+-  }
+-  return out;
+-}
+-
+ export type ParsedTarget =
+   | { kind: "last_change" }
+   | { kind: "sha"; sha: string }
+@@ -673,6 +618,7 @@ export function createGitHubCommitsClient(
+           status: string;
+           additions?: number;
+           deletions?: number;
++          previous_filename?: string;
+         }>;
+         ahead_by?: number;
+         behind_by?: number;
+@@ -684,6 +630,7 @@ export function createGitHubCommitsClient(
+           status: f.status,
+           additions: f.additions,
+           deletions: f.deletions,
++          previousFilename: f.previous_filename,
+         })),
+         aheadBy: data.ahead_by ?? 0,
+         behindBy: data.behind_by ?? 0,
+@@ -794,7 +741,7 @@ export async function rewindSite(
+   const fileRows = files.map((f) => ({
+     path: f.filename,
+     status: f.status,
+-    plainLabel: plainFileLabel(f.filename),
++    plainLabel: plainFileLabel(f.filename) ?? UNLABELED_FILE_LABEL,
+     additions: f.additions,
+     deletions: f.deletions,
+   }));
+diff --git a/apps/mcp/lib/site-section-labels.ts b/apps/mcp/lib/site-section-labels.ts
+new file mode 100644
+index 00000000..5df5e8c2
+--- /dev/null
++++ b/apps/mcp/lib/site-section-labels.ts
+@@ -0,0 +1,511 @@
++/**
++ * Owner-facing names for site files and content/site.ts fields.
++ *
++ * Single mapping used by rewind_site and preview_change. Labels speak the
++ * business ("your hours", "your services list") — never file paths, hunks,
++ * or line numbers.
++ */
++
++export type NamedFile = {
++  filename: string;
++  /** GitHub rename source. Omitted or empty when the file is not a rename. */
++  previousFilename?: string | null;
++};
++
++const IMAGE_EXTENSIONS = new Set([
++  "png",
++  "jpg",
++  "jpeg",
++  "gif",
++  "webp",
++  "avif",
++  "svg",
++  "ico",
++  "bmp",
++]);
++
++const IMAGE_ROUTE_STEMS = new Set([
++  "icon",
++  "apple-icon",
++  "opengraph-image",
++  "twitter-image",
++  "favicon",
++]);
++
++/**
++ * Source that actually runs. A path-based label for these would mark
++ * them classified for publish even though this tool cannot verify
++ * runtime behaviour — only `content/site.ts` is AST-diffed.
++ */
++const EXECUTABLE_SOURCE_EXTENSIONS = new Set([
++  "ts",
++  "tsx",
++  "js",
++  "jsx",
++  "mjs",
++  "cjs",
++  "mts",
++  "cts",
++  "mdx",
++]);
++
++/**
++ * Active static formats this tool never reads. Next/Vercel serves
++ * them on the customer origin. HTML/HTM can carry inline script, a
++ * credential-collection form, or a hidden route the main preview URL
++ * does not reveal. SVG can embed script. A path-based label would
++ * mark them classified and invite publish for a payload we never
++ * inspected.
++ */
++const UNVERIFIABLE_ACTIVE_STATIC_EXTENSIONS = new Set([
++  "html",
++  "htm",
++  "svg",
++]);
++
++function fileBasename(n: string): string {
++  const parts = n.split("/");
++  return parts[parts.length - 1] ?? n;
++}
++
++/**
++ * GitHub repository paths are already POSIX. A backslash is a literal
++ * filename character, not a directory separator — converting it would
++ * let `content\site.ts` impersonate `content/site.ts`.
++ */
++function normalizeRepoPath(path: string): string {
++  return path.replace(/^\.\//, "");
++}
++
++function fileStemAndExt(filename: string): { stem: string; ext: string } {
++  const i = filename.lastIndexOf(".");
++  if (i <= 0) return { stem: filename.toLowerCase(), ext: "" };
++  return {
++    stem: filename.slice(0, i).toLowerCase(),
++    ext: filename.slice(i + 1).toLowerCase(),
++  };
++}
++
++/**
++ * Site-root (or `src/`) directory. Nested copies under docs/, tests/,
++ * or another package are not the customer site.
++ */
++function customerSiteRest(n: string, dir: string): string | null {
++  if (n === dir) return "";
++  if (n.startsWith(`${dir}/`)) return n.slice(dir.length + 1);
++  const srcDir = `src/${dir}`;
++  if (n === srcDir) return "";
++  if (n.startsWith(`${srcDir}/`)) return n.slice(srcDir.length + 1);
++  return null;
++}
++
++/**
++ * True only for the customer site's `content/site.ts` (or `src/content/site.ts`).
++ * `examples/content/site.ts`, fixtures, and other packages are not that file.
++ */
++export function isCustomerSiteCopyPath(path: string): boolean {
++  const n = normalizeRepoPath(path);
++  return customerSiteRest(n, "content") === "site.ts";
++}
++
++function isImageFilePath(n: string): boolean {
++  const { stem, ext } = fileStemAndExt(fileBasename(n));
++  if (IMAGE_EXTENSIONS.has(ext)) return true;
++  return IMAGE_ROUTE_STEMS.has(stem);
++}
++
++function isExecutableSourcePath(n: string): boolean {
++  const { ext } = fileStemAndExt(fileBasename(n));
++  return EXECUTABLE_SOURCE_EXTENSIONS.has(ext);
++}
++
++function isUnverifiableActiveStaticPath(n: string): boolean {
++  const { ext } = fileStemAndExt(fileBasename(n));
++  return UNVERIFIABLE_ACTIVE_STATIC_EXTENSIONS.has(ext);
++}
++
++/**
++ * Manifest and hosting config whose contents this tool never inspects.
++ * package.json scripts can succeed in preview and fail or run something
++ * else in production; vercel.json can add production-only rewrites,
++ * headers, or cron. A path-based label would mark them classified.
++ */
++function isUnverifiableBuildConfigPath(n: string): boolean {
++  const base = fileBasename(n).toLowerCase();
++  return (
++    base === "package.json" ||
++    base === "package-lock.json" ||
++    base === "vercel.json"
++  );
++}
++
++/**
++ * True only when this file is a static asset or Next metadata image
++ * that the customer site actually serves. A screenshot in docs/ or a
++ * fixture under tests/ is not "a file in your photos and icons".
++ */
++function isCustomerSiteImagePath(n: string): boolean {
++  if (!isImageFilePath(n)) return false;
++  if (customerSiteRest(n, "public") != null) return true;
++  const { stem } = fileStemAndExt(fileBasename(n));
++  if (!IMAGE_ROUTE_STEMS.has(stem)) return false;
++  return (
++    customerSiteRest(n, "app") != null || customerSiteRest(n, "pages") != null
++  );
++}
++
++/**
++ * Owner-facing label when a changed file is in the repo but is not a
++ * surface we can defend as the live customer site. Never interpolated
++ * as "This updates …" — it is uncertainty, not a site effect.
++ */
++export const UNLABELED_FILE_LABEL = "files I cannot tie to the live site";
++
++/**
++ * Map a changed file path to a plain-language site section label.
++ * Returns null when the path is not a customer-site surface we can
++ * defend — callers must not invent a site effect for it.
++ * Never returns a file path.
++ */
++export function plainFileLabel(path: string): string | null {
++  const n = normalizeRepoPath(path);
++
++  const contentRest = customerSiteRest(n, "content");
++  if (contentRest === "site.ts") {
++    return "your site copy";
++  }
++  // Executable source is not a classified surface. A non-null label
++  // here would let a ready draft invite publish for a change this
++  // tool cannot verify (API routes, middleware, pages, helpers).
++  // The only executable file we AST-diff is content/site.ts above.
++  if (isExecutableSourcePath(n)) {
++    return null;
++  }
++  // HTML/HTM/SVG is the same class as executable source: served on
++  // the customer origin, contents never inspected. A label here
++  // would invite publish for a hidden public route this tool never
++  // read.
++  if (isUnverifiableActiveStaticPath(n)) {
++    return null;
++  }
++  // package.json scripts and vercel.json routing/headers/cron are
++  // the same class: unverifiable from the filename. A label here
++  // would invite publish for a change this tool never inspected.
++  if (isUnverifiableBuildConfigPath(n)) {
++    return null;
++  }
++  if (
++    contentRest === "kb" ||
++    (contentRest != null && contentRest.startsWith("kb/"))
++  ) {
++    return "your knowledge base";
++  }
++  // Other content/, app/, pages/, public/, and components/ files are
++  // not inspected. A path-based label (including the old "another
++  // part of the site" tree-membership fallback) would mark them
++  // classified and invite publish for a payload we never read —
++  // JSON configs, robots.txt, fonts, CSS, page leftovers after
++  // executable source is already rejected.
++  if (isCustomerSiteImagePath(n)) {
++    return "a file in your photos and icons";
++  }
++  return null;
++}
++
++/**
++ * True when the owner-facing label came from file location, not from
++ * parsed site-copy wording. Callers must not say "this updates" as if
++ * the page or layout behavior had been verified.
++ */
++export function isPathLocationLabel(label: string): boolean {
++  return (
++    label === "your site copy" ||
++    label === "your knowledge base" ||
++    label === "your other site content" ||
++    label === "your photos and icons" ||
++    label === "a file in your photos and icons" ||
++    label === "your pages and layout" ||
++    label === "a file in your pages and layout" ||
++    label === "your page layout" ||
++    label === "a file in your page layout" ||
++    label === "the site's dependencies" ||
++    label === "how the site is hosted" ||
++    label === "another part of the site"
++  );
++}
++
++/**
++ * Destination plus rename source. GitHub reports a rename as one file:
++ * `filename` is where it landed, `previousFilename` is where it left.
++ * Classification that only reads the destination drops the source
++ * surface from the summary.
++ */
++export function namedFilePaths(file: NamedFile): string[] {
++  const paths = [file.filename];
++  const previous = String(file.previousFilename ?? "").trim();
++  if (previous && previous !== file.filename) {
++    paths.push(previous);
++  }
++  return paths;
++}
++
++/**
++ * Unique plain-language sections from a file list. Unrecognized paths
++ * are omitted — they are not a named site section. A rename that
++ * crosses two classified surfaces contributes both labels.
++ */
++export function sectionsFromFiles(files: NamedFile[]): string[] {
++  const seen = new Set<string>();
++  const out: string[] = [];
++  for (const f of files) {
++    for (const path of namedFilePaths(f)) {
++      const section = plainFileLabel(path);
++      if (!section) continue;
++      if (!seen.has(section)) {
++        seen.add(section);
++        out.push(section);
++      }
++    }
++  }
++  return out;
++}
++
++export type FieldLabelOpts = {
++  /** Service name when the field lives on a services[] item. */
++  serviceName?: string;
++};
++
++/**
++ * Collapse untrusted site copy so it cannot open a new owner-facing line.
++ * Newlines and other controls become spaces; the words stay.
++ */
++export function flattenOwnerWhitespace(value: string): string {
++  return value
++    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ")
++    .replace(/\s+/g, " ")
++    .trim();
++}
++
++/**
++ * Consecutive keys at the START of the path. A match at any depth
++ * (`analytics.services.enabled`) is not a prefix — it would label
++ * an unrelated nested field as verified business content.
++ */
++function hasLeadingPrefix(
++  keys: readonly string[],
++  prefix: readonly string[],
++): boolean {
++  if (prefix.length === 0 || prefix.length > keys.length) return false;
++  return prefix.every((part, i) => keys[i] === part);
++}
++
++function hasLeadingKey(keys: readonly string[], name: string): boolean {
++  return keys[0] === name;
++}
++
++const HOURS_KEY_NAMES = new Set([
++  "hours",
++  "openinghours",
++  "openinghoursspecification",
++]);
++
++/**
++ * Shop hours live at top-level `hours` / `openingHours` /
++ * `openingHoursSpecification`, or under `contact` / `schema`. A
++ * nested `analytics.hours.trackingWindow` is not the owner's hours.
++ */
++function isOwnerHoursPath(keys: readonly string[]): boolean {
++  if (HOURS_KEY_NAMES.has(keys[0] ?? "")) return true;
++  if (
++    (keys[0] === "contact" || keys[0] === "schema") &&
++    HOURS_KEY_NAMES.has(keys[1] ?? "")
++  ) {
++    return true;
++  }
++  return false;
++}
++
++/**
++ * Address lives at top-level `address`, `contact.address`, or
++ * `schema.address`. A nested `analytics.address.geo` is not the
++ * shop address.
++ */
++function isOwnerAddressPath(keys: readonly string[]): boolean {
++  if (hasLeadingKey(keys, "address")) return true;
++  return (
++    hasLeadingPrefix(keys, ["contact", "address"]) ||
++    hasLeadingPrefix(keys, ["schema", "address"])
++  );
++}
++
++/**
++ * Phone lives at top-level `phone`, `contact.phone`, or `schema.phone`.
++ * A nested `analytics.phone` event name is not the shop number.
++ */
++function isOwnerPhonePath(keys: readonly string[]): boolean {
++  if (hasLeadingKey(keys, "phone")) return true;
++  return (
++    hasLeadingPrefix(keys, ["contact", "phone"]) ||
++    hasLeadingPrefix(keys, ["schema", "phone"])
++  );
++}
++
++/**
++ * Email lives at top-level `email`, `contact.email`, or `schema.email`.
++ * A nested `analytics.email` flag is not the shop inbox.
++ */
++function isOwnerEmailPath(keys: readonly string[]): boolean {
++  if (hasLeadingKey(keys, "email")) return true;
++  return (
++    hasLeadingPrefix(keys, ["contact", "email"]) ||
++    hasLeadingPrefix(keys, ["schema", "email"])
++  );
++}
++
++/**
++ * Owner vocabulary from object-key names only. Array identities are not
++ * keys — a service slug like `x].hours[` must not be able to impersonate
++ * the hours field.
++ *
++ * Section names are position-scoped to the schema location (leading
++ * key, or a known parent). Matching the word anywhere in the path
++ * would classify `analytics.services.enabled` as "your services list".
++ */
++export function labelForSiteObjectKeys(
++  keys: readonly string[],
++  opts: FieldLabelOpts = {},
++): string | null {
++  if (keys.length === 0) return null;
++  const lower = keys.map((k) => k.toLowerCase());
++  const last = lower[lower.length - 1] ?? "";
++  const secondLast = lower.length >= 2 ? lower[lower.length - 2] : "";
++  const service = flattenOwnerWhitespace(opts.serviceName ?? "");
++
++  // Exact key names only. A substring match on "openinghours" would
++  // label analytics.openingHoursEventName as "your hours" and treat
++  // an unnamed field as verified.
++  if (isOwnerHoursPath(lower)) {
++    return "your hours";
++  }
++
++  if (hasLeadingKey(lower, "services")) {
++    // SEO metadata before the generic description check —
++    // `services[].seo.description` is the search listing, not the
++    // visible service description.
++    if (
++      secondLast === "seo" &&
++      (last === "title" || last === "description")
++    ) {
++      return service
++        ? `the ${service} search listing`
++        : "a service search listing";
++    }
++    if (last === "description" || last === "shortdescription") {
++      return service
++        ? `the ${service} service description`
++        : "a service description";
++    }
++    if (last === "name") {
++      return service ? `the ${service} service name` : "a service name";
++    }
++    return "your services list";
++  }
++
++  if (hasLeadingKey(lower, "hero")) {
++    if (secondLast === "hero" && last === "headline") {
++      return "your homepage headline";
++    }
++    if (secondLast === "hero" && last === "subheadline") {
++      return "your homepage subheadline";
++    }
++    return "your homepage hero section";
++  }
++
++  if (hasLeadingKey(lower, "faq")) {
++    return "your FAQs";
++  }
++
++  if (isOwnerPhonePath(lower)) {
++    return "your phone number";
++  }
++  if (isOwnerEmailPath(lower)) {
++    return "your email";
++  }
++  if (isOwnerAddressPath(lower)) {
++    return "your address";
++  }
++
++  if (
++    (lower.length === 1 && last === "name") ||
++    (lower.length === 2 && lower[0] === "meta" && last === "name") ||
++    (lower.length === 1 && last === "businessname") ||
++    (lower.length === 2 && lower[0] === "meta" && last === "businessname")
++  ) {
++    return "your business name";
++  }
++  if (
++    (lower.length === 1 && last === "tagline") ||
++    (lower.length === 2 && lower[0] === "meta" && last === "tagline")
++  ) {
++    return "your tagline";
++  }
++
++  if (hasLeadingKey(lower, "nav")) {
++    return "your menu";
++  }
++  if (hasLeadingKey(lower, "process")) {
++    return "how you work";
++  }
++  if (hasLeadingKey(lower, "gallery")) {
++    return "your photo gallery";
++  }
++  if (hasLeadingKey(lower, "schedulesection")) {
++    return "your scheduling section";
++  }
++  if (hasLeadingKey(lower, "contactsection")) {
++    return "your contact section";
++  }
++  if (hasLeadingKey(lower, "reviews")) {
++    return "your reviews";
++  }
++  if (hasLeadingKey(lower, "trustbar")) {
++    return "your trust badges";
++  }
++
++  return null;
++}
++
++/**
++ * Map a content/site.ts field path to owner vocabulary.
++ * Returns null when the path is not a known owner-facing field — callers
++ * must not invent a name for it.
++ *
++ * Bracket groups are treated as array slots and dropped. Callers that
++ * have structured path segments must use `labelForSiteObjectKeys` so an
++ * array identity cannot inject extra keys.
++ */
++export function labelForSiteField(
++  fieldPath: string,
++  opts: FieldLabelOpts = {},
++): string | null {
++  const keys = fieldPath
++    .replace(/\[[^\]]*\]/g, ".")
++    .split(".")
++    .filter((part) => part.length > 0);
++  return labelForSiteObjectKeys(keys, opts);
++}
++
++/**
++ * True when a string looks like a file path, hunk header, or line number —
++ * the things owner-facing text must never contain.
++ */
++export function looksLikeFilePathOrHunk(text: string): boolean {
++  if (/\bcontent\/site\.ts\b/.test(text)) return true;
++  if (/\b(?:app|pages|public|components|content)\/[\w./-]+\.\w{1,8}\b/.test(text)) {
++    return true;
++  }
++  if (/^@@ /.test(text) || /\s@@\s/.test(text)) return true;
++  if (/\bpackage(?:-lock)?\.json\b/.test(text)) return true;
++  if (/\bnext\.config\.\w+\b/.test(text)) return true;
++  return false;
++}
+diff --git a/apps/mcp/lib/tool-catalog.ts b/apps/mcp/lib/tool-catalog.ts
+index 07832039..8b309113 100644
+--- a/apps/mcp/lib/tool-catalog.ts
++++ b/apps/mcp/lib/tool-catalog.ts
+@@ -50,6 +50,8 @@ export const TOOL_BLURBS: Record<string, string> = {
+   extract_site_skeleton: "pull structure from an existing site",
+   list_suggestions: "plain-language list of open PRs (preview only; never merges)",
+   get_suggestion: "one PR detail: files, conflict status, description (preview only)",
++  preview_change:
++    "plain-language what changed, before/after when readable, draft-site link only when hosting returned one",
+   check_suggestion_overlap:
+     "advisory soft-lock: open PRs that already touch paths you plan to edit",
+   prepare_agent_suggestion:
+diff --git a/apps/mcp/next.config.ts b/apps/mcp/next.config.ts
+index a3f66906..3e014aab 100644
+--- a/apps/mcp/next.config.ts
++++ b/apps/mcp/next.config.ts
+@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
+   turbopack: {
+     root: path.join(__dirname),
+   },
++  // typescript is a runtime parser for content/site.ts export binding.
++  // Do not bundle it into the serverless trace.
++  serverExternalPackages: ["typescript"],
+   // Ensure docs + presets ship with the MCP API route on Vercel.
+   outputFileTracingIncludes: {
+     "/api/[transport]": ["./content/**/*"],
+diff --git a/apps/mcp/package-lock.json b/apps/mcp/package-lock.json
+index dd98df7c..83a106af 100644
+--- a/apps/mcp/package-lock.json
++++ b/apps/mcp/package-lock.json
+@@ -15,6 +15,7 @@
+         "next": "16.2.11",
+         "react": "19.2.4",
+         "react-dom": "19.2.4",
++        "typescript": "^5",
+         "zod": "^4.4.3"
+       },
+       "devDependencies": {
+@@ -24,7 +25,6 @@
+         "@types/react-dom": "^19",
+         "eslint": "^9",
+         "eslint-config-next": "16.2.11",
+-        "typescript": "^5",
+         "vitest": "^3.2.7"
+       }
+     },
+@@ -8095,7 +8095,6 @@
+       "version": "5.9.3",
+       "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+       "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+-      "dev": true,
+       "license": "Apache-2.0",
+       "bin": {
+         "tsc": "bin/tsc",
+diff --git a/apps/mcp/package.json b/apps/mcp/package.json
+index c4dd36d1..e843be48 100644
+--- a/apps/mcp/package.json
++++ b/apps/mcp/package.json
+@@ -20,6 +20,7 @@
+     "next": "16.2.11",
+     "react": "19.2.4",
+     "react-dom": "19.2.4",
++    "typescript": "^5",
+     "zod": "^4.4.3"
+   },
+   "devDependencies": {
+@@ -29,7 +30,6 @@
+     "@types/react-dom": "^19",
+     "eslint": "^9",
+     "eslint-config-next": "16.2.11",
+-    "typescript": "^5",
+     "vitest": "^3.2.7"
+   }
+ }
+diff --git a/docs/active-work.md b/docs/active-work.md
+index c382835d..cafaa05e 100644
+--- a/docs/active-work.md
++++ b/docs/active-work.md
+@@ -59,4 +59,5 @@ Released: issue-548-cortex-acl-product-contract (PR #549 merged as d02b54314c8b7
+ | 2026-08-21T10:19Z | issue-509-b1-buzz-bridge | apps/buzz-bridge/**, docs/BUZZ-BRIDGE.md, docs/active-work.md, specs/buzz.md, .gibson-gate.json, .github/workflows/gibson-gate.yml, AGENTS.md | session:grok-lane-b1-buzz-bridge |
+ | 2026-08-21T21:29Z | issue-525-association-resolver | apps/dashboard/lib/association/**, docs/active-work.md | session:grok-lane-525 |
+ | 2026-08-21T21:29Z | issue-527-failure-surfacing | apps/dashboard/lib/failures/**, docs/active-work.md | session:grok-lane-527 |
++| 2026-08-24T12:00Z | issue-535-preview-diff | apps/mcp/lib/preview-diff*, apps/mcp/lib/site-section-labels*, apps/mcp/lib/rewind.ts, apps/mcp/lib/entitlements.ts, apps/mcp/lib/tool-catalog.ts, apps/mcp/app/api/[transport]/route.ts, marketing/content/{site.ts,platform-manifest.json}, docs/active-work.md | session:grok-lane-535 |
+ | 2026-08-24T23:40Z | issue-537-confirmation-voice | docs/VOICE.md, marketing/lib/issue-537-confirmation-voice.test.ts, marketing/lib/voice-guide-contract.test.ts, specs/provisioning-invisible-deployment.md, docs/active-work.md | session:grok-lane-537 |
+diff --git a/marketing/content/platform-manifest.json b/marketing/content/platform-manifest.json
+index a6ac4e43..bc367422 100644
+--- a/marketing/content/platform-manifest.json
++++ b/marketing/content/platform-manifest.json
+@@ -46,14 +46,15 @@
+       "extract_site_skeleton",
+       "list_suggestions",
+       "get_suggestion",
++      "preview_change",
+       "check_suggestion_overlap",
+       "prepare_agent_suggestion"
+     ]
+   },
+   "toolCount": {
+     "free": 27,
+-    "licensed": 15,
+-    "total": 42
++    "licensed": 16,
++    "total": 43
+   },
+   "products": [
+     {
+diff --git a/marketing/content/site.ts b/marketing/content/site.ts
+index 911daedc..c1452ad2 100644
+--- a/marketing/content/site.ts
++++ b/marketing/content/site.ts
+@@ -3609,6 +3609,12 @@ Never push production without my approval. Preview branch first; I merge when it
+               "One PR detail: files, conflict status, description (preview only)",
+             tier: "Full",
+           },
++          {
++            tool: "preview_change",
++            purpose:
++              "Plain-language what changed, before/after when readable, draft-site link only when hosting returned one",
++            tier: "Full",
++          },
+           {
+             tool: "check_suggestion_overlap",
+             purpose:
