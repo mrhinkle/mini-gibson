@@ -135,149 +135,145 @@ tested with Transformers and PEFT.
 We keep their datasets and results separate.
 
 35
-00:01:43,154 --> 00:01:43,329
-The
+00:01:43,187 --> 00:01:47,601
+Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch
 
 36
-00:01:43,329 --> 00:01:48,609
-Gibson is our process framework: define the task, isolate changes,
+00:01:47,601 --> 00:01:49,485
+of buffoons. We thought it was apropos.
 
 37
-00:01:48,816 --> 00:01:51,622
-run checks, and get independent review.
+00:01:49,485 --> 00:01:53,976
+Our Gibson defines tasks, isolates changes, runs checks, and requires
 
 38
-00:01:52,178 --> 00:01:55,760
-Gibson Environment is the foundation that runs tools and checks their
+00:01:53,976 --> 00:01:58,083
+independent review. Gibson Environment runs the tools and checks results.
 
 39
-00:01:55,760 --> 00:01:59,058
-results. Connecting it to this model is still ahead.
+00:01:58,148 --> 00:01:59,867
+Connecting the model is still ahead.
 
 40
-00:01:59,375 --> 00:02:04,193
-The model proposes repairs. Independent review and our approval rules stay
+00:01:59,867 --> 00:02:03,660
+The model proposes repairs; checks and approval rules stay in place.
 
 41
-00:02:04,193 --> 00:02:05,105
-in place.
-
-42
-00:02:05,311 --> 00:02:08,083
+00:02:03,660 --> 00:02:06,432
 This is our existing Agent Kontrol dashboard.
 
-43
-00:02:08,553 --> 00:02:13,438
+42
+00:02:06,901 --> 00:02:11,786
 It shows Claude, Grok, and Codex across the fleet: working, finished, or
 
-44
-00:02:13,438 --> 00:02:16,857
+43
+00:02:11,786 --> 00:02:15,205
 waiting for me. We can see where work gets stuck.
 
-45
-00:02:17,414 --> 00:02:21,050
+44
+00:02:15,763 --> 00:02:19,399
 The experiment asks whether a specialized model can reduce the work that
 
-46
-00:02:21,050 --> 00:02:22,147
+45
+00:02:19,399 --> 00:02:20,496
 needs our attention.
 
-47
-00:02:22,408 --> 00:02:26,231
+46
+00:02:20,757 --> 00:02:24,580
 For the seven B rehearsal, two hundred eighty-three source records became
 
-48
-00:02:26,231 --> 00:02:29,726
+47
+00:02:24,580 --> 00:02:28,075
 one hundred eighty-eight training rows and thirty development rows.
 
-49
-00:02:30,195 --> 00:02:34,141
+48
+00:02:28,544 --> 00:02:32,489
 Some examples were broken; others lost the answer at the token limit.
 
-50
-00:02:34,270 --> 00:02:37,261
+49
+00:02:32,618 --> 00:02:35,610
 We saved and reloaded a small LoRA adapter.
 
-51
-00:02:37,643 --> 00:02:41,794
+50
+00:02:35,992 --> 00:02:40,143
 The thirty B OpenHands track still needs its training-data record matched to
 
-52
-00:02:41,794 --> 00:02:43,440
+51
+00:02:40,143 --> 00:02:41,788
 the evaluated adapter.
 
-53
-00:02:43,996 --> 00:02:47,316
+52
+00:02:42,345 --> 00:02:45,665
 Our biggest lesson: a working connection isn't a finished job.
 
-54
-00:02:47,786 --> 00:02:51,685
+53
+00:02:46,134 --> 00:02:50,034
 The seven B adapter passed a required tool call, but failed a real
 
-55
-00:02:51,685 --> 00:02:57,205
+54
+00:02:50,034 --> 00:02:55,553
 repository change. Automatic mode returned prose; forced calls repeatedly
 
-56
-00:02:57,205 --> 00:03:00,426
+55
+00:02:55,553 --> 00:02:58,775
 targeted the wrong file. No edit was applied.
 
-57
-00:03:00,633 --> 00:03:05,004
+56
+00:02:58,982 --> 00:03:03,352
 In the separate thirty B development run, the base passed six of twenty-four
 
-58
-00:03:05,004 --> 00:03:07,754
+57
+00:03:03,352 --> 00:03:06,102
 tasks; the adapter passed twelve.
 
-59
-00:03:08,421 --> 00:03:10,854
+58
+00:03:06,769 --> 00:03:09,202
 Those are exploratory development results.
 
-60
-00:03:11,115 --> 00:03:15,354
+59
+00:03:09,464 --> 00:03:13,702
 We still need to match the training records, lock the comparison, and test
 
-61
-00:03:15,354 --> 00:03:20,075
+60
+00:03:13,702 --> 00:03:18,423
 on untouched tasks. Better quality and fewer human interruptions are still
 
-62
-00:03:20,075 --> 00:03:20,842
+61
+00:03:18,423 --> 00:03:19,191
 unproven.
 
-63
-00:03:21,050 --> 00:03:22,836
+62
+00:03:19,399 --> 00:03:21,184
 Three optional pieces could help.
 
-64
-00:03:23,153 --> 00:03:25,805
+63
+00:03:21,501 --> 00:03:24,153
 Nemo Gym would organize repeatable trials.
 
-65
-00:03:26,066 --> 00:03:30,252
+64
+00:03:24,415 --> 00:03:28,601
 Jev would turn locked results into advice for John and me to review.
 
-66
-00:03:30,722 --> 00:03:34,512
+65
+00:03:29,070 --> 00:03:32,861
 Langfuse would show the sequence of model calls, tools, and checks.
 
-67
-00:03:35,179 --> 00:03:38,456
+66
+00:03:33,528 --> 00:03:36,804
 Those connections are proposed; we're not claiming they're running.
 
-68
-00:03:39,012 --> 00:03:42,977
+67
+00:03:37,361 --> 00:03:41,326
 We want useful work that passes checks and independent review, with less
 
-69
-00:03:42,977 --> 00:03:44,610
+68
+00:03:41,326 --> 00:03:42,959
 chasing and rescuing from us.
 
-70
-00:03:44,774 --> 00:03:47,579
+69
+00:03:43,122 --> 00:03:45,928
 That's how we keep the human from becoming the bottleneck.
 
-71
-00:03:48,048 --> 00:03:49,923
+70
+00:03:46,397 --> 00:03:48,271
 Follow the repository on screen.

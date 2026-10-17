@@ -13,3 +13,5 @@ The JSON summary preserves model, adapter, control and source-result hashes. The
 Final held-out quality, reliable autonomous repository work, and reductions in human intervention remain pending.
 
 [Startup and dataset lessons](startup-lessons-source.json) identify Mark's firsthand report and the separately documented setup and data failures. The local logs do not independently establish provider overload as their root cause.
+
+[The Gibson naming origin](gibson-name-source.json) records Mark's movie reference and supplied film still. It is a presentation detail, not experimental evidence.

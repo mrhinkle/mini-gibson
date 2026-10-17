@@ -1,5 +1,4 @@
-<template>
-<style>@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:400;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:700;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/ArchivoBlack-Regular.ttf") format("truetype");font-weight:900;font-style:normal;}#root{position:relative;width:100%;height:100%;overflow:hidden;color:#F8FAFC;font-family:FilmSans;box-sizing:border-box;}
+<template><style>@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:400;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:700;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/ArchivoBlack-Regular.ttf") format("truetype");font-weight:900;font-style:normal;}#root{position:relative;width:100%;height:100%;overflow:hidden;color:#F8FAFC;font-family:FilmSans;box-sizing:border-box;}
 .frame-06-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .frame-06-eyebrow{position:absolute;left:100px;top:65px;font-size:24px;font-weight:700;letter-spacing:2px;color:#FF8F2D;}
 .frame-06-brand{position:absolute;left:100px;top:142px;width:190px;height:190px;object-fit:contain;}
@@ -17,10 +16,15 @@
 .frame-06-proposal{position:absolute;left:100px;top:776px;font-size:32px;font-weight:700;line-height:1.15;color:#B7C5D6;}
 .frame-06-pending{position:absolute;left:1080px;top:650px;font-size:28px;color:#FF8F2D;line-height:1.2;}
 .frame-06-verdict{position:absolute;left:1080px;top:711px;font-size:78px;font-weight:900;line-height:1.08;letter-spacing:-2px;}
-</style>
-<div data-hf-id="hf-dy9k" id="root" data-composition-id="frame-06" data-width="1920" data-height="1080" data-duration="22.157">
-<img data-hf-id="hf-ybfp" class="clip frame-06-bg" src="assets/navy-background.png" alt="" data-start="0" data-duration="22.157" data-track-index="0" id="frame-06-editable-1">
-<div data-hf-id="hf-iggq" class="frame-06-eyebrow">THE PROCESS</div>
+
+#frame-06-process,#frame-06-brand,#frame-06-headline,#frame-06-subtitle,#frame-06-task,#frame-06-change,#frame-06-checks,#frame-06-review,#frame-06-environment,#frame-06-pending,#frame-06-proposal,#frame-06-verdict{opacity:0}
+.frame-06-origin-title{position:absolute;left:100px;top:140px;margin:0;font-size:96px;line-height:1.04;letter-spacing:-3px;font-weight:900}
+.frame-06-still{position:absolute;left:100px;top:270px;width:960px;height:540px;object-fit:contain}
+.frame-06-movie{position:absolute;left:1140px;top:290px;font-size:27px;letter-spacing:2px;font-weight:700;color:#FF8F2D}
+.frame-06-joke{position:absolute;left:1140px;top:345px;font-size:53px;line-height:1.25;font-weight:700}
+.frame-06-punchline{position:absolute;left:1140px;top:650px;font-size:43px;line-height:1.18;font-weight:700;color:#FF8F2D}
+.frame-06-credit{position:absolute;left:100px;top:825px;font-size:22px;color:#B7C5D6}
+</style><div id="root" data-composition-id="frame-06" data-width="1920" data-height="1080" data-duration="20.5056462585034"><img id="frame-06-background" class="clip frame-06-bg" src="assets/navy-background.png" alt="" data-start="0" data-duration="20.5056462585034" data-track-index="0"><section id="frame-06-origin"><div class="frame-06-eyebrow">THE NAME / A LITTLE SELF-AWARENESS</div><h1 class="frame-06-origin-title">Why The Gibson?</h1><img class="frame-06-still" src="assets/hackers-gibson-still.png" alt="User-supplied still from Hackers showing the fictional computer operations team"><div class="frame-06-movie">HACKERS (1995)</div><div class="frame-06-joke">A ridiculous<br>supercomputer.<br>Run by a bunch<br>of buffoons.</div><div class="frame-06-punchline">We thought it<br>was apropos.</div><div class="frame-06-credit">Hackers (1995) · film still supplied by Mark</div></section><section id="frame-06-process"><div data-hf-id="hf-iggq" class="frame-06-eyebrow">THE PROCESS</div>
 <img data-hf-id="hf-dp27" class="frame-06-brand" id="frame-06-brand" src="assets/gibson-logo.png" alt="The Gibson">
 <h1 data-hf-id="hf-1yy1" class="frame-06-headline" id="frame-06-headline">The Gibson</h1>
 <div data-hf-id="hf-gm9t" class="frame-06-subtitle" id="frame-06-subtitle">An engineering process</div>
@@ -33,19 +37,4 @@
 <div data-hf-id="hf-api6" class="frame-06-pending" id="frame-06-pending">Model connection pending</div>
 <div data-hf-id="hf-eanl" class="frame-06-proposal" id="frame-06-proposal">The model proposes.</div>
 <div data-hf-id="hf-cxvl" class="frame-06-verdict" id="frame-06-verdict">Checks decide.</div>
-</div>
-<script>
-(function(){
-const tl=gsap.timeline({paused:true});
-const ids=['#frame-06-brand','#frame-06-headline','#frame-06-subtitle','#frame-06-task','#frame-06-change','#frame-06-checks','#frame-06-review','#frame-06-environment','#frame-06-pending','#frame-06-proposal','#frame-06-verdict'];
-tl.set(ids,{opacity:0},0);
-function enter(sel,t,y,d){tl.set(sel,{opacity:1},t);tl.fromTo(sel,{y:y},{y:0,duration:d,ease:'power4.out',immediateRender:false},t);}
-enter('#frame-06-brand',0.04,78,0.20);enter('#frame-06-headline',0.24,48,0.16);enter('#frame-06-subtitle',0.39,38,0.13);
-enter('#frame-06-task',2.55,55,0.18);enter('#frame-06-change',3.75,48,0.16);enter('#frame-06-checks',5.05,45,0.15);enter('#frame-06-review',6.25,40,0.14);
-enter('#frame-06-environment',8.6,62,0.18);enter('#frame-06-pending',12.1,44,0.15);enter('#frame-06-proposal',15.65,46,0.16);enter('#frame-06-verdict',18.15,75,0.20);
-['frame-06-path-1','frame-06-path-2','frame-06-path-3'].forEach(function(id,i){const p=document.getElementById(id);const n=p.getTotalLength();p.style.strokeDasharray=String(n);p.style.strokeDashoffset=String(n);tl.to(p,{strokeDashoffset:0,duration:0.6,ease:'power2.out'},[3.4,4.7,5.9][i]);});
-tl.to({},{duration:21.734},0);
-window.__timelines=window.__timelines||{};tl.to({},{duration:21.734},0);const revisedTimeline=gsap.timeline({paused:true});tl.timeScale(21.734/22.157);tl.paused(false);revisedTimeline.add(tl,0);window.__timelines["frame-06"]=revisedTimeline;
-})();
-</script>
-</template>
+</section></div><script>(function(){const tl=gsap.timeline({paused:true});tl.to('#frame-06-origin',{opacity:0,duration:.22},5.931132);tl.set('#frame-06-process',{opacity:1},6.211132);tl.fromTo('#frame-06-brand',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},6.231132);tl.fromTo('#frame-06-headline',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},6.231132);tl.fromTo('#frame-06-subtitle',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},6.231132);tl.fromTo('#frame-06-task',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},6.800000);tl.fromTo('#frame-06-change',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},7.895283);tl.fromTo('#frame-06-checks',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},9.133019);tl.fromTo('#frame-06-review',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},10.721698);tl.fromTo('#frame-06-environment',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},11.805660);tl.fromTo('#frame-06-pending',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},14.894340);tl.fromTo('#frame-06-proposal',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},16.613208);tl.fromTo('#frame-06-verdict',{opacity:0,y:24},{opacity:1,y:0,duration:.3,ease:'power3.out',immediateRender:false},18.278302);{const path=document.getElementById('frame-06-path-1');const n=path.getTotalLength();path.style.strokeDasharray=String(n);path.style.strokeDashoffset=String(n);tl.to(path,{strokeDashoffset:0,duration:.35,ease:'power2.out'},7.895283);}{const path=document.getElementById('frame-06-path-2');const n=path.getTotalLength();path.style.strokeDasharray=String(n);path.style.strokeDashoffset=String(n);tl.to(path,{strokeDashoffset:0,duration:.35,ease:'power2.out'},9.133019);}{const path=document.getElementById('frame-06-path-3');const n=path.getTotalLength();path.style.strokeDasharray=String(n);path.style.strokeDashoffset=String(n);tl.to(path,{strokeDashoffset:0,duration:.35,ease:'power2.out'},10.721698);}tl.to({},{duration:20.5056462585034},0);window.__timelines=window.__timelines||{};window.__timelines['frame-06']=tl;})();</script></template>

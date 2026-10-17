@@ -40,17 +40,17 @@ Visual: Opening: slow start, provider pressure and stalled builds; then transiti
 
 Voiceover: Getting started took longer than we expected. We hit overloaded providers and stalled builds. Once we got past that, we could run our datasets and learn from actual failures. Our seven B model completed twenty training steps on Brev, using one H one hundred and NeMo Automodel. Vee ell ell em serves that adapter and passed connection checks. Separately, thirty B Lightning has a loaded adapter and development results, tested with Transformers and PEFT. We keep their datasets and results separate.
 
-## Frame 6 — The Gibson: a process the model can learn
+## Frame 6 — Why The Gibson? / An engineering process
 
-Start: 103.154s. Duration: 22.157s.
+Start: 103.154s. Duration: 20.506s.
 
-Visual: The Gibson engineering-process diagram. Model connection remains pending.
+Visual: Supplied Hackers still and naming-origin joke; then transition to The Gibson logo, Task → Isolated change → Checks → Review. Model connection remains pending.
 
-Voiceover: The Gibson is our process framework: define the task, isolate changes, run checks, and get independent review. Gibson Environment is the foundation that runs tools and checks their results. Connecting it to this model is still ahead. The model proposes repairs. Independent review and our approval rules stay in place.
+Voiceover: Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos. Our Gibson defines tasks, isolates changes, runs checks, and requires independent review. Gibson Environment runs the tools and checks results. Connecting the model is still ahead. The model proposes repairs; checks and approval rules stay in place.
 
 ## Frame 7 — Agent Kontrol: where work waits for us
 
-Start: 125.311s. Duration: 17.097s.
+Start: 123.660s. Duration: 17.097s.
 
 Visual: Actual existing Agent Kontrol screenshot; working/finished/needs-you states.
 
@@ -58,7 +58,7 @@ Voiceover: This is our existing Agent Kontrol dashboard. It shows Claude, Grok, 
 
 ## Frame 8 — Good JSON wasn't enough.
 
-Start: 142.408s. Duration: 21.588s.
+Start: 140.757s. Duration: 21.588s.
 
 Visual: Good JSON was not enough: 283 source records become 188 train/30 development rows after filtering and real tokenization at 2,048 tokens. Separate 30B OpenHands training record remains unmatched.
 
@@ -66,7 +66,7 @@ Voiceover: For the seven B rehearsal, two hundred eighty-three source records be
 
 ## Frame 9 — A connection is not a finished job.
 
-Start: 163.996s. Duration: 37.054s.
+Start: 162.345s. Duration: 37.054s.
 
 Visual: Connection and required-tool checks pass, but real 7B coding task fails with no edit. Separate exploratory 30B development comparison: 6/24 base, 12/24 adapter. Final quality and human intervention remain unproven.
 
@@ -74,7 +74,7 @@ Voiceover: Our biggest lesson: a working connection isn't a finished job. The se
 
 ## Frame 10 — Optional extensions — still proposed
 
-Start: 201.050s. Duration: 17.962s.
+Start: 199.399s. Duration: 17.962s.
 
 Visual: Gym/Jev/Langfuse optional connections clearly proposed.
 
@@ -82,7 +82,7 @@ Voiceover: Three optional pieces could help. Nemo Gym would organize repeatable 
 
 ## Frame 11 — Keep the work moving.
 
-Start: 219.012s. Duration: 13.994s.
+Start: 217.361s. Duration: 13.994s.
 
 Visual: Keepworkmoving and public repository link; final quality gains pending.
 

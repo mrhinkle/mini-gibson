@@ -57,12 +57,12 @@
     },
     {
       "id": "06",
-      "duration_seconds": 22.157,
-      "screen_headline": "The Gibson: a process the model can learn",
-      "spoken": "The Gibson is our process framework: define the task, isolate changes, run checks, and get independent review. Gibson Environment is the foundation that runs tools and checks their results. Connecting it to this model is still ahead. The model proposes repairs. Independent review and our approval rules stay in place.",
-      "word_count": 50,
+      "duration_seconds": 20.505646,
+      "screen_headline": "Why The Gibson? / An engineering process",
+      "spoken": "Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos. Our Gibson defines tasks, isolates changes, runs checks, and requires independent review. Gibson Environment runs the tools and checks results. Connecting the model is still ahead. The model proposes repairs; checks and approval rules stay in place.",
+      "word_count": 57,
       "text_start": 1803,
-      "text_end": 2121,
+      "text_end": 2167,
       "start_seconds": 103.154
     },
     {
@@ -71,9 +71,9 @@
       "screen_headline": "Agent Kontrol: where work waits for us",
       "spoken": "This is our existing Agent Kontrol dashboard. It shows Claude, Grok, and Codex across the fleet: working, finished, or waiting for me. We can see where work gets stuck. The experiment asks whether a specialized model can reduce the work that needs our attention.",
       "word_count": 44,
-      "text_start": 2123,
-      "text_end": 2385,
-      "start_seconds": 125.311
+      "text_start": 2169,
+      "text_end": 2431,
+      "start_seconds": 123.659646
     },
     {
       "id": "08",
@@ -81,9 +81,9 @@
       "screen_headline": "Good JSON wasn't enough.",
       "spoken": "For the seven B rehearsal, two hundred eighty-three source records became one hundred eighty-eight training rows and thirty development rows. Some examples were broken; others lost the answer at the token limit. We saved and reloaded a small LoRA adapter. The thirty B OpenHands track still needs its training-data record matched to the evaluated adapter.",
       "word_count": 55,
-      "text_start": 2387,
-      "text_end": 2742,
-      "start_seconds": 142.408
+      "text_start": 2433,
+      "text_end": 2788,
+      "start_seconds": 140.756646
     },
     {
       "id": "09",
@@ -91,9 +91,9 @@
       "screen_headline": "A connection is not a finished job.",
       "spoken": "Our biggest lesson: a working connection isn't a finished job. The seven B adapter passed a required tool call, but failed a real repository change. Automatic mode returned prose; forced calls repeatedly targeted the wrong file. No edit was applied. In the separate thirty B development run, the base passed six of twenty-four tasks; the adapter passed twelve. Those are exploratory development results. We still need to match the training records, lock the comparison, and test on untouched tasks. Better quality and fewer human interruptions are still unproven.",
       "word_count": 88,
-      "text_start": 2744,
-      "text_end": 3307,
-      "start_seconds": 163.996
+      "text_start": 2790,
+      "text_end": 3353,
+      "start_seconds": 162.344646
     },
     {
       "id": "10",
@@ -101,25 +101,25 @@
       "screen_headline": "Optional extensions — still proposed",
       "spoken": "Three optional pieces could help. Nemo Gym would organize repeatable trials. Jev would turn locked results into advice for John and me to review. Langfuse would show the sequence of model calls, tools, and checks. Those connections are proposed; we're not claiming they're running.",
       "word_count": 44,
-      "text_start": 3309,
-      "text_end": 3590,
-      "start_seconds": 201.05
+      "text_start": 3355,
+      "text_end": 3636,
+      "start_seconds": 199.398646
     },
     {
       "id": "11",
-      "duration_seconds": 13.994,
+      "duration_seconds": 13.994354,
       "screen_headline": "Keep the work moving.",
       "spoken": "We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.",
       "word_count": 32,
-      "text_start": 3592,
-      "text_end": 3786,
-      "start_seconds": 219.012
+      "text_start": 3638,
+      "text_end": 3832,
+      "start_seconds": 217.360646
     }
   ],
-  "total_word_count": 607,
-  "total_duration_seconds": 233.006,
+  "total_word_count": 614,
+  "total_duration_seconds": 231.355,
   "synthesis_status": "Generated using confirmed Mark Hinkle voice ID; timestamp alignment from ElevenLabs",
   "narrative_revision": "2026-10-17: 7B vLLM pass/coding fail; separate30B Lightning v7 development6/24 vs12/24; provenance unresolved",
   "measurement_status": "Exploratory development counts only; final held-out quality and reduced human intervention remain unproven.",
-  "audio_duration_seconds": 230.005918
+  "audio_duration_seconds": 228.354558
 }

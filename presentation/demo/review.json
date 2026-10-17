@@ -1,22 +1,17 @@
 {
-  "checked_at_utc": "2026-10-17T20:26:52.772184+00:00",
+  "checked_at_utc": "2026-10-17T20:49:26.902330+00:00",
   "reviewer": "Claude, independent of Codex author",
-  "script": "PASS",
   "source_and_facts": "PASS",
-  "final_delta": "PASS",
-  "revision": "Provider slow start and concrete dataset lessons",
+  "revision": "Hackers naming origin and supplied film still",
   "reviewed_source_sha256": {
-    "presentation/demo/README.md": "ec27c949c6d012207889fae750f6db8f28c5d30651e55ab967d11a985c33443a",
-    "presentation/demo/project/index.html": "b496af839dd9c589dcfb504e5fcc5b67ef276c232f685656b1a47b106519d2da",
-    "presentation/demo/project/narration.txt": "69391ad1a222668428f583844ada001288c950e46709c514a36981e03a0c3486",
-    "presentation/demo/project/compositions/frames/frame-05.html": "f9e20bb3b265a80605bddb932fb84c005ac05475c3c244650696a7f3eb985e8d",
-    "presentation/demo/project/compositions/frames/frame-08.html": "0e0364652aaddd1f846b2e25575c02ebf53194bbdfe898aef8e9d111a2421d2f",
-    "presentation/demo/project/compositions/frames/frame-09.html": "05e784c17fd4e4797f11e76e57292fba1d2fb72bed0a7e287570d54a5b252e4e",
-    "presentation/demo/evidence/startup-lessons-source.json": "5506dc5aeef22a9a0f053c4e3a6dafaecd11a5911ac2c9ad5a4bc64ef467b1be",
-    "presentation/demo/project/frame.md": "fafca95861537e36d7a51893dd1a15f2de09309e64854e8e1e3f656cdd5be3d6",
-    "presentation/demo/project/compositions/frames/frame-11.html": "37561c95086d8a3f5942b0f30e63dc7a81383f97b65f539f9057d219160b49be"
+    "presentation/demo/project/narration.txt": "35dbd7c02ca7461b0194d8c1819f70d3241e9c431ae8fabfba7449404c89f053",
+    "presentation/demo/project/index.html": "4f8b6bc5c73955a353a81b556ec88785c0c3e25e38145a9af9a89bb802b0d785",
+    "presentation/demo/project/compositions/frames/frame-06.html": "99ccbdf274d0343d142c0e19408d998ac477beb5475efc01db41ae359aa9331f",
+    "presentation/demo/project/runtime-source-notes.txt": "498ec516c799f43a66a754717a4b88c889aa5e0a8c132caf84be4dcf6a7ae4a1"
   },
-  "measurement_metadata_sha256": "e18ba5bddc379665e6ac45415d68941e6ad401fbb854dce2e0813749b7a7b905",
-  "measurement_note": "Stale source level fields noted by reviewer were replaced with FFmpeg measurements of the new audio. Full decoded MP4 levels are in verification.json.",
-  "scope": "Source and fact review of this bounded revision, with previous reviewed experiment evidence retained. No training, inference, causal-quality or deployment approval."
+  "previous_review_commit": "d5feefa7ca6f5b32cfa0714982999e0e4fb108c7",
+  "previous_review_sha256": "65fde9f5af8f1f56df9a106be74bc432a664031c8ef2142e084ba93d926ac7b6",
+  "measurement_metadata_sha256": "c1fdc53ba269980b8bf9d8911a9bc14232e1f18c91a1990951fa29b66e49e594",
+  "measurement_note": "Source levels were refreshed with FFmpeg after the bounded narration edit. Decoded MP4 levels are in verification.json.",
+  "scope": "Independent source, timing, cue, claim and mechanism review of this bounded edit; visual stills inspected separately. Existing reviewed runtime evidence retained. No training, inference, quality-gain or deployment approval."
 }

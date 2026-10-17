@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-17",
+  "requested_by": "Mark Hinkle",
+  "naming_joke": "Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos.",
+  "interpretation": "Mark supplied this affectionate, self-deprecating joke about a fictional computer and its operators.",
+  "film": "Hackers (1995)",
+  "film_metadata": "https://tv.apple.com/us/movie/hackers/umc.cmc.4ug4r0vwr7og0d35al431d6zc",
+  "asset": "project/assets/hackers-gibson-still.png",
+  "asset_sha256": "cf60e7f4f8afcb1b6851c04de2101b1e2758ca068839fcf6b21bcb6c2e80ce3b",
+  "source_kind": "User-supplied film still, used to explain the project name; not represented as original or open-licensed project artwork."
+}

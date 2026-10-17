@@ -25,8 +25,12 @@ Final held-out quality, promotion readiness, reliable autonomous work and reduce
 
 ## Delivery
 
-ElevenLabs authorized clone,607 spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
+ElevenLabs authorized clone,614 spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
 
 ## Startup and lessons revision
 
 Mark reported that provider overload slowed the start. Logged build failures and an unavailable container image are separate documented setup problems; they do not independently diagnose provider capacity. Show the slow start, then the concrete lessons from filtering, tokenization and real coding-task checks. Keep 7B rehearsal and 30B development results separate, with final quality and human-intervention gains pending.
+
+## Why The Gibson?
+
+Mark requested a brief naming-origin joke using his supplied still from Hackers (1995). Use his self-deprecating description of a ridiculous supercomputer operated by buffoons, followed immediately by the real engineering-process explanation. The opinion is Mark's joke, not a factual evaluation of real people. The supplied still is film material, not an original or open-licensed project illustration. The MP4 export and existing review delivery remain authorized.
