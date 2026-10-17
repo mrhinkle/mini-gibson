@@ -1,0 +1,45 @@
+<template>
+<style>@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:400}@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:700}@font-face{font-family:FilmSans;src:url('assets/fonts/ArchivoBlack-Regular.ttf') format('truetype');font-weight:900}
+#root{position:relative;width:1920px;height:1080px;overflow:hidden;color:#F8FAFC;font-family:FilmSans;font-weight:400}*{box-sizing:border-box}.frame-03-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.frame-03-lay{position:absolute;inset:0}.frame-03-ey{position:absolute;left:100px;top:65px;font-size:24px;line-height:30px;letter-spacing:3px;font-weight:700;color:#FF8F2D}.frame-03-hd{position:absolute;left:100px;top:130px;margin:0;font-size:96px;line-height:1.04;letter-spacing:-3px;font-weight:900}.frame-03-sec{color:#B7C5D6}.frame-03-or{color:#FF8F2D}.frame-03-rail{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}.frame-03-rail path{fill:none;stroke:#FF8F2D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.frame-03-step{position:absolute;top:355px;width:280px;text-align:center}
+.frame-03-step-number{font-size:36px;line-height:1.2;letter-spacing:2px;color:#B7C5D6}
+.frame-03-step-label{margin-top:32px;font-size:48px;line-height:1.1;letter-spacing:-1.3px;font-weight:700}
+.frame-03-dot{position:absolute;left:132px;top:243px;width:16px;height:16px;border:2px solid #FF8F2D;border-radius:50%}
+#frame-03-read{left:100px}#frame-03-tool{left:450px}#frame-03-test{left:800px}#frame-03-repair{left:1150px}#frame-03-proof{left:1500px}
+#frame-03-rescue{position:absolute;left:620px;top:730px;width:640px;text-align:center;font-size:62px;font-weight:900;letter-spacing:-1.8px;line-height:1.04;color:#FF8F2D}
+</style>
+<div data-hf-id="hf-dhmn" id="root" data-composition-id="frame-03" data-width="1920" data-height="1080" data-duration="13.908">
+<img data-hf-id="hf-9wlf" class="clip frame-03-bg" data-start="0" data-duration="13.908" data-track-index="0" src="assets/navy-background.png" alt=""  id="frame-03-editable-1">
+<div data-hf-id="hf-ffbn" class="clip frame-03-lay" data-start="0" data-duration="13.908" data-track-index="1" id="frame-03-editable-2">
+<div data-hf-id="hf-cez6" class="frame-03-ey" id="frame-03-ey">THE PROBLEM</div>
+<h1 data-hf-id="hf-dhmk" class="frame-03-hd" id="frame-03-head">Everything comes back to me.</h1>
+<div data-hf-id="hf-vu80" class="frame-03-step" id="frame-03-read"><div data-hf-id="hf-imd3" class="frame-03-step-number">01</div><div data-hf-id="hf-cpt9" class="frame-03-step-label">Explain</div><div data-hf-id="hf-o2cp" class="frame-03-dot"></div></div>
+<div data-hf-id="hf-mwi2" class="frame-03-step" id="frame-03-tool"><div data-hf-id="hf-i822" class="frame-03-step-number">02</div><div data-hf-id="hf-lbq4" class="frame-03-step-label">Handoff</div><div data-hf-id="hf-8dzx" class="frame-03-dot"></div></div>
+<div data-hf-id="hf-typc" class="frame-03-step" id="frame-03-test"><div data-hf-id="hf-htr1" class="frame-03-step-number">03</div><div data-hf-id="hf-fn07" class="frame-03-step-label">Check</div><div data-hf-id="hf-9kx0" class="frame-03-dot"></div></div>
+<div data-hf-id="hf-0kub" class="frame-03-step" id="frame-03-repair"><div data-hf-id="hf-klw8" class="frame-03-step-number">04</div><div data-hf-id="hf-gaci" class="frame-03-step-label">Fix</div><div data-hf-id="hf-96lz" class="frame-03-dot"></div></div>
+<div data-hf-id="hf-0yn2" class="frame-03-step" id="frame-03-proof"><div data-hf-id="hf-k7l7" class="frame-03-step-number">05</div><div data-hf-id="hf-0vln" class="frame-03-step-label">Verify</div><div data-hf-id="hf-adj2" class="frame-03-dot"></div></div>
+<svg data-hf-id="hf-8uwh" class="frame-03-rail" viewBox="0 0 1920 1080"><path data-hf-id="hf-i911" id="frame-03-link1" d="M248 606 H582" /><path data-hf-id="hf-e4f7" id="frame-03-link2" d="M598 606 H932" /><path data-hf-id="hf-2p8a" id="frame-03-link3" d="M948 606 H1282" /><path data-hf-id="hf-bb39" id="frame-03-link4" d="M1298 606 H1632" /><path data-hf-id="hf-jvr9" id="frame-03-bottleneck" d="M940 614 V700" /></svg>
+<div data-hf-id="hf-srk6" id="frame-03-rescue">Waiting for me</div>
+</div>
+</div>
+<script>
+(function(){
+const tl=gsap.timeline({paused:true});
+function arrive(id,at,heavy=false){
+const el=document.getElementById(id);
+tl.set(el,{opacity:0},0);
+tl.set(el,{opacity:1},at);
+tl.fromTo(el,{y:heavy?72:44},{y:0,duration:heavy?0.19:0.15,ease:'power4.out',immediateRender:false},at);
+}
+function draw(id,at,duration=0.7){
+const el=document.getElementById(id);const len=el.getTotalLength();
+tl.set(el,{strokeDasharray:len,strokeDashoffset:len},0);
+tl.to(el,{strokeDashoffset:0,duration,ease:'power2.out'},at);
+}
+arrive('frame-03-ey',0.1);arrive('frame-03-head',0.05,true);arrive('frame-03-read',0.059199,true);arrive('frame-03-tool',1.585339);draw('frame-03-link1',1.585339,0.6);arrive('frame-03-test',3.041243);draw('frame-03-link2',3.041243,0.6);arrive('frame-03-repair',4.147970);draw('frame-03-link3',4.147970,0.6);arrive('frame-03-proof',6.116601,true);draw('frame-03-link4',6.116601,0.6);draw('frame-03-bottleneck',7.374838,0.7);arrive('frame-03-rescue',7.374838,true);
+tl.to({},{duration:13.955},0);
+window.__timelines=window.__timelines||{};tl.to({},{duration:13.955},0);const revisedTimeline=gsap.timeline({paused:true});tl.timeScale(13.955/13.908);tl.paused(false);revisedTimeline.add(tl,0);window.__timelines["frame-03"]=revisedTimeline;
+})();
+</script>
+</template>

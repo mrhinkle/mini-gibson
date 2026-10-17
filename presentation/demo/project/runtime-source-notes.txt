@@ -1,0 +1,18 @@
+Mini Gibson progress evidence, October17,2026
+
+# Exploratory Lightning development results
+
+The local v7 development run recorded **6 of 24 passing tasks for the base model** and **12 of 24 for the OpenHands-tuned adapter**. Both arms used the same pinned 30B Lightning model revision, fixture hashes, harness, prompt and tool contracts, and 10-turn / 512-token limits. The recorded outcomes include 8 tuned-only successes, 2 base-only successes, 4 shared successes, and 10 shared failures.
+
+These are development fixtures, reused during harness development. They are not final holdouts. Earlier v6 results on the same task identities were 4 of 24 versus 12 of 24 under a different harness; do not pool the attempts or select the more favorable comparison as a final score.
+
+The loaded adapter state was checked against the recorded export: 188 tensors, 6,749,696 parameters. This 30B evaluation used Transformers and PEFT. The separate 7B rehearsal provides the vLLM serving evidence.
+
+The matching NeMo AutoModel training configuration specifies 94 steps. A complete local training-step log was not recovered, and the exact data-manifest hash recorded by evaluation differs from the available preparation manifest. The local preparation manifest identifies `nvidia/SWE-Hero-openhands-trajectories`, revision `150bc119e52c647216fce285fd801f16b6fd745b`, and CC-BY-4.0; its 188 training / 30 development rows are preparation counts, not a verified run-input claim.
+
+The JSON summary preserves model, adapter, control and source-result hashes. The 48 sanitized row receipts retain task identities, result codes and hashes without conversation text, code diffs, credentials, private hostnames, local host paths or source corpus. They summarize existing execution records; this audit did not run the model.
+
+Final held-out quality, reliable autonomous repository work, and reductions in human intervention remain pending.
+
+7Brehearsal receiptSHA256:4a72d1d222f06d1385c061ca7d4154fe8f8621747d81ae488564a81335e0c4f6
+7B20distincttrainingmetricrecords and bothmetricfilehashes were locally checked;283source,188train/30dev at2048tokens. Source commitc240beb2e19555c7825a51f040ec78d390467aec includes the endpoint development report. No live model call was made by this demo revision.

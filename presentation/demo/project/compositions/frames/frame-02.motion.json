@@ -1,0 +1,17 @@
+{
+  "scene": "frame-02",
+  "duration_s": 29.269,
+  "rules": [
+    "waterfall-entry",
+    "svg-path-draw"
+  ],
+  "exit": {
+    "vector": "stationary 0 px/s",
+    "still_moving": false
+  },
+  "entry": {
+    "vector": "stationary 0 px/s",
+    "from_rest": true
+  },
+  "revision": "Human bottleneck narrative; established animation proportionally retimed"
+}

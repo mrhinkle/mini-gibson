@@ -1,0 +1,6 @@
+Mark Hinkle roles supplied by Mark: former Executive Director,Node.jsFoundation;VPDeveloperRelations,Cloud.com;VPMarketing,LinuxFoundation;co-founder,AllThingsAI.
+John Willis roles:co-author,TheDevOpsHandbook;VPTraining/Services,Opscode/Chef;Enstratius(acquiredbyDell);co-founder,SocketPlane(acquiredbyDocker).
+Public corroboration:https://devopsdays.org/events/2023-dallas/speakers/john-willis/
+https://www.usenix.org/conference/lisa15/speaker-or-organizer/john-willisnodefield-speakers-institution
+https://itsmacademy.com/content/webinar/How_AI_Will_IMpact_ITSM.pdf
+Portraits,logos,GitHubgraph anddashboard supplied/sourced for the existing presentation. InternalNotionreferences omitted.

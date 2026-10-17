@@ -1,0 +1,13 @@
+{
+  "provider": "ElevenLabs via authenticated Composio proxy",
+  "voice": "Mark Hinkle",
+  "audio_file": "assets/narration.mp3",
+  "duration_seconds": 216.781497,
+  "captions": "captions.srt",
+  "alignment": "assets/narration.alignment.json",
+  "mix_gain_db": 5,
+  "source_mean_db": -28.4,
+  "source_max_db": -6.7,
+  "predicted_mix_max_db": -1.7,
+  "narrative_revision": "Human bottleneck; completed 7B rehearsal; 30B plan; 2026-10-17"
+}

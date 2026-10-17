@@ -1,0 +1,50 @@
+{
+  "bytes": 22043621,
+  "sha256": "9ad6877399cdeb1b4b97b25c1723a49567a87de49ae6bb73c912dd8e479df20b",
+  "duration_seconds": 219.8,
+  "width": 1920,
+  "height": 1080,
+  "fps": "30/1",
+  "video_codec": "h264",
+  "pixel_format": "yuv420p",
+  "audio_codec": "aac",
+  "audio_sample_rate": "48000",
+  "audio_channels": 2,
+  "audio_volume_db": {
+    "mean_volume": -23.9,
+    "max_volume": -1.6
+  },
+  "full_decode": "passed",
+  "narration_sha256": "1a7e4b1b4506193675b788c816bd1098f0154a0daeb1ae7496691501779d6fb0",
+  "audio_sha256": "0711219fc98aee662946076af0f9169a0744328d114aa8f41ab03f28aa08f54c",
+  "claim_limits": "7BvLLMchecks passed per execution report; realcodingtaskfailed/noedit. Separate30BTransformers/PEFTv7developmentcounts6/24base,12/24adapter. Trainingrecordunresolved;finalheldoutquality/humaninterventiongainsunproven. No new GPU work performed for video.",
+  "preview_comparisons": [
+    {
+      "seconds": 7,
+      "ssim": 0.989825
+    },
+    {
+      "seconds": 40.5,
+      "ssim": 0.984465
+    },
+    {
+      "seconds": 95.5,
+      "ssim": 0.984257
+    },
+    {
+      "seconds": 154.5,
+      "ssim": 0.984796
+    },
+    {
+      "seconds": 186.5,
+      "ssim": 0.980455
+    },
+    {
+      "seconds": 219,
+      "ssim": 0.982226
+    }
+  ],
+  "capture_backend": "drawelement; hardwareGPU",
+  "hyperframes_version": "0.8.169",
+  "measured_quality_gains": "unproven; development observations only"
+}

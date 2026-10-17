@@ -1,8 +1,22 @@
 # Mini Gibson
 
-**Small Model. Serious Engineer.**
+**Keep the work moving.**
 
-Private preparation repository for the NVIDIA × Red Hat Small Models Hack, October 17–18, 2026.
+Experiment repository for the NVIDIA × Red Hat Small Models Hack, October 17–18, 2026.
+
+## Demo and current evidence
+
+The [narrated demo and editable project](presentation/demo/README.md) explain our
+question: can a specialized small model reduce the checking, coordination, and
+rescue that makes the human a development bottleneck?
+
+The reviewed records now include a completed 20-step 7B rehearsal, subsequent
+vLLM connection checks, a failed 7B repository coding attempt, and a separate
+30B Lightning development comparison: 6/24 base tasks passed versus 12/24 with
+an adapter. These are exploratory development results. The 30B training-data
+record still needs reconciliation; final held-out quality and reductions in
+human intervention remain unproven. See the demo's
+[sanitized evidence](presentation/demo/evidence/README.md) for the boundaries.
 
 ## Question
 
@@ -43,7 +57,9 @@ completed training and model results require separate run receipts.
 - Negative results are valid.
 - Reproducibility is a deliverable.
 
-Private preparation repo: do not publish holdouts, private historical data, secrets, or training artifacts without an explicit release decision.
+Holdouts, source training data, secrets, and model artifacts require their own
+release decision. The public demo package contains selected evidence summaries,
+not a corpus or model release.
 
 ## Optional Jev advice
 

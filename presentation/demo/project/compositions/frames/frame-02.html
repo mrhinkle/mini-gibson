@@ -1,0 +1,61 @@
+<template>
+<style>@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:400}@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:700}@font-face{font-family:FilmSans;src:url('assets/fonts/ArchivoBlack-Regular.ttf') format('truetype');font-weight:900}
+#root{position:relative;width:1920px;height:1080px;overflow:hidden;color:#F8FAFC;font-family:FilmSans;font-weight:400}*{box-sizing:border-box}.frame-02-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.frame-02-lay{position:absolute;inset:0}.frame-02-ey{position:absolute;left:100px;top:65px;font-size:24px;line-height:30px;letter-spacing:3px;font-weight:700;color:#FF8F2D}.frame-02-hd{position:absolute;left:100px;top:130px;margin:0;font-size:96px;line-height:1.04;letter-spacing:-3px;font-weight:900}.frame-02-sec{color:#B7C5D6}.frame-02-or{color:#FF8F2D}.frame-02-rail{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}.frame-02-rail path{fill:none;stroke:#FF8F2D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.frame-02-portrait{position:absolute;top:310px;width:280px;height:365px;overflow:hidden}
+.frame-02-portrait img{width:100%;height:100%;object-fit:cover}
+#frame-02-mark-photo{left:100px}#frame-02-mark-photo img{object-position:center 30%}
+#frame-02-john-photo{left:1000px}#frame-02-john-photo img{object-position:50% 35%}
+.frame-02-name{position:absolute;top:335px;margin:0;font-size:68px;line-height:1.03;letter-spacing:-2px;font-weight:900;max-width:500px}
+#frame-02-mark-name{left:430px}#frame-02-john-name{left:1330px}
+.frame-02-role{position:absolute;top:435px;font-size:30px;line-height:1.3;color:#B7C5D6;width:450px}
+#frame-02-mark-role{left:430px}#frame-02-john-role{left:1330px}
+.frame-02-lens{position:absolute;top:570px;font-size:32px;line-height:1.2;color:#FF8F2D;max-width:450px;font-weight:700}
+#frame-02-builder{left:430px}#frame-02-delivery{left:1330px}
+#frame-02-standard{position:absolute;left:100px;top:760px;font-size:48px;letter-spacing:-1px;line-height:1.1;font-weight:700}
+
+.frame-02-portrait{width:220px;height:330px}
+.frame-02-name{top:330px;font-size:64px;max-width:550px}
+#frame-02-mark-name,#frame-02-mark-role,#frame-02-builder{left:370px}
+#frame-02-john-name,#frame-02-john-role,#frame-02-delivery{left:1270px}
+.frame-02-role{top:430px;font-size:26px;line-height:1.42;width:550px}
+.frame-02-lens{top:630px;font-size:28px;max-width:550px}
+#frame-02-standard{font-size:44px;width:1720px}
+</style>
+<div data-hf-id="hf-e3n9" id="root" data-composition-id="frame-02" data-width="1920" data-height="1080" data-duration="29.269">
+<img data-hf-id="hf-lzfo" class="clip frame-02-bg" data-start="0" data-duration="29.269" data-track-index="0" src="assets/navy-background.png" alt=""  id="frame-02-editable-1">
+<div data-hf-id="hf-mbte" class="clip frame-02-lay" data-start="0" data-duration="29.269" data-track-index="1" id="frame-02-editable-2">
+<div data-hf-id="hf-a9yx" class="frame-02-ey" id="frame-02-ey">THE BUILDERS</div>
+<h1 data-hf-id="hf-tdqj" class="frame-02-hd" id="frame-02-head">Back at the keyboard.</h1>
+<div data-hf-id="hf-labb" class="frame-02-portrait" id="frame-02-mark-photo"><img data-hf-id="hf-ogle" src="assets/mark.jpg" alt="Mark Hinkle" /></div>
+<h2 data-hf-id="hf-vpsb" class="frame-02-name" id="frame-02-mark-name">Mark Hinkle</h2>
+<div data-hf-id="hf-4d8e" class="frame-02-role" id="frame-02-mark-role">Executive Director · Node.js Foundation<br>VP, Developer Relations · Cloud.com<br>VP, Marketing · Linux Foundation<br>Co-founder · All Things AI</div>
+<div data-hf-id="hf-vnsz" class="frame-02-portrait" id="frame-02-john-photo"><img data-hf-id="hf-b11n" src="assets/john.jpg" alt="John Willis" /></div>
+<h2 data-hf-id="hf-ucgg" class="frame-02-name" id="frame-02-john-name">John Willis</h2>
+<div data-hf-id="hf-st7y" class="frame-02-role" id="frame-02-john-role">VP, Training &amp; Services · Opscode/Chef<br>VP, Solutions · Enstratius → Dell<br>Co-founder · SocketPlane → Docker<br>Co-author · The DevOps Handbook</div>
+<div data-hf-id="hf-bhri" class="frame-02-lens" id="frame-02-builder">Open source + developer communities</div>
+<div data-hf-id="hf-ubcy" class="frame-02-lens" id="frame-02-delivery">DevOps + software delivery</div>
+<svg data-hf-id="hf-6m1m" class="frame-02-rail" viewBox="0 0 1920 1080"><path data-hf-id="hf-6pfv" id="frame-02-rule" d="M100 720 H1820" /></svg>
+<div data-hf-id="hf-x5ds" id="frame-02-standard">Today, the old guys are dusting off their keyboards.</div>
+</div>
+</div>
+<script>
+(function(){
+const tl=gsap.timeline({paused:true});
+function arrive(id,at,heavy=false){
+const el=document.getElementById(id);
+tl.set(el,{opacity:0},0);
+tl.set(el,{opacity:1},at);
+tl.fromTo(el,{y:heavy?72:44},{y:0,duration:heavy?0.19:0.15,ease:'power4.out',immediateRender:false},at);
+}
+function draw(id,at,duration=0.7){
+const el=document.getElementById(id);const len=el.getTotalLength();
+tl.set(el,{strokeDasharray:len,strokeDashoffset:len},0);
+tl.to(el,{strokeDashoffset:0,duration,ease:'power2.out'},at);
+}
+arrive('frame-02-head',0.05,true);arrive('frame-02-ey',0.08);arrive('frame-02-mark-photo',0.18,true);arrive('frame-02-mark-name',0.37,true);arrive('frame-02-mark-role',1.466301);arrive('frame-02-john-photo',6.159439,true);arrive('frame-02-john-name',6.159439,true);arrive('frame-02-john-role',7.593770);arrive('frame-02-builder',12.148189);arrive('frame-02-delivery',12.148189);draw('frame-02-rule',12.148189,0.8);arrive('frame-02-standard',14.407246,true);
+tl.to({},{duration:15.86},0);
+window.__timelines=window.__timelines||{};tl.to({},{duration:15.86},0);const revisedTimeline=gsap.timeline({paused:true});tl.timeScale(15.86/29.269);tl.paused(false);revisedTimeline.add(tl,0);window.__timelines["frame-02"]=revisedTimeline;
+})();
+</script>
+</template>

@@ -1,0 +1,1 @@
+1920x1080,30fps; navy/off-white/orange fine-line backgrounds; Arimo400/700 and ArchivoBlack900. Preserve actual screenshots/logos, readable titles, one caption lane, and explicit development-only/final-quality-pending labels. Narration remains under4minutes.

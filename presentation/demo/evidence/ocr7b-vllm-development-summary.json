@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "DEV_OBSERVATIONAL_NOT_SCORED",
+  "evidence_type": "local execution report, not fresh runtime probe",
+  "source_report_relative_path": "docs/evidence/brev-ocr7b-endpoint-development-run-2026-10-17.md",
+  "source_report_sha256": "4d1f11fef3c54dbceba0f3ea01b9293cd75089c960e7b1d32cdf66018d85bff4",
+  "model": "nvidia/OpenCodeReasoning-Nemotron-7B",
+  "revision": "3baa2a3d73bbca12483ad19fef7babdcb2222987",
+  "adapter_sha256": "c463ca6137f45fe6c7f75cff9631cd7cdf54826fcaafec2fa9e7eaa0803567a4",
+  "vllm_version": "0.11.0",
+  "vllm_image_digest": "sha256:014a95f21c9edf6abe0aea6b07353f96baa4ec291c427bb1176dc7c93a85845c",
+  "scope": "exact prior20-step7B rehearsal adapter; separate from30BLightning/OpenHands track",
+  "checks": {
+    "health": "PASS",
+    "base_and_adapter_model_listing": "PASS",
+    "exact_deterministic_chat": "PASS",
+    "required_structured_read_file_call": "PASS",
+    "repository_nonce_tool_smoke": "PASS",
+    "agent_selected_repository_tool_use": "FAIL",
+    "end_to_end_repository_coding_task": "FAIL"
+  },
+  "model_generated_file_changes": 0,
+  "live_smoke_request_sha256": "08a9d2984215126b690325a76a2a9751af8b29dfec891bd986036c95f4b7a8f1",
+  "live_smoke_response_sha256": "83589860a2ce390ad272ee693deb16caf147cc753afb73be09042390c6b81b74",
+  "claim_boundary": "Serving and parser transport passed; autonomous repository coding and held-out quality gains not established."
+}
