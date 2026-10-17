@@ -1,27 +1,65 @@
 {
-  "schema_version": 1,
-  "checkpointed_at": "2026-10-17T21:42:30Z",
+  "schema_version": 2,
+  "checkpointed_at": "2026-10-17T23:54:06Z",
   "repository": "mrhinkle/mini-gibson",
-  "main_sha": "23b4c28a25a2bd1cff03b9c39ce2ec4bb3d6a24d",
+  "main_sha_at_evidence_cutoff": "3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374",
   "recovery_document": "docs/FINAL-LOOP-RECOVERY.md",
+  "status_report": "docs/evidence/mini-gibson-final-loop-2026-10-17.md",
+  "experiment_status": "blocked_external_brev_credits",
   "final_holdout_state": "sealed",
-  "active_brev_instance": {
-    "name": "mini-gibson-lightning-ft",
-    "id": "3f81y01fz",
-    "machine": "hyperstack_H100x2",
-    "action_policy": "do_not_stop_or_delete_without_fresh_explicit_confirmation"
+  "active_gpu_hourly_cost_usd": 0,
+  "brev": {
+    "listed_instances": [
+      {
+        "name": "weird-white-ocelot",
+        "id": "ds7uiptfk",
+        "machine": "a100-80gb.2x",
+        "gpu": "A100",
+        "status": "STOPPED",
+        "build_status": "COMPLETED",
+        "shell_status": "NOT READY"
+      }
+    ],
+    "connect_nodes": [],
+    "missing_previous_instances": [
+      "mini-gibson-lightning-ft",
+      "mini-gibson-ocr7b-lora"
+    ],
+    "last_start_attempt": "failed_account_credits_exhausted",
+    "action_policy": "do_not_purchase_create_stop_or_delete_without_fresh_explicit_confirmation"
   },
-  "adapter_archive": {
-    "remote_path": "/ephemeral/mini-gibson-lightning/exports/mini-gibson-lightning-20261017.tgz",
-    "sha256": "75881702a163aa163cc3cfc7270c298bc1c4b0e84587b8fb2348d84c1a42c7ef",
-    "path_list_sha256": "cf5ea3b6de49934d523f8272a1a67c85b8f891bd4f17962d4c78c81d0d0112ed",
-    "offline_reload_smoke": "pass"
+  "merged_prs": {
+    "18": "7ad03e97f96b5d53fa6a1cd7a892743a738beb37",
+    "26": "d7d5eace68679c5dbd7ce82d48b1b621f2eb3308",
+    "27": "3ff5dfdc37835b8db658e3f2e805e02b231be473",
+    "28": "91b5c4aa110e5b5131061408c9508d372220f7ca",
+    "29": "3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374"
   },
-  "in_progress_branches": [
-    "codex/rebench-docker-backend-20261017",
-    "codex/rebench-cohort-freeze-20261017",
-    "codex/demo-progress-20261017"
-  ],
-  "resume_stage": "finish_hardened_backend_then_freeze_disjoint_pilot_and_dev_cohort",
-  "remote_final_loop_root": "/ephemeral/mini-gibson-lightning/final-loop-20261017"
+  "frozen_source": {
+    "dataset": "nebius/SWE-rebench-V2",
+    "revision": "10483de0f50fe5da545942705a76c6150171af7f",
+    "parquet_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "rows": 32079,
+    "eligible_before_exclusions": 17822
+  },
+  "frozen_cohorts": {
+    "pilot_tasks": 24,
+    "development_tasks_per_cohort": 144,
+    "development_cohorts": 3,
+    "formal_maximum_tasks": 432,
+    "total_frozen_tasks": 456,
+    "sequential_plan_file_sha256": "28c92eab536d2bd0cae6dc1596ae4fca245d7ba005caf15d355d6dc22cc3df9e",
+    "sequential_plan_canonical_sha256": "961ee3c99b89248316f34dcbf8b30caa32291aebb5b239f8a2523634abbd6427",
+    "pre_plan_exclusions_file_sha256": "5660348a58783a6e600db8b5864eec301fddc8c351d39061c8adffb13f01aad8",
+    "pre_plan_exclusions_canonical_sha256": "e683db581e7db3a773793b08b1edb2e9fc769e15f43ea9e8cd8c0a9c3e47b454",
+    "freeze_evidence_sha256": "ca1ba1c045a883ef256ee74f45fe21d6a7d24e8962715275d6bb4fc847271210"
+  },
+  "verification": {
+    "full_pytest": 281,
+    "independent_review": "PASS",
+    "docker_qualification_started": false,
+    "v2_training_started": false,
+    "formal_v2_outcomes_observed": false
+  },
+  "resume_stage": "restore_brev_credits_then_seal_and_qualify_456_candidates"
 }
