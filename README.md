@@ -24,6 +24,16 @@ Planned comparison:
 
 The causal protocol is not frozen until the Claude-led Kimi K3 + GLM-5.2 steelman review is complete.
 
+## Brev training environment
+
+Our hackathon training environment is an NVIDIA H100 (80 GB) instance on Brev.
+The [October 17 environment evidence](docs/evidence/brev-h100-2026-10-17.md)
+preserves the team-supplied console screenshot and the hardware shown there.
+At capture, the instance was **Building** and the environment was **Waiting**;
+completed training and model results require separate run receipts.
+
+![NVIDIA Brev console showing the H100 80 GB instance during initialization](docs/evidence/assets/brev-h100-2026-10-17.png)
+
 ## Principles
 
 - The model cannot award itself `VERIFIED`.
