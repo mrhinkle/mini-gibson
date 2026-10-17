@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/cohort-lock.v1.schema.json",
+  "title": "Mini Gibson real-repository cohort lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "cohort_id", "mode", "source", "selection",
+    "exclusion_registry", "sealed_verifier_package", "parser", "tasks"
+  ],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-real-repo-cohort/v1"},
+    "cohort_id": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["pilot", "development"]},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "revision", "split", "dataset_card_url"],
+      "properties": {
+        "dataset": {"const": "nebius/SWE-rebench-V2"},
+        "revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+        "split": {"const": "train"},
+        "dataset_card_url": {
+          "const": "https://huggingface.co/datasets/nebius/SWE-rebench-V2/tree/10483de0f50fe5da545942705a76c6150171af7f"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version", "seed", "expected_tasks", "min_languages",
+        "min_repositories", "max_tasks_per_repo"
+      ],
+      "properties": {
+        "policy_version": {"const": "swe-rebench-v2-balanced/v1"},
+        "seed": {"type": "integer", "minimum": 0},
+        "expected_tasks": {"type": "integer"},
+        "min_languages": {"type": "integer"},
+        "min_repositories": {"type": "integer"},
+        "max_tasks_per_repo": {"type": "integer"}
+      }
+    },
+    "exclusion_registry": {"$ref": "#/$defs/file_ref"},
+    "sealed_verifier_package": {"$ref": "#/$defs/file_ref"},
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_repo", "source_revision", "vendored_parser_sha256"],
+      "properties": {
+        "source_repo": {"const": "https://github.com/SWE-rebench/SWE-rebench-V2"},
+        "source_revision": {"const": "c71902a8cf8d2b725f63d51f199f4d3e56f68d2d"},
+        "vendored_parser_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/task"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"mode": {"const": "pilot"}}},
+      "then": {
+        "properties": {
+          "selection": {
+            "properties": {
+              "expected_tasks": {"const": 24},
+              "min_languages": {"const": 6},
+              "min_repositories": {"const": 12},
+              "max_tasks_per_repo": {"const": 4}
+            }
+          },
+          "tasks": {"minItems": 24, "maxItems": 24}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"mode": {"const": "development"}}},
+      "then": {
+        "properties": {
+          "selection": {
+            "properties": {
+              "expected_tasks": {"const": 144},
+              "min_languages": {"const": 8},
+              "min_repositories": {"const": 24},
+              "max_tasks_per_repo": {"const": 8}
+            }
+          },
+          "tasks": {"minItems": 144, "maxItems": 144}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "file_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_rank", "instance_id", "repo", "source_identity", "base_commit",
+        "problem_statement", "language", "license", "split", "image",
+        "install_config_sha256", "task_projection_sha256", "fingerprints",
+        "qualification", "log_parser", "verify_timeout_s"
+      ],
+      "properties": {
+        "selection_rank": {"type": "integer", "minimum": 1},
+        "instance_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "repo": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "source_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pr_url", "pr_number", "issue_urls", "merge_commit", "episode_ids"],
+          "properties": {
+            "pr_url": {"type": "string", "format": "uri"},
+            "pr_number": {"type": "integer", "minimum": 1},
+            "issue_urls": {"type": "array", "items": {"type": "string", "format": "uri"}},
+            "merge_commit": {"$ref": "#/$defs/git_sha"},
+            "episode_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+          }
+        },
+        "base_commit": {"$ref": "#/$defs/git_sha"},
+        "problem_statement": {"type": "string", "minLength": 1},
+        "language": {"type": "string", "minLength": 1},
+        "license": {"type": "string", "minLength": 1},
+        "split": {"enum": ["pilot", "development"]},
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "digest", "platform", "workdir"],
+          "properties": {
+            "reference": {"type": "string", "pattern": "@sha256:[0-9a-f]{64}$"},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "platform": {"const": "linux/amd64"},
+            "workdir": {"type": "string", "pattern": "^/[^.].*"}
+          }
+        },
+        "install_config_sha256": {"$ref": "#/$defs/sha256"},
+        "task_projection_sha256": {"$ref": "#/$defs/sha256"},
+        "fingerprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issue_text_sha256", "patch_sha256", "test_patch_sha256",
+            "changed_files_sha256", "ast_edits_sha256", "image_cluster_sha256"
+          ],
+          "properties": {
+            "issue_text_sha256": {"$ref": "#/$defs/sha256"},
+            "patch_sha256": {"$ref": "#/$defs/sha256"},
+            "test_patch_sha256": {"$ref": "#/$defs/sha256"},
+            "changed_files_sha256": {"$ref": "#/$defs/sha256"},
+            "ast_edits_sha256": {"$ref": "#/$defs/sha256"},
+            "image_cluster_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "qualification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "receipt_sha256", "base_fail_repeats", "gold_pass_repeats"],
+          "properties": {
+            "status": {"const": "qualified"},
+            "receipt_sha256": {"$ref": "#/$defs/sha256"},
+            "base_fail_repeats": {"const": 2},
+            "gold_pass_repeats": {"const": 2}
+          }
+        },
+        "log_parser": {
+          "enum": [
+            "parse_java_mvn", "parse_log_cargo", "parse_log_dart_v3",
+            "parse_log_elixir", "parse_log_gotest", "parse_log_gradle_custom",
+            "parse_log_gradlew_v1", "parse_log_js", "parse_log_js_2",
+            "parse_log_js_3", "parse_log_js_4", "parse_log_julia",
+            "parse_log_junit", "parse_log_ocaml_v2", "parse_log_phpunit",
+            "parse_log_pytest", "parse_log_r", "parse_log_scala_v2",
+            "parse_log_swift"
+          ]
+        },
+        "verify_timeout_s": {"const": 900}
+      }
+    }
+  }
+}
