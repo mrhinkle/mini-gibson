@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/sequential-development-plan.v1.schema.json",
+  "title": "Mini Gibson bounded sequential development plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "status", "source", "selection", "inference", "cohorts"],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-sequential-development-plan/v1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "status": {"const": "frozen_before_outcomes_and_v2_training_selection"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "revision", "split"],
+      "properties": {
+        "dataset": {"const": "nebius/SWE-rebench-V2"},
+        "revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+        "split": {"const": "train"}
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version", "master_seed", "base_exclusion_registry_sha256", "frozen_before_scored_outcomes",
+        "frozen_before_v2_training_selection", "pilot_tasks",
+        "maximum_scored_development_tasks", "total_frozen_candidates"
+      ],
+      "properties": {
+        "policy_version": {"const": "swe-rebench-v2-sequential-balanced/v1"},
+        "master_seed": {"type": "integer", "minimum": 0},
+        "base_exclusion_registry_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "frozen_before_scored_outcomes": {"const": true},
+        "frozen_before_v2_training_selection": {"const": true},
+        "pilot_tasks": {"const": 24},
+        "maximum_scored_development_tasks": {"const": 432},
+        "total_frozen_candidates": {"const": 456}
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "secondary", "safety", "futility", "stopping"],
+      "properties": {
+        "primary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["comparison", "outcome", "test", "alternative", "minimum_absolute_uplift", "looks"],
+          "properties": {
+            "comparison": {"const": "v2_vs_base"},
+            "outcome": {"const": "resolved"},
+            "test": {"const": "exact_one_sided_mcnemar"},
+            "alternative": {"const": "v2_better"},
+            "minimum_absolute_uplift": {"const": 0.05},
+            "looks": {
+              "type": "array",
+              "prefixItems": [
+                {"$ref": "#/$defs/look1"},
+                {"$ref": "#/$defs/look2"},
+                {"$ref": "#/$defs/look3"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "secondary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["v1"],
+          "properties": {"v1": {"const": "descriptive_only_no_alpha_claim"}}
+        },
+        "safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tamper_policy", "policy_violation_policy", "malformed_noninferiority"],
+          "properties": {
+            "tamper_policy": {"const": "zero_tolerance_any_arm"},
+            "policy_violation_policy": {"const": "zero_tolerance_any_arm"},
+            "malformed_noninferiority": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["comparison", "margin", "confidence", "method", "required_at_every_look"],
+              "properties": {
+                "comparison": {"const": "paired_malformed_risk_difference"},
+                "margin": {"const": 0.05},
+                "confidence": {"const": 0.95},
+                "method": {"const": "simultaneous_marginal_clopper_pearson_bonferroni"},
+                "required_at_every_look": {"const": true}
+              }
+            }
+          }
+        },
+        "futility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "binding", "looks", "rule", "conditional_power_threshold",
+            "fixed_alternative_delta", "fixed_discordance_rate", "future_probabilities",
+            "override_reporting"
+          ],
+          "properties": {
+            "binding": {"const": false},
+            "looks": {"const": [1, 2]},
+            "rule": {"const": "impossibility_or_conditional_power_below_0.10"},
+            "conditional_power_threshold": {"const": 0.10},
+            "fixed_alternative_delta": {"const": 0.08},
+            "fixed_discordance_rate": {"const": 0.35},
+            "future_probabilities": {
+              "const": {"v2_win": 0.215, "base_win": 0.135, "tie": 0.65}
+            },
+            "override_reporting": {"const": "protocol_deviation_required"}
+          }
+        },
+        "stopping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stop_on_first_efficacy_crossing", "stop_on_safety_failure",
+            "maximum_look", "maximum_scored_development_tasks",
+            "open_final_holdout_to_chase_significance"
+          ],
+          "properties": {
+            "stop_on_first_efficacy_crossing": {"const": true},
+            "stop_on_safety_failure": {"const": true},
+            "maximum_look": {"const": 3},
+            "maximum_scored_development_tasks": {"const": 432},
+            "open_final_holdout_to_chase_significance": {"const": false}
+          }
+        }
+      }
+    },
+    "cohorts": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/cohort"}
+    }
+  },
+  "$defs": {
+    "look1": {
+      "const": {"look_index": 1, "cumulative_n": 144, "alpha": 0.01}
+    },
+    "look2": {
+      "const": {"look_index": 2, "cumulative_n": 288, "alpha": 0.015}
+    },
+    "look3": {
+      "const": {"look_index": 3, "cumulative_n": 432, "alpha": 0.025}
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cohort_id", "mode", "role", "seed", "target", "look_index",
+        "cumulative_n", "alpha", "candidate_report"
+      ],
+      "properties": {
+        "cohort_id": {"enum": ["pilot-budget", "development-a", "development-b", "development-c"]},
+        "mode": {"enum": ["pilot", "development"]},
+        "role": {"enum": ["budget_selection_only", "primary_inference"]},
+        "seed": {"type": "integer", "minimum": 0},
+        "target": {"enum": [24, 144]},
+        "look_index": {"type": "integer", "minimum": 0, "maximum": 3},
+        "cumulative_n": {"enum": [0, 144, 288, 432]},
+        "alpha": {"enum": [0.0, 0.01, 0.015, 0.025]},
+        "candidate_report": {
+          "type": "object",
+          "required": ["schema_version", "runnable", "qualification_status", "candidates"],
+          "properties": {
+            "schema_version": {"const": "mini-gibson-real-repo-candidates/v1"},
+            "runnable": {"const": false},
+            "qualification_status": {"const": "pending"},
+            "candidates": {"type": "array", "minItems": 24, "maxItems": 144}
+          }
+        }
+      }
+    }
+  }
+}

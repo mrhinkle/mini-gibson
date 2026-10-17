@@ -24,6 +24,14 @@ projection. The Python checks are authoritative; the JSON Schemas document the
 wire format but cannot express repository diversity, statement leakage, or
 cross-file hash binding on their own.
 
+`sequential.py` preregisters the bounded evidence-collection sequence without
+optional stopping: a disjoint 24-task budget pilot followed by three disjoint
+144-task development cohorts. It freezes all 456 candidate identities before
+v2 training-row selection or scored outcomes, finalizes a training exclusion
+registry only after every qualified lock supplies all fingerprints, and assesses
+the fixed cumulative looks at N=144/288/432. See
+[`docs/sequential-development-evaluation.md`](../docs/sequential-development-evaluation.md).
+
 The next implementation slice is a hardened Docker broker and repeated
 base-fail/gold-pass qualification smoke on a small upstream sample. Until that
 exists, no candidate report can become a frozen lock or a scored result.

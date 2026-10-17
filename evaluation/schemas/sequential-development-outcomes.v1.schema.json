@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/sequential-development-outcomes.v1.schema.json",
+  "title": "Mini Gibson cumulative sequential development outcomes v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_sha256", "execution_freeze_sha256", "look_index", "records"],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-sequential-development-outcomes/v1"},
+    "plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "execution_freeze_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "look_index": {"enum": [1, 2, 3]},
+    "records": {
+      "type": "array",
+      "minItems": 144,
+      "maxItems": 432,
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolved", "malformed_response", "policy_violation", "tamper_detected",
+        "isolation_violation", "receipt_inconsistent"
+      ],
+      "properties": {
+        "resolved": {"type": "boolean"},
+        "malformed_response": {"type": "boolean"},
+        "policy_violation": {"type": "boolean"},
+        "tamper_detected": {"type": "boolean"},
+        "isolation_violation": {"type": "boolean"},
+        "receipt_inconsistent": {"type": "boolean"}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cohort_id", "instance_id", "arms"],
+      "properties": {
+        "cohort_id": {"enum": ["development-a", "development-b", "development-c"]},
+        "instance_id": {"type": "string", "minLength": 1},
+        "arms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base", "v1", "v2"],
+          "properties": {
+            "base": {"$ref": "#/$defs/arm"},
+            "v1": {"$ref": "#/$defs/arm"},
+            "v2": {"$ref": "#/$defs/arm"}
+          }
+        }
+      }
+    }
+  }
+}
