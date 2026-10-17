@@ -1,0 +1,48 @@
+<template>
+<style>@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:400;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/Arimo-Variable.ttf") format("truetype");font-weight:700;font-style:normal;}@font-face{font-family:FilmSans;src:url("assets/fonts/ArchivoBlack-Regular.ttf") format("truetype");font-weight:900;font-style:normal;}#root{position:relative;width:100%;height:100%;overflow:hidden;color:#F8FAFC;font-family:FilmSans;box-sizing:border-box;}
+.frame-07-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.frame-07-eyebrow{position:absolute;left:100px;top:65px;font-size:24px;font-weight:700;letter-spacing:2px;color:#FF8F2D;}
+.frame-07-mark{position:absolute;left:100px;top:139px;width:70px;height:70px;object-fit:contain;}
+.frame-07-headline{position:absolute;left:195px;top:125px;margin:0;font-size:94px;font-weight:900;line-height:1.04;letter-spacing:-3px;}
+.frame-07-url{position:absolute;left:100px;top:247px;font-size:30px;line-height:1.2;color:#B7C5D6;}
+.frame-07-builders{position:absolute;left:1180px;top:156px;display:flex;align-items:center;gap:19px;}
+.frame-07-icon{width:53px;height:53px;object-fit:contain;border-radius:6px;}
+.frame-07-screen{position:absolute;left:100px;top:305px;width:1390px;height:430px;object-fit:contain;border:1px solid #B7C5D6;border-radius:10px;box-sizing:border-box;}
+.frame-07-status{position:absolute;left:1550px;width:280px;font-size:34px;line-height:1.16;font-weight:700;}
+.frame-07-status-small{display:block;font-size:25px;line-height:1.2;color:#B7C5D6;font-weight:400;margin-top:7px;}
+.frame-07-status-work{top:330px;}.frame-07-status-done{top:438px;}.frame-07-status-wait{top:546px;color:#FF8F2D;}
+.frame-07-callout{position:absolute;left:1050px;top:774px;font-size:38px;font-weight:700;line-height:1.15;letter-spacing:-0.5px;}
+.frame-07-credit{position:absolute;left:100px;top:781px;width:800px;font-size:22px;line-height:1.2;color:#B7C5D6;}
+.frame-07-diagram{position:absolute;inset:0;width:1920px;height:1080px;pointer-events:none;}
+.frame-07-path{fill:none;stroke:#FF8F2D;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;}
+</style>
+<div data-hf-id="hf-8hdq" id="root" data-composition-id="frame-07" data-width="1920" data-height="1080" data-duration="15.498175">
+<img data-hf-id="hf-cj80" class="clip frame-07-bg" src="assets/navy-background.png" alt="" data-start="0" data-duration="15.498175" data-track-index="0" id="frame-07-editable-1">
+<div data-hf-id="hf-4jcg" class="frame-07-eyebrow">THE CONTROL ROOM</div>
+<img data-hf-id="hf-wn4j" class="frame-07-mark" id="frame-07-mark" src="assets/agent-kontrol.png" alt="Agent Kontrol">
+<h1 data-hf-id="hf-iobo" class="frame-07-headline" id="frame-07-headline">Agent Kontrol</h1>
+<div data-hf-id="hf-3hjd" class="frame-07-url" id="frame-07-url">fleet.peripety.com</div>
+<div data-hf-id="hf-jl2q" class="frame-07-builders" id="frame-07-builders"><img data-hf-id="hf-3lob" class="frame-07-icon" src="assets/claude.png" alt="Claude"><img data-hf-id="hf-sq83" class="frame-07-icon" src="assets/grok.png" alt="Grok"><img data-hf-id="hf-gt4f" class="frame-07-icon" src="assets/codex.png" alt="Codex"></div>
+<img data-hf-id="hf-vx3t" class="frame-07-screen" id="frame-07-screen" src="assets/fleet-crop.png" alt="Existing Agent Kontrol fleet dashboard, showing agent sessions and needs-you status">
+<div data-hf-id="hf-aw8w" class="frame-07-status frame-07-status-work" id="frame-07-working">Working<span data-hf-id="hf-thrc" class="frame-07-status-small">A session is active</span></div>
+<div data-hf-id="hf-rnmd" class="frame-07-status frame-07-status-done" id="frame-07-done">Done<span data-hf-id="hf-ucyg" class="frame-07-status-small">A session finished</span></div>
+<div data-hf-id="hf-fvif" class="frame-07-status frame-07-status-wait" id="frame-07-wait">Needs you<span data-hf-id="hf-7t2q" class="frame-07-status-small">Human attention</span></div>
+<svg data-hf-id="hf-ewyb" class="frame-07-diagram" viewBox="0 0 1920 1080" aria-hidden="true"><path data-hf-id="hf-y74t" class="frame-07-path" id="frame-07-path" d="M 1490 581 L 1532 581 M 1521 571 L 1532 581 L 1521 591"/></svg>
+<div data-hf-id="hf-1x0d" class="frame-07-credit" id="frame-07-credit">Existing fleet dashboard • captured before experiment</div>
+<div data-hf-id="hf-hu4o" class="frame-07-callout" id="frame-07-callout">Where are we the bottleneck?</div>
+</div>
+<script>
+(function(){
+const tl=gsap.timeline({paused:true});
+const ids=['#frame-07-mark','#frame-07-headline','#frame-07-url','#frame-07-screen','#frame-07-builders','#frame-07-working','#frame-07-done','#frame-07-wait','#frame-07-credit','#frame-07-callout'];
+tl.set(ids,{opacity:0},0);
+function enter(sel,t,y,d){tl.set(sel,{opacity:1},t);tl.fromTo(sel,{y:y},{y:0,duration:d,ease:'power4.out',immediateRender:false},t);}
+enter('#frame-07-mark',0.04,72,0.20);enter('#frame-07-headline',0.23,45,0.16);enter('#frame-07-screen',0.41,38,0.15);enter('#frame-07-url',0.55,32,0.12);enter('#frame-07-credit',0.67,32,0.12);
+enter('#frame-07-builders',3.45,47,0.16);enter('#frame-07-working',6.263727,55,0.18);enter('#frame-07-done',6.748678,45,0.15);enter('#frame-07-wait',7.523709,39,0.14);
+const p=document.getElementById('frame-07-path');const n=p.getTotalLength();p.style.strokeDasharray=String(n);p.style.strokeDashoffset=String(n);tl.to(p,{strokeDashoffset:0,duration:0.6,ease:'power2.out'},6.35);
+enter('#frame-07-callout',8.867332,66,0.20);
+tl.to({},{duration:16.126},0);
+window.__timelines=window.__timelines||{};tl.to({},{duration:16.126},0);const revisedTimeline=gsap.timeline({paused:true});tl.timeScale(16.126/17.097);tl.paused(false);revisedTimeline.add(tl,0);window.__timelines["frame-07"]=revisedTimeline;
+})();
+;(function(){const original=window.__timelines["frame-07"];if(!original)throw new Error('Missing source timeline: frame-07');const paced=gsap.timeline({paused:true});original.timeScale(original.timeScale()*1.103162115942);original.paused(false);paced.add(original,0);paced.to({},{duration:15.498175},0);window.__timelines["frame-07"]=paced;})();</script>
+</template>

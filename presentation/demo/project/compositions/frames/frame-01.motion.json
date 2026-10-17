@@ -1,0 +1,17 @@
+{
+  "scene": "frame-01",
+  "duration_s": 10.961218,
+  "rules": [
+    "waterfall-entry",
+    "svg-path-draw"
+  ],
+  "entry": {
+    "vector": "Y +45px to0 over0.2s",
+    "from_rest": true
+  },
+  "exit": {
+    "vector": "0px/s",
+    "still_moving": false
+  },
+  "revision": "3m30s pacing; narration and established motion accelerated together, final hold retained"
+}

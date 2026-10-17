@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "purpose": "Offline scalar evidence for Mini Gibson tool-calling development diagnostics",
+  "created_at_utc": "2026-10-17T21:36:45.626748+00:00",
+  "source_receipts_executed_previously": true,
+  "bundle_operation": "Offline sanitization and recount only; no new inference or training",
+  "artifacts": [
+    {
+      "batch_id": "v8-base",
+      "file": "v8-base.jsonl",
+      "artifact_sha256": "64bc6b041253641eefb0ab02a8b8a263cc98f8647e2a955398d3b2eafccf0691",
+      "source_sha256": "76b4903d7db3e6e4186aa6cb43f330832172ed1f98b85b9580ed1c6087d1f60d",
+      "harness_sha256": [
+        "77fe13ff512e99fc8a1e64d42b9f7fa33a3001c8c32a243b0276783abc4bf625"
+      ],
+      "max_new_tokens": [
+        512
+      ],
+      "counts": {
+        "rows": 24,
+        "passed": 3,
+        "invalid_tasks": 6,
+        "invalid_at_token_limit_tasks": 6,
+        "policy_violation_tasks": 0,
+        "tests_tampered_tasks": 0,
+        "execution_error_tasks": 19,
+        "execution_errors": 103
+      }
+    },
+    {
+      "batch_id": "v8-adapter",
+      "file": "v8-adapter.jsonl",
+      "artifact_sha256": "e6e23b36c6e69f1f3d941e9a6b0e5f938f89fb610fc5fe18ced302ba4323a3ca",
+      "source_sha256": "0e4c00585fce317dc89a9f510dd88dcf5f8dfba11bf53d88e25a36968340e08a",
+      "harness_sha256": [
+        "77fe13ff512e99fc8a1e64d42b9f7fa33a3001c8c32a243b0276783abc4bf625"
+      ],
+      "max_new_tokens": [
+        512
+      ],
+      "counts": {
+        "rows": 24,
+        "passed": 4,
+        "invalid_tasks": 15,
+        "invalid_at_token_limit_tasks": 15,
+        "policy_violation_tasks": 0,
+        "tests_tampered_tasks": 0,
+        "execution_error_tasks": 9,
+        "execution_errors": 39
+      }
+    },
+    {
+      "batch_id": "selected-1024",
+      "file": "selected-1024.jsonl",
+      "artifact_sha256": "b0ee76eae1ea7bfe296b503ca94a9d55401c2306760b2b2f70c7fc75c2fddc6d",
+      "source_sha256": "6e55224299d8613522e9d2f28b59efd1d28f828fb5e6138cd0d280dedc212518",
+      "harness_sha256": [
+        "0b3a0832851bf408f2c3bf4f4928cd1afbdbb47d40eade7a8c493d49f49592ba"
+      ],
+      "max_new_tokens": [
+        1024
+      ],
+      "counts": {
+        "rows": 21,
+        "passed": 8,
+        "invalid_tasks": 4,
+        "invalid_at_token_limit_tasks": 4,
+        "policy_violation_tasks": 1,
+        "tests_tampered_tasks": 1,
+        "execution_error_tasks": 17,
+        "execution_errors": 57
+      }
+    },
+    {
+      "batch_id": "residual-1536",
+      "file": "residual-1536.jsonl",
+      "artifact_sha256": "0cb7f587514aeb892380798903a0999765bc6dc32c801802fc2972860a13110e",
+      "source_sha256": "17840a37a3b89217e1efc609dca4a11ab323ee7fbcac6a10c372b1e4aa6e7b04",
+      "harness_sha256": [
+        "5d82507fbbb8237284cb952aac07e2aa5f748aa364a9d339cf526b612af87818"
+      ],
+      "max_new_tokens": [
+        1536
+      ],
+      "counts": {
+        "rows": 4,
+        "passed": 2,
+        "invalid_tasks": 2,
+        "invalid_at_token_limit_tasks": 2,
+        "policy_violation_tasks": 0,
+        "tests_tampered_tasks": 0,
+        "execution_error_tasks": 2,
+        "execution_errors": 2
+      }
+    }
+  ],
+  "prior_development_cohort_reference": {
+    "base_passed": 6,
+    "adapter_passed": 12,
+    "tasks_per_arm": 24,
+    "source_base_sha256": "1146766d2451f7baeb7d696f1fcd3197d7c8d4dad756e9b4545cdf52b959ceb6",
+    "source_adapter_sha256": "a9aee19732a0aa8c7d32f61d2b0b7ef1b6c8b5fd23c40e0410ef60499bd7843e",
+    "harness_sha256": "43e48f468b962b55566c80d4eb09a9ce2f5b135fd415a0226ac9ed928d2a369f",
+    "caveat": "Previously reviewed development cohort, referenced by original source hashes. Its scalar rows are not duplicated in this bundle or recounted by this verifier."
+  },
+  "interpretation": {
+    "v8_comparison": "The next development cohort barely improved: base 3/24, adapter 4/24. Compare within this batch only.",
+    "selected_1024_diagnostic": "Selected 21 previously malformed adapter tasks: 8 passed, 4 still malformed at the output limit. One test-file modification was flagged and failed.",
+    "residual_1536_diagnostic": "Selected remaining four malformed adapter tasks: 2 passed, 2 still malformed at the output limit. Both passes recovered after a tool error.",
+    "next_experiment": "Prepare shorter valid tool calls, inspect source before replacements, recover from failed calls, and retain tests and change boundaries."
+  },
+  "caveats": [
+    "v7 and v8 are different development cohorts with different harness revisions. Do not aggregate them as one same-harness experiment.",
+    "Token-limit diagnostics are selected adapter-only retries. No matched base retry arm was run in these files. Do not pool these diagnostic passes into the original comparison.",
+    "At-limit malformed output supports truncation as a failure mode; it does not establish that output length caused every failure.",
+    "execution_errors counts tool observations beginning ERROR. It does not count every nonzero shell-command exit.",
+    "Pass is based on deterministic test exit and changed-file allowlist. A model completion claim or a hosted judge does not determine pass.",
+    "Original source SHA256 values identify upstream receipts. They are provenance references, not signatures or an independently downloadable source archive.",
+    "Sanitized artifact SHA256 values and recounts can be independently verified with the included script."
+  ],
+  "quality": {
+    "final_quality_gains_pending": true,
+    "heldout_quality_verified": false,
+    "reduced_human_intervention_verified": false,
+    "new_training_completed_by_this_revision": false,
+    "training_provenance_reconciled": false
+  },
+  "observability": {
+    "local_trace_records_present": true,
+    "hosted_langfuse_export_verified": false,
+    "hosted_langfuse_status": "No connected hosted session or export receipt evidenced in the inspected experiment records",
+    "hosted_jev_score_verified": false,
+    "authority": "Local deterministic test results and changed-file boundaries; hosted observability and judge exports are optional and do not determine pass"
+  },
+  "privacy": {
+    "included": "Task IDs, scalar outcomes and counts, model identity and revision, cryptographic provenance hashes",
+    "excluded": [
+      "Raw prompts or model text",
+      "Tool content or commands",
+      "Diffs",
+      "Changed filenames",
+      "Absolute filesystem paths",
+      "Voice IDs",
+      "Credentials and environment settings"
+    ]
+  }
+}

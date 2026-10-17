@@ -1,0 +1,283 @@
+1
+00:00:00,099 --> 00:00:03,227
+I started vibecoding on February fourteenth, twenty twenty-six.
+
+2
+00:00:03,227 --> 00:00:05,282
+AI helped me turn ideas into software.
+
+3
+00:00:05,282 --> 00:00:06,642
+My GitHub graph turned green.
+
+4
+00:00:06,642 --> 00:00:09,591
+Then I noticed a problem: the agents could keep building, but too much of
+
+5
+00:00:09,591 --> 00:00:10,961
+the work still came back to me.
+
+6
+00:00:10,961 --> 00:00:11,159
+I'm
+
+7
+00:00:11,159 --> 00:00:13,403
+Mark Hinkle, co-founder of All Things AI.
+
+8
+00:00:13,403 --> 00:00:16,819
+I've been executive director of the Node.js Foundation, VP of developer
+
+9
+00:00:16,819 --> 00:00:20,632
+relations at Cloud.com, and VP of marketing at the Linux Foundation.
+
+10
+00:00:20,810 --> 00:00:23,064
+John Willis co-wrote The DevOps Handbook.
+
+11
+00:00:23,073 --> 00:00:26,608
+He led training and services at Opscode, now Chef, worked at Enstratius,
+
+12
+00:00:26,608 --> 00:00:29,984
+acquired by Dell, and co-founded SocketPlane, acquired by Docker.
+
+13
+00:00:30,261 --> 00:00:33,688
+We know process, but lately we've spent more time managing than coding.
+
+14
+00:00:33,826 --> 00:00:35,991
+Today, the old guys are dusting off their keyboards.
+
+15
+00:00:35,991 --> 00:00:36,170
+I'm
+
+16
+00:00:36,170 --> 00:00:39,515
+explaining the same context, handing work between agents, checking results,
+
+17
+00:00:39,515 --> 00:00:43,636
+and rescuing failed attempts. More code means more decisions waiting for me.
+
+18
+00:00:43,864 --> 00:00:46,693
+The question is how to improve the system so the human doesn't become the
+
+19
+00:00:46,693 --> 00:00:48,143
+bottleneck. Mini
+
+20
+00:00:48,143 --> 00:00:51,866
+Gibson is our experiment. We want a small model to learn concrete handoffs,
+
+21
+00:00:51,866 --> 00:00:54,786
+responses to failed tests, and evidence of what changed.
+
+22
+00:00:55,013 --> 00:00:58,519
+We'll compare the base model, the model inside Gibson, and the tuned model
+
+23
+00:00:58,519 --> 00:01:02,570
+inside Gibson. Our hypothesis is fewer requests for human help while the
+
+24
+00:01:02,570 --> 00:01:04,337
+work meets the same quality bar.
+
+25
+00:01:04,754 --> 00:01:05,032
+Getting
+
+26
+00:01:05,032 --> 00:01:06,750
+started took longer than we expected.
+
+27
+00:01:07,087 --> 00:01:09,809
+We hit overloaded providers and stalled builds.
+
+28
+00:01:10,086 --> 00:01:13,422
+Once we got past that, we could run our datasets and learn from actual
+
+29
+00:01:13,422 --> 00:01:18,078
+failures. Our seven B model completed twenty training steps on Brev, using
+
+30
+00:01:18,078 --> 00:01:20,273
+one H one hundred and NeMo Automodel.
+
+31
+00:01:20,689 --> 00:01:24,106
+vLLM serves that adapter and passed connection checks.
+
+32
+00:01:24,602 --> 00:01:28,266
+Separately, thirty B Lightning has a loaded adapter and development results,
+
+33
+00:01:28,493 --> 00:01:30,381
+tested with Transformers and PEFT.
+
+34
+00:01:30,876 --> 00:01:32,912
+We keep their datasets and results separate.
+
+35
+00:01:33,537 --> 00:01:37,539
+Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch
+
+36
+00:01:37,539 --> 00:01:39,247
+of buffoons. We thought it was apropos.
+
+37
+00:01:39,247 --> 00:01:43,317
+Our Gibson defines tasks, isolates changes, runs checks, and requires
+
+38
+00:01:43,317 --> 00:01:47,050
+independent review. Gibson Environment runs the tools and checks results.
+
+39
+00:01:47,100 --> 00:01:48,658
+Connecting the model is still ahead.
+
+40
+00:01:48,658 --> 00:01:52,096
+The model proposes repairs; checks and approval rules stay in place.
+
+41
+00:01:52,096 --> 00:01:54,618
+This is our existing Agent Kontrol dashboard.
+
+42
+00:01:55,034 --> 00:01:59,462
+It shows Claude, Grok, and Codex across the fleet: working, finished, or
+
+43
+00:01:59,462 --> 00:02:02,571
+waiting for me. We can see where work gets stuck.
+
+44
+00:02:03,067 --> 00:02:06,363
+The experiment asks whether a specialized model can reduce the work that
+
+45
+00:02:06,363 --> 00:02:07,367
+needs our attention.
+
+46
+00:02:07,594 --> 00:02:11,059
+For the seven B rehearsal, two hundred eighty-three source records became
+
+47
+00:02:11,059 --> 00:02:14,237
+one hundred eighty-eight training rows and thirty development rows.
+
+48
+00:02:14,653 --> 00:02:18,239
+Some examples were broken; others lost the answer at the token limit.
+
+49
+00:02:18,346 --> 00:02:21,067
+We saved and reloaded a small LoRA adapter.
+
+50
+00:02:21,404 --> 00:02:25,167
+The thirty B OpenHands track still needs its training-data record matched to
+
+51
+00:02:25,167 --> 00:02:26,668
+the evaluated adapter.
+
+52
+00:02:27,183 --> 00:02:29,063
+Our biggest lesson was tool calling.
+
+53
+00:02:29,182 --> 00:02:32,992
+The seven B adapter passed a forced call but failed a real code change.
+
+54
+00:02:33,252 --> 00:02:37,481
+On thirty B, the first development batch looked promising; the next barely
+
+55
+00:02:37,481 --> 00:02:40,601
+improved. Long tool calls kept getting cut off.
+
+56
+00:02:40,811 --> 00:02:44,300
+On selected retries, doubling the response limit recovered eight of
+
+57
+00:02:44,300 --> 00:02:46,919
+twenty-one failures; four calls still broke.
+
+58
+00:02:47,229 --> 00:02:49,079
+More room helped, but wasn't enough.
+
+59
+00:02:49,469 --> 00:02:53,948
+One attempt changed a test file; our checks flagged it and kept it failed.
+
+60
+00:02:54,208 --> 00:02:58,318
+Next, teach shorter valid calls, inspect before editing, and recover from
+
+61
+00:02:58,318 --> 00:03:00,968
+errors. These retries are diagnostics.
+
+62
+00:03:01,127 --> 00:03:04,647
+Final quality and fewer human interruptions are still unproven.
+
+63
+00:03:04,907 --> 00:03:07,077
+Local traces helped us see those failures.
+
+64
+00:03:07,077 --> 00:03:08,986
+Hosted Langfuse is still proposed.
+
+65
+00:03:08,986 --> 00:03:11,196
+Nemo Gym could organize repeatable trials.
+
+66
+00:03:11,506 --> 00:03:14,985
+Jev could turn locked results into advice for John and me to review.
+
+67
+00:03:15,375 --> 00:03:16,915
+Those connections aren't running.
+
+68
+00:03:17,034 --> 00:03:20,629
+We want useful work that passes checks and independent review, with less
+
+69
+00:03:20,629 --> 00:03:22,118
+chasing and rescuing from us.
+
+70
+00:03:22,257 --> 00:03:24,810
+That's how we keep the human from becoming the bottleneck.
+
+71
+00:03:25,225 --> 00:03:26,934
+Follow the repository on screen.

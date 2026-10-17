@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "status": "EXPLORATORY_DEVELOPMENT_NOT_FINAL_HOLDOUT",
+  "source_result_files": {
+    "base": {
+      "sha256": "1146766d2451f7baeb7d696f1fcd3197d7c8d4dad756e9b4545cdf52b959ceb6",
+      "row_count": 24
+    },
+    "tuned": {
+      "sha256": "a9aee19732a0aa8c7d32f61d2b0b7ef1b6c8b5fd23c40e0410ef60499bd7843e",
+      "row_count": 24
+    }
+  },
+  "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+  "revision": "a9904d24bcc1d289a1950fa9d2b978c47cf903b9",
+  "runtime": {
+    "evaluation_framework": "Transformers 5.8.1 plus PEFT",
+    "torch": "2.12.0a0+0291f960b6.nv26.04.48445190",
+    "gpu": "NVIDIA H100 PCIe",
+    "serving_30b_with_vllm_verified": false
+  },
+  "controls": {
+    "harness_sha256": "43e48f468b962b55566c80d4eb09a9ce2f5b135fd415a0226ac9ed928d2a369f",
+    "tools_sha256": "f3c3bfa919fe6c5e85fef28c00e70e6ca737ff42101fcc3a21f98105cd8588bf",
+    "system_prompt_sha256": "317479fb2f76d3f77a50e0e4f5e7f15bda7851bf3f4f6668a0752a2f11acc500",
+    "max_turns": 10,
+    "max_new_tokens": 512,
+    "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    "revision": "a9904d24bcc1d289a1950fa9d2b978c47cf903b9"
+  },
+  "provenance_lock_sha256": "0dc5ad19637e1f6c9925c4a3002dd884baf9f1fdfb0b491f53f039151424ac68",
+  "adapter": {
+    "config_sha256": "1f2871fa1b90e1d546e5fb319ad39db4451514415535432d1764847e7513d410",
+    "weights_sha256": "a7c6f56ea24527816a0a2c4aa652b7e28e4766ba902deaebb9186727d9bda23c",
+    "export_manifest_sha256": "6585c0051daa5df84a4069450eefaaec8f1c22cdde50613a537c61b003d15a7b",
+    "loaded_state_verified": true,
+    "loaded_tensor_count": 188,
+    "loaded_parameter_count": 6749696
+  },
+  "source_adapter_weights_sha256": "7acf4381661099918c3d41c8196f919dbebd6e496831e1af5c59de6bf857a612",
+  "task_membership": {
+    "total": 24,
+    "original_development_fixes": 4,
+    "development_suite_a": 10,
+    "development_suite_b": 10,
+    "final_holdout_tasks": 0,
+    "ids": [
+      "fresh-fix-clamp",
+      "fresh-fix-factorial",
+      "fresh-fix-greeting",
+      "fresh-fix-slugify",
+      "fresh-a-apportion-cents",
+      "fresh-a-chunked",
+      "fresh-a-inventory-ledger",
+      "fresh-a-merge-spans",
+      "fresh-a-moving-average",
+      "fresh-a-parse-duration",
+      "fresh-a-query-multimap",
+      "fresh-a-redact-token",
+      "fresh-a-ring-cursor",
+      "fresh-a-stable-unique",
+      "fresh-b-balanced-brackets",
+      "fresh-b-chunk-list",
+      "fresh-b-date-range",
+      "fresh-b-dedupe-records",
+      "fresh-b-iso-week-labels",
+      "fresh-b-merge-counts",
+      "fresh-b-normalize-tags",
+      "fresh-b-rotate-list",
+      "fresh-b-running-peaks",
+      "fresh-b-validate-port"
+    ]
+  },
+  "observed_outcomes": {
+    "base_pass": 6,
+    "tuned_pass": 12,
+    "tasks_per_arm": 24,
+    "both_pass": 4,
+    "tuned_only": 8,
+    "base_only": 2,
+    "neither": 10,
+    "tests_tampered": 0,
+    "policy_violations": 0
+  },
+  "data_preparation": {
+    "source_dataset": "nvidia/SWE-Hero-openhands-trajectories",
+    "source_revision": "150bc119e52c647216fce285fd801f16b6fd745b",
+    "license_per_local_manifest": "CC-BY-4.0",
+    "local_prepared_counts": {
+      "candidate_rows": 630,
+      "dev": 30,
+      "eligible_unique": 663,
+      "fetched": 3200,
+      "render_fit": 392,
+      "render_rejected": 238,
+      "train": 188
+    },
+    "local_manifest_sha256": "7fd026325c9b6e8ed9a2aa1277ce6830ae45efcc04bfd60509f896920be0e62a",
+    "local_manifest_status": "PREPARED_NOT_TRAINED",
+    "evaluation_recorded_data_manifest_sha256": "adcc36778c0d64221133fb7d06e6b204bf972ec7f665049a0b22fbc7dbcbd704",
+    "exact_run_manifest_recovered": false
+  },
+  "training": {
+    "framework": "NeMo AutoModel per matching training configuration",
+    "configuration_sha256": "b93a8961fef50dd78d64d9448586dfe23d6c49d4627d1c7269d77fe27aad07d8",
+    "configuration_max_steps": 94,
+    "completed_steps_independently_verified": false
+  },
+  "limitations": [
+    "Development fixtures reused across v6 and v7; do not pool attempts or call final holdout.",
+    "v6 earlier same-task comparison was base4/24 versus tuned12/24 under a different harness.",
+    "Current later C/D evaluation lock differs; no C/D result rows were found.",
+    "Exact run data manifest differs from the local preparation manifest.",
+    "Adapter loaded and development-tested; complete training-step log not recovered.",
+    "No final held-out quality gain, promotion decision, or measured reduction in human intervention.",
+    "7B vLLM serving evidence belongs to a separate model/data track.",
+    "Local observability records exist; hosted Langfuse/Jev exports not established."
+  ],
+  "sanitized_task_receipts_sha256": "3d146c652f2451536cc6d9b8c7dcd50d5ffa3fa8a314647f3481c65977854427"
+}

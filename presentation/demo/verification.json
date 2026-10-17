@@ -1,0 +1,64 @@
+{
+  "bytes": 23045787,
+  "sha256": "ee30cddf06d78169f3dc8bfdb619d5cd56b7272491faf0d851603eeacb58a14d",
+  "duration_seconds": 210.0,
+  "width": 1920,
+  "height": 1080,
+  "fps": "30/1",
+  "video_codec": "h264",
+  "pixel_format": "yuv420p",
+  "audio_codec": "aac",
+  "audio_sample_rate": "48000",
+  "audio_channels": 2,
+  "audio_volume_db": {
+    "mean_volume": -26.1,
+    "max_volume": -1.9
+  },
+  "full_decode": "passed",
+  "narration_sha256": "74271b3c190388ecd1b937cdb38e4d968b55b163ca3d5456cd8e31e2e1ffbb21",
+  "audio_sha256": "4dd32f057dd2ced76f5511ada8d7a26dbec9dd7d513de3fc01d1f996bf6ee211",
+  "startup_report": "Provider overload is Mark Hinkle firsthand report. Logged build and image failures are separately documented; root cause is not independently established.",
+  "claim_limits": "7BvLLMchecks passed per execution report; realcodingtaskfailed/noedit. Separate30BTransformers/PEFT development: v7base6/24adapter12/24; freshv8base3/24adapter4/24; distinctharnessrevisions. Selectedadapter-only1024diagnostic8/21pass4malformed;1536residual2/4pass2malformed;one1024testfileeditflaggedandfailed. Trainingrecordunresolved;finalheldoutquality/humaninterventiongainsunproven. No new GPU work performed for video.",
+  "preview_comparisons": [
+    {
+      "seconds": 6.345,
+      "ssim": 0.989669
+    },
+    {
+      "seconds": 29.734,
+      "ssim": 0.989329
+    },
+    {
+      "seconds": 98.716,
+      "ssim": 0.984467
+    },
+    {
+      "seconds": 152.817,
+      "ssim": 0.982792
+    },
+    {
+      "seconds": 161.471,
+      "ssim": 0.983977
+    },
+    {
+      "seconds": 168.129,
+      "ssim": 0.983138
+    },
+    {
+      "seconds": 178.108,
+      "ssim": 0.981795
+    },
+    {
+      "seconds": 189.907,
+      "ssim": 0.985887
+    },
+    {
+      "seconds": 209.5,
+      "ssim": 0.982212
+    }
+  ],
+  "hyperframes_version": "0.8.169",
+  "capture_backend": "See render log; frame comparisons verified against inspected hardware-GPU preview",
+  "measured_quality_gains": "PENDING; development and selected diagnostics only",
+  "narrative_revision": "3:30 tool-calling lessons, separate development cohorts and adapter-only selected retries"
+}

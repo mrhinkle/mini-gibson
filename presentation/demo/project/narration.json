@@ -1,0 +1,141 @@
+{
+  "title": "Mini Gibson: Keep the Human from Becoming the Bottleneck",
+  "speaker": "Mark Hinkle",
+  "target_duration_seconds": 210,
+  "status": "Progress revision authorized for GitHub; exploratory development results; final quality gains pending",
+  "repository_url": "https://github.com/mrhinkle/mini-gibson",
+  "scenes": [
+    {
+      "id": "01",
+      "duration_seconds": 10.961218,
+      "screen_headline": "Why is everything waiting for me?",
+      "spoken": "I started vibecoding on February fourteenth, twenty twenty-six. AI helped me turn ideas into software. My GitHub graph turned green. Then I noticed a problem: the agents could keep building, but too much of the work still came back to me.",
+      "word_count": 41,
+      "text_start": 0,
+      "text_end": 238,
+      "start_seconds": 0.0
+    },
+    {
+      "id": "02",
+      "duration_seconds": 25.029866,
+      "screen_headline": "The old guys are dusting off their keyboards.",
+      "spoken": "I'm Mark Hinkle, co-founder of All Things AI. I've been executive director of the Node.js Foundation, VP of developer relations at Cloud dot com, and VP of marketing at the Linux Foundation. John Willis co-wrote The DevOps Handbook. He led training and services at Opscode, now Chef, worked at Enstratius, acquired by Dell, and co-founded SocketPlane, acquired by Docker. We know process, but lately we've spent more time managing than coding. Today, the old guys are dusting off their keyboards.",
+      "word_count": 80,
+      "text_start": 240,
+      "text_end": 736,
+      "start_seconds": 10.961218
+    },
+    {
+      "id": "03",
+      "duration_seconds": 11.893991,
+      "screen_headline": "Everything comes back to me.",
+      "spoken": "I'm explaining the same context, handing work between agents, checking results, and rescuing failed attempts. More code means more decisions waiting for me. The question is how to improve the system so the human doesn't become the bottleneck.",
+      "word_count": 38,
+      "text_start": 738,
+      "text_end": 980,
+      "start_seconds": 35.991084
+    },
+    {
+      "id": "04",
+      "duration_seconds": 16.868781,
+      "screen_headline": "Can we keep work moving with less help?",
+      "spoken": "Mini Gibson is our experiment. We want a small model to learn concrete handoffs, responses to failed tests, and evidence of what changed. We'll compare the base model, the model inside Gibson, and the tuned model inside Gibson. Our hypothesis is fewer requests for human help while the work meets the same quality bar.",
+      "word_count": 54,
+      "text_start": 982,
+      "text_end": 1300,
+      "start_seconds": 47.885074
+    },
+    {
+      "id": "05",
+      "duration_seconds": 28.753707,
+      "screen_headline": "Slow start. Real lessons. / Two tracks. Different evidence.",
+      "spoken": "Getting started took longer than we expected. We hit overloaded providers and stalled builds. Once we got past that, we could run our datasets and learn from actual failures. Our seven B model completed twenty training steps on Brev, using one H one hundred and NeMo Automodel. Vee ell ell em serves that adapter and passed connection checks. Separately, thirty B Lightning has a loaded adapter and development results, tested with Transformers and PEFT. We keep their datasets and results separate.",
+      "word_count": 81,
+      "text_start": 1302,
+      "text_end": 1801,
+      "start_seconds": 64.753855
+    },
+    {
+      "id": "06",
+      "duration_seconds": 18.588062,
+      "screen_headline": "Why The Gibson? / An engineering process",
+      "spoken": "Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos. Our Gibson defines tasks, isolates changes, runs checks, and requires independent review. Gibson Environment runs the tools and checks results. Connecting the model is still ahead. The model proposes repairs; checks and approval rules stay in place.",
+      "word_count": 57,
+      "text_start": 1803,
+      "text_end": 2167,
+      "start_seconds": 93.507562
+    },
+    {
+      "id": "07",
+      "duration_seconds": 15.498175,
+      "screen_headline": "Agent Kontrol: where work waits for us",
+      "spoken": "This is our existing Agent Kontrol dashboard. It shows Claude, Grok, and Codex across the fleet: working, finished, or waiting for me. We can see where work gets stuck. The experiment asks whether a specialized model can reduce the work that needs our attention.",
+      "word_count": 44,
+      "text_start": 2169,
+      "text_end": 2431,
+      "start_seconds": 112.095624
+    },
+    {
+      "id": "08",
+      "duration_seconds": 19.5692,
+      "screen_headline": "Good JSON wasn't enough.",
+      "spoken": "For the seven B rehearsal, two hundred eighty-three source records became one hundred eighty-eight training rows and thirty development rows. Some examples were broken; others lost the answer at the token limit. We saved and reloaded a small LoRA adapter. The thirty B OpenHands track still needs its training-data record matched to the evaluated adapter.",
+      "word_count": 55,
+      "text_start": 2433,
+      "text_end": 2788,
+      "start_seconds": 127.5938
+    },
+    {
+      "id": "09",
+      "duration_seconds": 37.743616,
+      "screen_headline": "Tool calling: more room helped, but was not enough",
+      "spoken": "Our biggest lesson was tool calling. The seven B adapter passed a forced call but failed a real code change. On thirty B, the first development batch looked promising; the next barely improved. Long tool calls kept getting cut off. On selected retries, doubling the response limit recovered eight of twenty-one failures; four calls still broke. More room helped, but wasn't enough. One attempt changed a test file; our checks flagged it and kept it failed. Next, teach shorter valid calls, inspect before editing, and recover from errors. These retries are diagnostics. Final quality and fewer human interruptions are still unproven.",
+      "word_count": 101,
+      "text_start": 2790,
+      "text_end": 3423,
+      "start_seconds": 147.163
+    },
+    {
+      "id": "10",
+      "duration_seconds": 12.127567,
+      "screen_headline": "Local traces now. Optional connections next.",
+      "spoken": "Local traces helped us see those failures. Hosted Langfuse is still proposed. Nemo Gym could organize repeatable trials. Jev could turn locked results into advice for John and me to review. Those connections aren't running.",
+      "word_count": 35,
+      "text_start": 3425,
+      "text_end": 3648,
+      "start_seconds": 184.906616
+    },
+    {
+      "id": "11",
+      "duration_seconds": 12.964817,
+      "screen_headline": "Keep the work moving.",
+      "spoken": "We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.",
+      "word_count": 32,
+      "text_start": 3650,
+      "text_end": 3844,
+      "start_seconds": 197.034183
+    }
+  ],
+  "total_word_count": 618,
+  "total_duration_seconds": 209.999,
+  "synthesis_status": "Generated using confirmed Mark Hinkle voice ID; timestamp alignment from ElevenLabs",
+  "narrative_revision": "Tool-call truncation, selected response-cap retries, test-boundary failure and proposed shorter-call curriculum; final quality pending",
+  "measurement_status": "Separate v7/v8 development batches; selected adapter-only diagnostics; final held-out quality and less human intervention unproven.",
+  "audio_duration_seconds": 206.999388,
+  "pacing_revision": {
+    "previous_duration_seconds": 231.355,
+    "tempo_multiplier": 1.103162115942029,
+    "pitch_preserved": true,
+    "method": "FFmpeg atempo; seekable motion, captions and alignment scaled by the same factor; three-second closing hold retained"
+  },
+  "tool_calling_edit": {
+    "old_section_start": 147.163,
+    "old_section_end": 197.034183,
+    "new_section_start": 147.163,
+    "new_section_end": 197.034183,
+    "pitch_preserving_tempo_multiplier": 1.1612029937208428,
+    "source_voice_speed": 1.07,
+    "section_gain_db": -2.6999999999999993,
+    "method": "Authorized clone; timed section replacement with pitch-preserving atempo; rest of narration retained"
+  }
+}

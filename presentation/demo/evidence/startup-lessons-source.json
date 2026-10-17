@@ -1,0 +1,20 @@
+{
+  "reviewed_at_utc": "2026-10-17T20:18:43.135512+00:00",
+  "team_report": {
+    "reported_by": "Mark Hinkle",
+    "date": "2026-10-17",
+    "account": "Many providers were overloaded, the team got off to a slow start, and running the datasets taught them a lot."
+  },
+  "independently_documented": [
+    "Early instance screenshot showed Building/Waiting; initial instance creations later failed.",
+    "A requested NeMo container image was unavailable; recovery used an available digest-pinned release.",
+    "283 source records minus 39 prefilter rejections minus 26 token-window drops produced 188 training and 30 development rows.",
+    "The 7B endpoint and required-tool checks passed, but a real coding task failed and applied no edit."
+  ],
+  "limits": "The local logs do not independently diagnose provider overload as the cause of build or image-availability failures. Final quality and reduced human intervention remain unproven.",
+  "source_sha256": {
+    "docs/evidence/brev-h100-2026-10-17.md": "28b4380cd0353f913ebdf6b4de70789da0acc90f84016d47df46d3e036e66162",
+    "docs/evidence/brev-ocr7b-lora-2026-10-17.md": "95506fa5aefb5ed5dc82e9d34e444b4a1ddbdc843043957bdaa058ba0b0ed7a4",
+    "docs/evidence/brev-ocr7b-endpoint-development-run-2026-10-17.md": "4d1f11fef3c54dbceba0f3ea01b9293cd75089c960e7b1d32cdf66018d85bff4"
+  }
+}

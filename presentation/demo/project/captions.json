@@ -1,0 +1,357 @@
+[
+  {
+    "start": 0.0992,
+    "end": 3.226574,
+    "text": "I started vibecoding on February fourteenth, twenty twenty-six."
+  },
+  {
+    "start": 3.226574,
+    "end": 5.282413,
+    "text": "AI helped me turn ideas into software."
+  },
+  {
+    "start": 5.282413,
+    "end": 6.642141,
+    "text": "My GitHub graph turned green."
+  },
+  {
+    "start": 6.642141,
+    "end": 9.590783,
+    "text": "Then I noticed a problem: the agents could keep building, but too much of"
+  },
+  {
+    "start": 9.590783,
+    "end": 10.960773,
+    "text": "the work still came back to me."
+  },
+  {
+    "start": 10.960773,
+    "end": 11.159173,
+    "text": "I'm"
+  },
+  {
+    "start": 11.159173,
+    "end": 13.403152,
+    "text": "Mark Hinkle, co-founder of All Things AI."
+  },
+  {
+    "start": 13.403152,
+    "end": 16.818719,
+    "text": "I've been executive director of the Node.js Foundation, VP of developer"
+  },
+  {
+    "start": 16.818719,
+    "end": 20.631887000000003,
+    "text": "relations at Cloud.com, and VP of marketing at the Linux Foundation."
+  },
+  {
+    "start": 20.809819,
+    "end": 23.064004,
+    "text": "John Willis co-wrote The DevOps Handbook."
+  },
+  {
+    "start": 23.073466,
+    "end": 26.607902,
+    "text": "He led training and services at Opscode, now Chef, worked at Enstratius,"
+  },
+  {
+    "start": 26.607902,
+    "end": 29.984076,
+    "text": "acquired by Dell, and co-founded SocketPlane, acquired by Docker."
+  },
+  {
+    "start": 30.261209,
+    "end": 33.687838,
+    "text": "We know process, but lately we've spent more time managing than coding."
+  },
+  {
+    "start": 33.826432,
+    "end": 35.990879,
+    "text": "Today, the old guys are dusting off their keyboards."
+  },
+  {
+    "start": 35.990879,
+    "end": 36.16961,
+    "text": "I'm"
+  },
+  {
+    "start": 36.16961,
+    "end": 39.515053,
+    "text": "explaining the same context, handing work between agents, checking results,"
+  },
+  {
+    "start": 39.515053,
+    "end": 43.636084000000004,
+    "text": "and rescuing failed attempts. More code means more decisions waiting for me."
+  },
+  {
+    "start": 43.863616,
+    "end": 46.693388,
+    "text": "The question is how to improve the system so the human doesn't become the"
+  },
+  {
+    "start": 46.693388,
+    "end": 48.14291,
+    "text": "bottleneck. Mini"
+  },
+  {
+    "start": 48.14291,
+    "end": 51.86634,
+    "text": "Gibson is our experiment. We want a small model to learn concrete handoffs,"
+  },
+  {
+    "start": 51.86634,
+    "end": 54.78585,
+    "text": "responses to failed tests, and evidence of what changed."
+  },
+  {
+    "start": 55.013382,
+    "end": 58.518743,
+    "text": "We'll compare the base model, the model inside Gibson, and the tuned model"
+  },
+  {
+    "start": 58.518743,
+    "end": 62.569705,
+    "text": "inside Gibson. Our hypothesis is fewer requests for human help while the"
+  },
+  {
+    "start": 62.569705,
+    "end": 64.337296,
+    "text": "work meets the same quality bar."
+  },
+  {
+    "start": 64.753821,
+    "end": 65.031753,
+    "text": "Getting"
+  },
+  {
+    "start": 65.031753,
+    "end": 66.749743,
+    "text": "started took longer than we expected."
+  },
+  {
+    "start": 67.086737,
+    "end": 69.808703,
+    "text": "We hit overloaded providers and stalled builds."
+  },
+  {
+    "start": 70.085835,
+    "end": 73.42187,
+    "text": "Once we got past that, we could run our datasets and learn from actual"
+  },
+  {
+    "start": 73.42187,
+    "end": 78.078297,
+    "text": "failures. Our seven B model completed twenty training steps on Brev, using"
+  },
+  {
+    "start": 78.078297,
+    "end": 80.27347499999999,
+    "text": "one H one hundred and NeMo Automodel."
+  },
+  {
+    "start": 80.689145,
+    "end": 84.10551199999999,
+    "text": "vLLM serves that adapter and passed connection checks."
+  },
+  {
+    "start": 84.601568,
+    "end": 88.265936,
+    "text": "Separately, thirty B Lightning has a loaded adapter and development results,"
+  },
+  {
+    "start": 88.493469,
+    "end": 90.380783,
+    "text": "tested with Transformers and PEFT."
+  },
+  {
+    "start": 90.875984,
+    "end": 92.912099,
+    "text": "We keep their datasets and results separate."
+  },
+  {
+    "start": 93.537493,
+    "end": 97.538855,
+    "text": "Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch"
+  },
+  {
+    "start": 97.538855,
+    "end": 99.246639,
+    "text": "of buffoons. We thought it was apropos."
+  },
+  {
+    "start": 99.246639,
+    "end": 103.31727,
+    "text": "Our Gibson defines tasks, isolates changes, runs checks, and requires"
+  },
+  {
+    "start": 103.31727,
+    "end": 107.050051,
+    "text": "independent review. Gibson Environment runs the tools and checks results."
+  },
+  {
+    "start": 107.099708,
+    "end": 108.657836,
+    "text": "Connecting the model is still ahead."
+  },
+  {
+    "start": 108.657836,
+    "end": 112.095915,
+    "text": "The model proposes repairs; checks and approval rules stay in place."
+  },
+  {
+    "start": 112.095915,
+    "end": 114.61777,
+    "text": "This is our existing Agent Kontrol dashboard."
+  },
+  {
+    "start": 115.034295,
+    "end": 119.462389,
+    "text": "It shows Claude, Grok, and Codex across the fleet: working, finished, or"
+  },
+  {
+    "start": 119.462389,
+    "end": 122.570893,
+    "text": "waiting for me. We can see where work gets stuck."
+  },
+  {
+    "start": 123.06695,
+    "end": 126.362793,
+    "text": "The experiment asks whether a specialized model can reduce the work that"
+  },
+  {
+    "start": 126.362793,
+    "end": 127.36671299999999,
+    "text": "needs our attention."
+  },
+  {
+    "start": 127.594245,
+    "end": 131.059412,
+    "text": "For the seven B rehearsal, two hundred eighty-three source records became"
+  },
+  {
+    "start": 131.059412,
+    "end": 134.23718499999998,
+    "text": "one hundred eighty-eight training rows and thirty development rows."
+  },
+  {
+    "start": 134.652856,
+    "end": 138.23854699999998,
+    "text": "Some examples were broken; others lost the answer at the token limit."
+  },
+  {
+    "start": 138.346354,
+    "end": 141.067465,
+    "text": "We saved and reloaded a small LoRA adapter."
+  },
+  {
+    "start": 141.404459,
+    "end": 145.167228,
+    "text": "The thirty B OpenHands track still needs its training-data record matched to"
+  },
+  {
+    "start": 145.167228,
+    "end": 146.668004,
+    "text": "the evaluated adapter."
+  },
+  {
+    "start": 147.182807,
+    "end": 149.062858,
+    "text": "Our biggest lesson was tool calling."
+  },
+  {
+    "start": 149.182457,
+    "end": 152.992403,
+    "text": "The seven B adapter passed a forced call but failed a real code change."
+  },
+  {
+    "start": 153.251513,
+    "end": 157.480748,
+    "text": "On thirty B, the first development batch looked promising; the next barely"
+  },
+  {
+    "start": 157.480748,
+    "end": 160.600892,
+    "text": "improved. Long tool calls kept getting cut off."
+  },
+  {
+    "start": 160.810915,
+    "end": 164.299539,
+    "text": "On selected retries, doubling the response limit recovered eight of"
+  },
+  {
+    "start": 164.299539,
+    "end": 166.919339,
+    "text": "twenty-one failures; four calls still broke."
+  },
+  {
+    "start": 167.229259,
+    "end": 169.07916799999998,
+    "text": "More room helped, but wasn't enough."
+  },
+  {
+    "start": 169.469177,
+    "end": 173.94825699999998,
+    "text": "One attempt changed a test file; our checks flagged it and kept it failed."
+  },
+  {
+    "start": 174.208228,
+    "end": 178.317759,
+    "text": "Next, teach shorter valid calls, inspect before editing, and recover from"
+  },
+  {
+    "start": 178.317759,
+    "end": 180.967701,
+    "text": "errors. These retries are diagnostics."
+  },
+  {
+    "start": 181.126915,
+    "end": 184.646645,
+    "text": "Final quality and fewer human interruptions are still unproven."
+  },
+  {
+    "start": 184.906616,
+    "end": 187.076779,
+    "text": "Local traces helped us see those failures."
+  },
+  {
+    "start": 187.076779,
+    "end": 188.986006,
+    "text": "Hosted Langfuse is still proposed."
+  },
+  {
+    "start": 188.986006,
+    "end": 191.195887,
+    "text": "Nemo Gym could organize repeatable trials."
+  },
+  {
+    "start": 191.505807,
+    "end": 194.985061,
+    "text": "Jev could turn locked results into advice for John and me to review."
+  },
+  {
+    "start": 195.37507,
+    "end": 196.914956,
+    "text": "Those connections aren't running."
+  },
+  {
+    "start": 197.034422,
+    "end": 200.628721,
+    "text": "We want useful work that passes checks and independent review, with less"
+  },
+  {
+    "start": 200.628721,
+    "end": 202.11838,
+    "text": "chasing and rescuing from us."
+  },
+  {
+    "start": 202.256974,
+    "end": 204.80961399999998,
+    "text": "That's how we keep the human from becoming the bottleneck."
+  },
+  {
+    "start": 205.225284,
+    "end": 206.933868,
+    "text": "Follow the repository on screen."
+  }
+]

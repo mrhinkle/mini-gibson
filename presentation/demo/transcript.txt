@@ -1,0 +1,21 @@
+I started vibecoding on February fourteenth, twenty twenty-six. AI helped me turn ideas into software. My GitHub graph turned green. Then I noticed a problem: the agents could keep building, but too much of the work still came back to me.
+
+I'm Mark Hinkle, co-founder of All Things AI. I've been executive director of the Node.js Foundation, VP of developer relations at Cloud dot com, and VP of marketing at the Linux Foundation. John Willis co-wrote The DevOps Handbook. He led training and services at Opscode, now Chef, worked at Enstratius, acquired by Dell, and co-founded SocketPlane, acquired by Docker. We know process, but lately we've spent more time managing than coding. Today, the old guys are dusting off their keyboards.
+
+I'm explaining the same context, handing work between agents, checking results, and rescuing failed attempts. More code means more decisions waiting for me. The question is how to improve the system so the human doesn't become the bottleneck.
+
+Mini Gibson is our experiment. We want a small model to learn concrete handoffs, responses to failed tests, and evidence of what changed. We'll compare the base model, the model inside Gibson, and the tuned model inside Gibson. Our hypothesis is fewer requests for human help while the work meets the same quality bar.
+
+Getting started took longer than we expected. We hit overloaded providers and stalled builds. Once we got past that, we could run our datasets and learn from actual failures. Our seven B model completed twenty training steps on Brev, using one H one hundred and NeMo Automodel. Vee ell ell em serves that adapter and passed connection checks. Separately, thirty B Lightning has a loaded adapter and development results, tested with Transformers and PEFT. We keep their datasets and results separate.
+
+Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos. Our Gibson defines tasks, isolates changes, runs checks, and requires independent review. Gibson Environment runs the tools and checks results. Connecting the model is still ahead. The model proposes repairs; checks and approval rules stay in place.
+
+This is our existing Agent Kontrol dashboard. It shows Claude, Grok, and Codex across the fleet: working, finished, or waiting for me. We can see where work gets stuck. The experiment asks whether a specialized model can reduce the work that needs our attention.
+
+For the seven B rehearsal, two hundred eighty-three source records became one hundred eighty-eight training rows and thirty development rows. Some examples were broken; others lost the answer at the token limit. We saved and reloaded a small LoRA adapter. The thirty B OpenHands track still needs its training-data record matched to the evaluated adapter.
+
+Our biggest lesson was tool calling. The seven B adapter passed a forced call but failed a real code change. On thirty B, the first development batch looked promising; the next barely improved. Long tool calls kept getting cut off. On selected retries, doubling the response limit recovered eight of twenty-one failures; four calls still broke. More room helped, but wasn't enough. One attempt changed a test file; our checks flagged it and kept it failed. Next, teach shorter valid calls, inspect before editing, and recover from errors. These retries are diagnostics. Final quality and fewer human interruptions are still unproven.
+
+Local traces helped us see those failures. Hosted Langfuse is still proposed. Nemo Gym could organize repeatable trials. Jev could turn locked results into advice for John and me to review. Those connections aren't running.
+
+We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.

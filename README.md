@@ -1,8 +1,29 @@
 # Mini Gibson
 
-**Small Model. Serious Engineer.**
+**Keep the work moving.**
 
-Private preparation repository for the NVIDIA × Red Hat Small Models Hack, October 17–18, 2026.
+Experiment repository for the NVIDIA × Red Hat Small Models Hack, October 17–18, 2026.
+
+## Demo and current evidence
+
+[Watch the latest 3:30 demo](presentation/demo/mini-gibson-demo.mp4) ·
+[Transcript](presentation/demo/transcript.txt) ·
+[Editable project ZIP](presentation/demo/mini-gibson-demo-project.zip)
+
+The [narrated demo and editable project](presentation/demo/README.md) explain our
+question: can a specialized small model reduce the checking, coordination, and
+rescue that makes the human a development bottleneck?
+
+The reviewed records include a completed 20-step 7B rehearsal, subsequent
+vLLM connection checks, and a failed 7B repository coding attempt. Separate
+30B development batches passed 6/24 base versus 12/24 adapter tasks in v7,
+and 3/24 versus 4/24 on the fresh v8 batch; the harness revision differs between
+batches. Selected response-limit retries exposed cut-off tool calls, recovery,
+and a test-file edit that was flagged and remained failed. These are development
+observations and adapter-only diagnostics, not final evaluation. The 30B
+training-data record still needs reconciliation; final held-out quality and
+reductions in human intervention remain unproven. See the demo's
+[sanitized evidence](presentation/demo/evidence/README.md) for the boundaries.
 
 ## Question
 
@@ -43,7 +64,9 @@ completed training and model results require separate run receipts.
 - Negative results are valid.
 - Reproducibility is a deliverable.
 
-Private preparation repo: do not publish holdouts, private historical data, secrets, or training artifacts without an explicit release decision.
+Holdouts, source training data, secrets, and model artifacts require their own
+release decision. The public demo package contains selected evidence summaries,
+not a corpus or model release.
 
 ## Optional Jev advice
 

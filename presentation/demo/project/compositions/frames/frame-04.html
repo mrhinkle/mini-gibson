@@ -1,0 +1,47 @@
+<template>
+<style>@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:400}@font-face{font-family:FilmSans;src:url('assets/fonts/Arimo-Variable.ttf') format('truetype');font-weight:700}@font-face{font-family:FilmSans;src:url('assets/fonts/ArchivoBlack-Regular.ttf') format('truetype');font-weight:900}
+#root{position:relative;width:1920px;height:1080px;overflow:hidden;color:#F8FAFC;font-family:FilmSans;font-weight:400}*{box-sizing:border-box}.frame-04-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.frame-04-lay{position:absolute;inset:0}.frame-04-ey{position:absolute;left:100px;top:65px;font-size:24px;line-height:30px;letter-spacing:3px;font-weight:700;color:#FF8F2D}.frame-04-hd{position:absolute;left:100px;top:130px;margin:0;font-size:96px;line-height:1.04;letter-spacing:-3px;font-weight:900}.frame-04-sec{color:#B7C5D6}.frame-04-or{color:#FF8F2D}.frame-04-rail{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}.frame-04-rail path{fill:none;stroke:#FF8F2D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+#frame-04-line2{top:253px;color:#B7C5D6}
+#frame-04-less{position:absolute;left:100px;top:415px;font-size:170px;font-weight:900;letter-spacing:-8px;line-height:1.05;color:#FF8F2D}
+#frame-04-ambition{position:absolute;left:110px;top:645px;font-size:28px;font-weight:700;letter-spacing:3px;color:#B7C5D6}
+.frame-04-ingredient{position:absolute;left:820px;font-size:60px;line-height:1.1;font-weight:700;letter-spacing:-1.7px}
+#frame-04-model{top:450px}#frame-04-history{top:580px}
+#frame-04-plus{position:absolute;left:740px;top:580px;font-size:60px;line-height:1.1;color:#FF8F2D}
+#frame-04-unproven{position:absolute;left:820px;top:765px;font-size:30px;font-weight:700;letter-spacing:2px;color:#FF8F2D}
+</style>
+<div data-hf-id="hf-p55u" id="root" data-composition-id="frame-04" data-width="1920" data-height="1080" data-duration="16.868781">
+<img data-hf-id="hf-b2yj" class="clip frame-04-bg" data-start="0" data-duration="16.868781" data-track-index="0" src="assets/navy-background.png" alt=""  id="frame-04-editable-1">
+<div data-hf-id="hf-5053" class="clip frame-04-lay" data-start="0" data-duration="16.868781" data-track-index="1" id="frame-04-editable-2">
+<div data-hf-id="hf-z4yv" class="frame-04-ey" id="frame-04-ey">THE HYPOTHESIS</div>
+<h1 data-hf-id="hf-pm8v" class="frame-04-hd" id="frame-04-line1">Keep work moving.</h1>
+<div data-hf-id="hf-1bx1" class="frame-04-hd" id="frame-04-line2">With less help from us.</div>
+<div data-hf-id="hf-woh7" id="frame-04-less">Less</div>
+<div data-hf-id="hf-uuax" id="frame-04-ambition">HUMAN INTERVENTION</div>
+<div data-hf-id="hf-3ve4" class="frame-04-ingredient" id="frame-04-model">Small model</div>
+<div data-hf-id="hf-ltq7" id="frame-04-plus">+</div>
+<div data-hf-id="hf-xbla" class="frame-04-ingredient" id="frame-04-history">Real work history</div>
+<svg data-hf-id="hf-qrd4" class="frame-04-rail" viewBox="0 0 1920 1080"><path data-hf-id="hf-kb67" id="frame-04-ambition-rule" d="M100 716 H510" /><path data-hf-id="hf-aq1v" id="frame-04-formula-rule" d="M820 716 H1720" /></svg>
+<div data-hf-id="hf-h5im" id="frame-04-unproven">HYPOTHESIS • FINAL RESULTS PENDING</div>
+</div>
+</div>
+<script>
+(function(){
+const tl=gsap.timeline({paused:true});
+function arrive(id,at,heavy=false){
+const el=document.getElementById(id);
+tl.set(el,{opacity:0},0);
+tl.set(el,{opacity:1},at);
+tl.fromTo(el,{y:heavy?72:44},{y:0,duration:heavy?0.19:0.15,ease:'power4.out',immediateRender:false},at);
+}
+function draw(id,at,duration=0.7){
+const el=document.getElementById(id);const len=el.getTotalLength();
+tl.set(el,{strokeDasharray:len,strokeDashoffset:len},0);
+tl.to(el,{strokeDashoffset:0,duration,ease:'power2.out'},at);
+}
+arrive('frame-04-ey',0.1);arrive('frame-04-line1',0.05,true);arrive('frame-04-less',0.317481,true);arrive('frame-04-ambition',0.498898);draw('frame-04-ambition-rule',5.2,0.7);arrive('frame-04-model',1.761548,true);arrive('frame-04-plus',2.725114);arrive('frame-04-history',2.906532,true);arrive('frame-04-line2',0.634962,true);draw('frame-04-formula-rule',13.8,0.7);arrive('frame-04-unproven',0.725670);
+tl.to({},{duration:16.88},0);
+window.__timelines=window.__timelines||{};tl.to({},{duration:16.88},0);const revisedTimeline=gsap.timeline({paused:true});tl.timeScale(16.88/18.609);tl.paused(false);revisedTimeline.add(tl,0);window.__timelines["frame-04"]=revisedTimeline;
+})();
+;(function(){const original=window.__timelines["frame-04"];if(!original)throw new Error('Missing source timeline: frame-04');const paced=gsap.timeline({paused:true});original.timeScale(original.timeScale()*1.103162115942);original.paused(false);paced.add(original,0);paced.to({},{duration:16.868781},0);window.__timelines["frame-04"]=paced;})();</script>
+</template>
