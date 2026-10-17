@@ -7,7 +7,10 @@ from pathlib import Path
 root = Path(__file__).resolve().parent
 evidence = root / "evidence"
 summary = json.loads((evidence / "lightning-v7-development-summary.json").read_text())
-rows = [json.loads(line) for line in (evidence / "lightning-v7-development-task-receipts.jsonl").read_text().splitlines() if line]
+receipt_bytes = (evidence / "lightning-v7-development-task-receipts.jsonl").read_bytes()
+if hashlib.sha256(receipt_bytes).hexdigest() != summary["sanitized_task_receipts_sha256"]:
+    raise ValueError("Published task-receipt SHA-256 does not match the summary")
+rows = [json.loads(line) for line in receipt_bytes.decode("utf-8").splitlines() if line]
 arms = {arm: [row for row in rows if row["arm"] == arm] for arm in ("base", "openhands-lightning")}
 assert len(rows) == 48
 for arm, records in arms.items():

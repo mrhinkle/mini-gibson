@@ -6,6 +6,10 @@ Experiment repository for the NVIDIA × Red Hat Small Models Hack, October 17–
 
 ## Demo and current evidence
 
+[Watch the latest 3:30 demo](presentation/demo/mini-gibson-demo.mp4) ·
+[Transcript](presentation/demo/transcript.txt) ·
+[Editable project ZIP](presentation/demo/mini-gibson-demo-project.zip)
+
 The [narrated demo and editable project](presentation/demo/README.md) explain our
 question: can a specialized small model reduce the checking, coordination, and
 rescue that makes the human a development bottleneck?

@@ -1,6 +1,8 @@
 # Judge Presentation
 
-The current [3–4 minute narrated demo](demo/README.md) includes the MP4, transcript,
+[Watch the latest 3:30 demo](demo/mini-gibson-demo.mp4).
+
+The current [narrated demo and editable project](demo/README.md) includes the MP4, transcript,
 captions, editable HyperFrames source, and reviewed development evidence. Its
 story is about keeping the human from becoming the bottleneck.
 

@@ -25,5 +25,24 @@
     "description": "Poster alt label updated to Tool-calling lessons after image inspection; no experimental claim changed",
     "current_readme_sha256": "3dc63b06533b0a850d4d9f2061bf8e80af477c77f2b22ef78c5a5f8fb88f6ac9"
   },
-  "scope": "Independent source/timing/claims/privacy review at recorded hashes; later poster alt-label change identified separately. Actual rendered pixels, full decode and audio levels verified separately. No live serving, training, inference, held-out quality or promotion approval."
+  "scope": "Independent source/timing/claims/privacy review at recorded hashes; later poster alt-label change identified separately. Actual rendered pixels, full decode and audio levels verified separately. No live serving, training, inference, held-out quality or promotion approval.",
+  "merge_preparation_review": {
+    "checked_at_utc": "2026-10-17T22:54:51.743666+00:00",
+    "reviewer": "Claude, independent of Codex author",
+    "verdict": "PASS",
+    "reviewed_source_sha256": {
+      "README.md": "1536d822f2580c96c38a51b53a15623d036e0d0099414cb0d3d26843cfdb2527",
+      "presentation/README.md": "58b78aec60fdbf5194ea97ad8092851a298d1c8b9a202248aa984313f6132367",
+      "presentation/demo/verify_evidence.py": "a3289add204c9984a16350b1f627150f83f7d0170495cc940a7125866ff6dc34"
+    },
+    "scope": "Receipt bytes are hashed before parsing; changed outcomes with identical totals are rejected, including under Python -O. Direct latest-video README links resolve. Existing video/narration and final-quality limits unchanged.",
+    "checks": {
+      "baseline": "PASS",
+      "same_count_changed_outcomes_rejected": true,
+      "hash_gate_survives_python_optimization": true,
+      "manifest_files_verified": 94,
+      "readme_links_resolve": true,
+      "latest_video_sha256": "ee30cddf06d78169f3dc8bfdb619d5cd56b7272491faf0d851603eeacb58a14d"
+    }
+  }
 }

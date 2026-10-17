@@ -88,9 +88,9 @@
   "project/narration.txt": "74271b3c190388ecd1b937cdb38e4d968b55b163ca3d5456cd8e31e2e1ffbb21",
   "project/package.json": "9dd90d6c165b2fcb097962e993eb3e113f75970c311853c5f706aac4a1c3fe5a",
   "project/runtime-source-notes.txt": "883a107964f29c5c81d8e93630a183d7a08f18a798c770c06de56ee36f1d0fe3",
-  "review.json": "d8131b627589d2a1fbe35c92b6f7133d9094e9fe3fca5d4a202a02034bf5ffcf",
+  "review.json": "58e055b53b65a9f13eb7b1956981033db1c10f53ae7b9b310511a7d36bbe5b90",
   "transcript.txt": "74271b3c190388ecd1b937cdb38e4d968b55b163ca3d5456cd8e31e2e1ffbb21",
   "verification.json": "de0de5211a3650bf830b43ffc07b2a1508b0df593c44bb23dfc5510a9b17d917",
-  "verify_evidence.py": "cc34712f5cd399c95ba7834445071b1d6144c6ea64412aebb801cb9a53da3425",
+  "verify_evidence.py": "a3289add204c9984a16350b1f627150f83f7d0170495cc940a7125866ff6dc34",
   "verify_tool_calling_evidence.py": "7dadfaa4e23e294f4abe5f8cf60542fd0b0b277e02abfece2fa0d4f23b233cb9"
 }
