@@ -11,3 +11,5 @@ The matching NeMo AutoModel training configuration specifies 94 steps. A complet
 The JSON summary preserves model, adapter, control and source-result hashes. The 48 sanitized row receipts retain task identities, result codes and hashes without conversation text, code diffs, credentials, private hostnames, local host paths or source corpus. They summarize existing execution records; this audit did not run the model.
 
 Final held-out quality, reliable autonomous repository work, and reductions in human intervention remain pending.
+
+[Startup and dataset lessons](startup-lessons-source.json) identify Mark's firsthand report and the separately documented setup and data failures. The local logs do not independently establish provider overload as their root cause.

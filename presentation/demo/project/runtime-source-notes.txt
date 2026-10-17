@@ -16,3 +16,9 @@ Final held-out quality, reliable autonomous repository work, and reductions in h
 
 7Brehearsal receiptSHA256:4a72d1d222f06d1385c061ca7d4154fe8f8621747d81ae488564a81335e0c4f6
 7B20distincttrainingmetricrecords and bothmetricfilehashes were locally checked;283source,188train/30dev at2048tokens. Source commitc240beb2e19555c7825a51f040ec78d390467aec includes the endpoint development report. No live model call was made by this demo revision.
+
+# Startup experience and dataset lessons
+
+Mark directly reported on October 17, 2026 that many providers were overloaded, the team got off to a slow start, and running the datasets taught them a lot. The first-person startup narration reflects his account. Local execution documents independently record Building/Waiting status, failed initial instance creations, and an unavailable container image. These do not independently establish provider overload as their root cause.
+
+The 7B data report records 39 prefilter rejections and 26 further rows dropped because tokenization/truncation left no assistant labels, producing 188 train plus 30 development rows from 283 source records. This supports the lesson that syntactically valid data can still be unusable for the model. Passing connection or required-tool checks also did not establish successful repository work. See evidence/startup-lessons-source.json in the public demo package for source hashes.

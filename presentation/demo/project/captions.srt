@@ -1,263 +1,283 @@
 1
-00:00:00,116 --> 00:00:03,773
+00:00:00,109 --> 00:00:03,559
 I started vibecoding on February fourteenth, twenty twenty-six.
 
 2
-00:00:03,773 --> 00:00:06,177
+00:00:03,559 --> 00:00:05,827
 AI helped me turn ideas into software.
 
 3
-00:00:06,177 --> 00:00:07,767
+00:00:05,827 --> 00:00:07,327
 My GitHub graph turned green.
 
 4
-00:00:07,767 --> 00:00:11,215
+00:00:07,327 --> 00:00:10,580
 Then I noticed a problem: the agents could keep building, but too much of
 
 5
-00:00:11,215 --> 00:00:12,801
+00:00:10,580 --> 00:00:12,082
 the work still came back to me.
 
 6
-00:00:12,817 --> 00:00:15,657
-I'm Mark Hinkle, co-founder of All Things AI.
+00:00:12,092 --> 00:00:12,310
+I'm
 
 7
-00:00:15,673 --> 00:00:19,667
-I've been executive director of the Node.js Foundation, VP of developer
+00:00:12,310 --> 00:00:14,776
+Mark Hinkle, co-founder of All Things AI.
 
 8
-00:00:19,667 --> 00:00:24,109
-relations at Cloud.com, and VP of marketing at the Linux Foundation.
+00:00:14,786 --> 00:00:18,554
+I've been executive director of the Node.js Foundation, VP of developer
 
 9
-00:00:24,334 --> 00:00:26,953
-John Willis co-wrote The DevOps Handbook.
+00:00:18,554 --> 00:00:22,750
+relations at Cloud.com, and VP of marketing at the Linux Foundation.
 
 10
-00:00:26,981 --> 00:00:31,114
-He led training and services at Opscode, now Chef, worked at Enstratius,
+00:00:22,957 --> 00:00:25,433
+John Willis co-wrote The DevOps Handbook.
 
 11
-00:00:31,114 --> 00:00:35,045
-acquired by Dell, and co-founded SocketPlane, acquired by Docker.
+00:00:25,454 --> 00:00:29,353
+He led training and services at Opscode, now Chef, worked at Enstratius,
 
 12
-00:00:35,386 --> 00:00:39,376
-We know process, but lately we've spent more time managing than coding.
+00:00:29,353 --> 00:00:33,067
+acquired by Dell, and co-founded SocketPlane, acquired by Docker.
 
 13
-00:00:39,555 --> 00:00:42,086
-Today, the old guys are dusting off their keyboards.
+00:00:33,383 --> 00:00:37,153
+We know process, but lately we've spent more time managing than coding.
 
 14
-00:00:42,086 --> 00:00:45,696
-I'm explaining the same context, handing work between agents, checking
+00:00:37,316 --> 00:00:39,704
+Today, the old guys are dusting off their keyboards.
 
 15
-00:00:45,696 --> 00:00:47,991
-results, and rescuing failed attempts.
+00:00:39,704 --> 00:00:39,901
+I'm
 
 16
-00:00:48,332 --> 00:00:51,009
-More code means more decisions waiting for me.
+00:00:39,901 --> 00:00:43,592
+explaining the same context, handing work between agents, checking results,
 
 17
-00:00:51,292 --> 00:00:54,601
-The question is how to improve the system so the human doesn't become the
+00:00:43,592 --> 00:00:48,127
+and rescuing failed attempts. More code means more decisions waiting for me.
 
 18
-00:00:54,601 --> 00:00:55,398
-bottleneck.
+00:00:48,389 --> 00:00:51,510
+The question is how to improve the system so the human doesn't become the
 
 19
-00:00:55,994 --> 00:00:57,720
-Mini Gibson is our experiment.
+00:00:51,510 --> 00:00:53,109
+bottleneck. Mini
 
 20
-00:00:57,794 --> 00:01:02,357
-We want a small model to learn concrete handoffs, responses to failed tests,
+00:00:53,109 --> 00:00:57,208
+Gibson is our experiment. We want a small model to learn concrete handoffs,
 
 21
-00:01:02,357 --> 00:01:04,047
-and evidence of what changed.
+00:00:57,217 --> 00:01:00,427
+responses to failed tests, and evidence of what changed.
 
 22
-00:01:04,330 --> 00:01:08,429
+00:01:00,689 --> 00:01:04,556
 We'll compare the base model, the model inside Gibson, and the tuned model
 
 23
-00:01:08,429 --> 00:01:13,259
+00:01:04,556 --> 00:01:09,025
 inside Gibson. Our hypothesis is fewer requests for human help while the
 
 24
-00:01:13,259 --> 00:01:15,309
+00:01:09,025 --> 00:01:10,964
 work meets the same quality bar.
 
 25
-00:01:15,813 --> 00:01:17,480
-We now have two tracks.
+00:01:11,434 --> 00:01:11,741
+Getting
 
 26
-00:01:17,496 --> 00:01:22,175
-Our seven B model completed twenty training steps on Brev, using one H one
+00:01:11,741 --> 00:01:13,625
+started took longer than we expected.
 
 27
-00:01:22,175 --> 00:01:27,423
-hundred and NeMo Automodel. vLLM serves that adapter and passed connection
+00:01:14,008 --> 00:01:17,000
+We hit overloaded providers and stalled builds.
 
 28
-00:01:27,423 --> 00:01:31,347
-checks. Separately, thirty B Lightning has a loaded adapter and development
+00:01:17,316 --> 00:01:20,996
+Once we got past that, we could run our datasets and learn from actual
 
 29
-00:01:31,347 --> 00:01:34,237
-results, tested with Transformers and PEFT.
+00:01:20,996 --> 00:01:26,133
+failures. Our seven B model completed twenty training steps on Brev, using
 
 30
-00:01:34,237 --> 00:01:36,583
-We keep their datasets and results separate.
+00:01:26,133 --> 00:01:28,544
+one H one hundred and NeMo Automodel.
 
 31
-00:01:36,583 --> 00:01:41,169
-The Gibson is our process framework: define the task, isolate changes, run
+00:01:29,013 --> 00:01:32,772
+vLLM serves that adapter and passed connection checks.
 
 32
-00:01:41,169 --> 00:01:43,351
-checks, and get independent review.
+00:01:33,329 --> 00:01:37,361
+Separately, thirty B Lightning has a loaded adapter and development results,
 
 33
-00:01:43,351 --> 00:01:47,031
-Gibson Environment is the foundation that runs tools and checks their
+00:01:37,623 --> 00:01:39,694
+tested with Transformers and PEFT.
 
 34
-00:01:47,031 --> 00:01:49,736
-results. Connecting it to this model is still ahead.
+00:01:40,251 --> 00:01:42,487
+We keep their datasets and results separate.
 
 35
-00:01:49,736 --> 00:01:54,218
-The model proposes repairs. Independent review and our approval rules stay
+00:01:43,154 --> 00:01:43,329
+The
 
 36
-00:01:54,218 --> 00:01:54,949
-in place.
+00:01:43,329 --> 00:01:48,609
+Gibson is our process framework: define the task, isolate changes,
 
 37
-00:01:54,949 --> 00:01:57,724
-This is our existing Agent Kontrol dashboard.
+00:01:48,816 --> 00:01:51,622
+run checks, and get independent review.
 
 38
-00:01:57,724 --> 00:02:02,566
-It shows Claude, Grok, and Codex across the fleet: working, finished, or
+00:01:52,178 --> 00:01:55,760
+Gibson Environment is the foundation that runs tools and checks their
 
 39
-00:02:02,566 --> 00:02:05,963
-waiting for me. We can see where work gets stuck.
+00:01:55,760 --> 00:01:59,058
+results. Connecting it to this model is still ahead.
 
 40
-00:02:06,246 --> 00:02:10,275
-The experiment asks whether a specialized model can reduce the work that
+00:01:59,375 --> 00:02:04,193
+The model proposes repairs. Independent review and our approval rules stay
 
 41
-00:02:10,275 --> 00:02:11,362
-needs our attention.
+00:02:04,193 --> 00:02:05,105
+in place.
 
 42
-00:02:11,703 --> 00:02:15,859
-For the seven B rehearsal, we started with two hundred eighty-three source
+00:02:05,311 --> 00:02:08,083
+This is our existing Agent Kontrol dashboard.
 
 43
-00:02:15,859 --> 00:02:20,201
-records. Filtering and tokenization left one hundred eighty-eight training
+00:02:08,553 --> 00:02:13,438
+It shows Claude, Grok, and Codex across the fleet: working, finished, or
 
 44
-00:02:20,201 --> 00:02:24,945
-rows and thirty development rows, at a two thousand forty-eight token limit.
+00:02:13,438 --> 00:02:16,857
+waiting for me. We can see where work gets stuck.
 
 45
-00:02:25,449 --> 00:02:28,916
-We saved and reloaded a small LoRA adapter.
+00:02:17,414 --> 00:02:21,050
+The experiment asks whether a specialized model can reduce the work that
 
 46
-00:02:29,629 --> 00:02:33,437
-The separate OpenHands track still needs its training-data record matched to
+00:02:21,050 --> 00:02:22,147
+needs our attention.
 
 47
-00:02:33,437 --> 00:02:34,965
-the evaluated adapter.
+00:02:22,408 --> 00:02:26,231
+For the seven B rehearsal, two hundred eighty-three source records became
 
 48
-00:02:35,561 --> 00:02:38,332
-Working connections did not mean working software.
+00:02:26,231 --> 00:02:29,726
+one hundred eighty-eight training rows and thirty development rows.
 
 49
-00:02:39,044 --> 00:02:43,097
-The seven B adapter passed a required tool call, but failed a real
+00:02:30,195 --> 00:02:34,141
+Some examples were broken; others lost the answer at the token limit.
 
 50
-00:02:43,097 --> 00:02:47,973
-repository change. Automatic mode returned prose; forced calls repeatedly
+00:02:34,270 --> 00:02:37,261
+We saved and reloaded a small LoRA adapter.
 
 51
-00:02:47,973 --> 00:02:50,794
-targeted the wrong file. No edit was applied.
+00:02:37,643 --> 00:02:41,794
+The thirty B OpenHands track still needs its training-data record matched to
 
 52
-00:02:50,794 --> 00:02:55,159
-In the separate thirty B development run, the base passed six of twenty-four
+00:02:41,794 --> 00:02:43,440
+the evaluated adapter.
 
 53
-00:02:55,159 --> 00:02:57,825
-tasks; the adapter passed twelve.
+00:02:43,996 --> 00:02:47,316
+Our biggest lesson: a working connection isn't a finished job.
 
 54
-00:02:57,841 --> 00:03:00,082
-Those are exploratory development results.
+00:02:47,786 --> 00:02:51,685
+The seven B adapter passed a required tool call, but failed a real
 
 55
-00:03:00,082 --> 00:03:04,041
-We still need to match the training records, lock the comparison, and test
+00:02:51,685 --> 00:02:57,205
+repository change. Automatic mode returned prose; forced calls repeatedly
 
 56
-00:03:04,041 --> 00:03:08,599
-on untouched tasks. Better quality and fewer human interruptions are still
+00:02:57,205 --> 00:03:00,426
+targeted the wrong file. No edit was applied.
 
 57
-00:03:08,616 --> 00:03:09,417
-unproven.
+00:03:00,633 --> 00:03:05,004
+In the separate thirty B development run, the base passed six of twenty-four
 
 58
-00:03:09,417 --> 00:03:11,398
-Three optional pieces could help.
+00:03:05,004 --> 00:03:07,754
+tasks; the adapter passed twelve.
 
 59
-00:03:11,414 --> 00:03:14,200
-Nemo Gym would organize repeatable trials.
+00:03:08,421 --> 00:03:10,854
+Those are exploratory development results.
 
 60
-00:03:14,200 --> 00:03:18,004
-Jev would turn locked results into advice for John and me to review.
+00:03:11,115 --> 00:03:15,354
+We still need to match the training records, lock the comparison, and test
 
 61
-00:03:18,508 --> 00:03:22,543
-Langfuse would show the sequence of model calls, tools, and checks.
+00:03:15,354 --> 00:03:20,075
+on untouched tasks. Better quality and fewer human interruptions are still
 
 62
-00:03:22,954 --> 00:03:26,217
-Those connections are proposed; we're not claiming they're running.
+00:03:20,075 --> 00:03:20,842
+unproven.
 
 63
-00:03:26,217 --> 00:03:30,141
-We want useful work that passes checks and independent review, with less
+00:03:21,050 --> 00:03:22,836
+Three optional pieces could help.
 
 64
-00:03:30,141 --> 00:03:31,848
-chasing and rescuing from us.
+00:03:23,153 --> 00:03:25,805
+Nemo Gym would organize repeatable trials.
 
 65
-00:03:31,848 --> 00:03:34,699
-That's how we keep the human from becoming the bottleneck.
+00:03:26,066 --> 00:03:30,252
+Jev would turn locked results into advice for John and me to review.
 
 66
-00:03:34,715 --> 00:03:36,778
+00:03:30,722 --> 00:03:34,512
+Langfuse would show the sequence of model calls, tools, and checks.
+
+67
+00:03:35,179 --> 00:03:38,456
+Those connections are proposed; we're not claiming they're running.
+
+68
+00:03:39,012 --> 00:03:42,977
+We want useful work that passes checks and independent review, with less
+
+69
+00:03:42,977 --> 00:03:44,610
+chasing and rescuing from us.
+
+70
+00:03:44,774 --> 00:03:47,579
+That's how we keep the human from becoming the bottleneck.
+
+71
+00:03:48,048 --> 00:03:49,923
 Follow the repository on screen.

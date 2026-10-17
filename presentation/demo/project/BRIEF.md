@@ -25,4 +25,8 @@ Final held-out quality, promotion readiness, reliable autonomous work and reduce
 
 ## Delivery
 
-ElevenLabs authorized clone,580spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
+ElevenLabs authorized clone,607 spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
+
+## Startup and lessons revision
+
+Mark reported that provider overload slowed the start. Logged build failures and an unavailable container image are separate documented setup problems; they do not independently diagnose provider capacity. Show the slow start, then the concrete lessons from filtering, tokenization and real coding-task checks. Keep 7B rehearsal and 30B development results separate, with final quality and human-intervention gains pending.

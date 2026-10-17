@@ -1,6 +1,6 @@
 {
   "scene": "frame-03",
-  "duration_s": 13.908,
+  "duration_s": 13.121,
   "rules": [
     "waterfall-entry",
     "svg-path-draw"

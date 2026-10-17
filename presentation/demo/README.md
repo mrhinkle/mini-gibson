@@ -9,11 +9,15 @@ handoff, failed check, and repair waiting for a person?
 
 [![Mini Gibson development results](poster.png)](mini-gibson-demo.mp4)
 
-This approximately 3:40 demo introduces Mark Hinkle and John Willis, the human
+This approximately 3:53 demo introduces Mark Hinkle and John Willis, the human
 bottleneck, The Gibson, Agent Kontrol, the two model/data tracks, vLLM, and the
 proposed NeMo Gym, Jev, and Langfuse connections. Narration uses Mark's authorized
 ElevenLabs voice clone. The editable project uses the frozen audio; no voice API
 credential is required to replay or render it.
+
+## What the slow start taught us
+
+Mark reports overloaded providers; the records also document stalled/failed builds and an unavailable container image. Once the team got runs working, the data exposed broken examples and cases where the token limit removed the answer. The next lesson was behavioral: a model can answer and return a valid tool call while still failing to finish a real repository task. The [startup source note](evidence/startup-lessons-source.json) separates Mark's account from the logged setup problems.
 
 ## Progress reviewed on October 17, 2026
 

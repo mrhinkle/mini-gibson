@@ -1,22 +1,22 @@
 {
-  "checked_at_utc": "2026-10-17T20:04:44.385216+00:00",
+  "checked_at_utc": "2026-10-17T20:26:52.772184+00:00",
   "reviewer": "Claude, independent of Codex author",
   "script": "PASS",
   "source_and_facts": "PASS",
-  "initial_visibility_delta": "PASS",
+  "final_delta": "PASS",
+  "revision": "Provider slow start and concrete dataset lessons",
   "reviewed_source_sha256": {
-    "README.md": "bc7c51eaac5429ac7f9978f859e75c9ed117d6e4869c83e75a1b3cb0c52e37ab",
-    "presentation/README.md": "427817b86879f61f5d722897e862b4a554a98c5ab1e4a4aae2d7022f492a2faf",
-    "presentation/demo/README.md": "a515ac18fb0e64c906ab7a5d21ba7823bbc75175842f0e9dd5159407e25fc639",
-    "presentation/demo/verify_evidence.py": "cc34712f5cd399c95ba7834445071b1d6144c6ea64412aebb801cb9a53da3425",
-    "presentation/demo/project/index.html": "a0ad58b70f677a5c0c82fb5da85854364e64e402b3168aaa69119de644d58d2f",
-    "presentation/demo/project/compositions/frames/frame-05.html": "62ae69bc760d2a47e5bca109ed000d428043aee6d313aee4cc2cd5212766b998",
-    "presentation/demo/project/compositions/frames/frame-08.html": "acec189ee12e3b736192a0a0d42aee7832418ee758c96d4c6ee755077277a2c3",
-    "presentation/demo/project/compositions/frames/frame-09.html": "1c21d8bbf33d90cd2f98a66ae3fec2701bb6686d8b00d7b5cbfbae3a269c90b4",
-    "presentation/demo/project/narration.txt": "1a7e4b1b4506193675b788c816bd1098f0154a0daeb1ae7496691501779d6fb0",
-    "presentation/demo/evidence/lightning-v7-development-summary.json": "42f3a58d922e599ae048889b8b8ac6f85c24c7359736c413e20b411c820910cc",
-    "presentation/demo/evidence/ocr7b-vllm-development-summary.json": "7b2a1ffdb0b939f4a9dae52f87d1f296ef9c9dab0505131f0270ce9730ed9a0e",
-    "presentation/demo/evidence/ocr7b-rehearsal-summary.json": "4568b42e7c30e013441017e72500e4b675cb66315b608a37be8db3054dc6db46"
+    "presentation/demo/README.md": "ec27c949c6d012207889fae750f6db8f28c5d30651e55ab967d11a985c33443a",
+    "presentation/demo/project/index.html": "b496af839dd9c589dcfb504e5fcc5b67ef276c232f685656b1a47b106519d2da",
+    "presentation/demo/project/narration.txt": "69391ad1a222668428f583844ada001288c950e46709c514a36981e03a0c3486",
+    "presentation/demo/project/compositions/frames/frame-05.html": "f9e20bb3b265a80605bddb932fb84c005ac05475c3c244650696a7f3eb985e8d",
+    "presentation/demo/project/compositions/frames/frame-08.html": "0e0364652aaddd1f846b2e25575c02ebf53194bbdfe898aef8e9d111a2421d2f",
+    "presentation/demo/project/compositions/frames/frame-09.html": "05e784c17fd4e4797f11e76e57292fba1d2fb72bed0a7e287570d54a5b252e4e",
+    "presentation/demo/evidence/startup-lessons-source.json": "5506dc5aeef22a9a0f053c4e3a6dafaecd11a5911ac2c9ad5a4bc64ef467b1be",
+    "presentation/demo/project/frame.md": "fafca95861537e36d7a51893dd1a15f2de09309e64854e8e1e3f656cdd5be3d6",
+    "presentation/demo/project/compositions/frames/frame-11.html": "37561c95086d8a3f5942b0f30e63dc7a81383f97b65f539f9057d219160b49be"
   },
-  "scope": "Artifact/source/count review; no training, inference, causal-quality or deployment approval"
+  "measurement_metadata_sha256": "e18ba5bddc379665e6ac45415d68941e6ad401fbb854dce2e0813749b7a7b905",
+  "measurement_note": "Stale source level fields noted by reviewer were replaced with FFmpeg measurements of the new audio. Full decoded MP4 levels are in verification.json.",
+  "scope": "Source and fact review of this bounded revision, with previous reviewed experiment evidence retained. No training, inference, causal-quality or deployment approval."
 }

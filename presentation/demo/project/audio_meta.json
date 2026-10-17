@@ -2,12 +2,19 @@
   "provider": "ElevenLabs via authenticated Composio proxy",
   "voice": "Mark Hinkle",
   "audio_file": "assets/narration.mp3",
-  "duration_seconds": 216.781497,
+  "duration_seconds": 230.005918,
   "captions": "captions.srt",
   "alignment": "assets/narration.alignment.json",
-  "mix_gain_db": 5,
-  "source_mean_db": -28.4,
-  "source_max_db": -6.7,
-  "predicted_mix_max_db": -1.7,
-  "narrative_revision": "Human bottleneck; completed 7B rehearsal; 30B plan; 2026-10-17"
+  "mix_gain_db": 3.8,
+  "source_mean_db": -28.6,
+  "source_max_db": -4.4,
+  "predicted_mix_max_db": -0.6,
+  "narrative_revision": "Provider slow start and concrete dataset lessons; 7B rehearsal and 30B development kept separate",
+  "timing_adjustment": {
+    "pitch_preserved": true,
+    "tempo_multiplier": 1.06,
+    "method": "FFmpeg atempo; word and character timestamps scaled by the same multiplier",
+    "source_duration_seconds": 243.81
+  },
+  "mix_gain_linear": 1.54881662
 }
