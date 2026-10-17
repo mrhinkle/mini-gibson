@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/sequential-execution-freeze.v1.schema.json",
+  "title": "Mini Gibson pre-outcome execution freeze v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "candidate_plan_sha256", "status", "qualified_lock_sha256",
+    "training_exclusion_registry_sha256", "ordered_all_instance_ids_sha256",
+    "ordered_development_instance_ids_sha256", "formal_outcomes_may_begin"
+  ],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-sequential-execution-freeze/v1"},
+    "candidate_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "status": {"const": "frozen_before_formal_outcomes"},
+    "qualified_lock_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pilot-budget", "development-a", "development-b", "development-c"],
+      "properties": {
+        "pilot-budget": {"$ref": "#/$defs/sha256"},
+        "development-a": {"$ref": "#/$defs/sha256"},
+        "development-b": {"$ref": "#/$defs/sha256"},
+        "development-c": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "training_exclusion_registry_sha256": {"$ref": "#/$defs/sha256"},
+    "ordered_all_instance_ids_sha256": {"$ref": "#/$defs/sha256"},
+    "ordered_development_instance_ids_sha256": {"$ref": "#/$defs/sha256"},
+    "formal_outcomes_may_begin": {"const": true}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

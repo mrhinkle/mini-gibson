@@ -6,10 +6,12 @@ the 35 Gibson Bench v0.1 final-holdout tasks remain sealed.
 ## Decision
 
 Add a separate evaluator for real repositories instead of extending the 48-task
-synthetic-fixture harness. Freeze 144 scored development tasks and a disjoint
-24-task pilot from `nebius/SWE-rebench-V2` at dataset revision
+synthetic-fixture harness. Freeze three disjoint 144-task scored development
+cohorts and a disjoint 24-task pilot from `nebius/SWE-rebench-V2` at dataset revision
 `10483de0f50fe5da545942705a76c6150171af7f`. Use the pilot only to choose a
-single 30- or 50-turn budget before any scored task runs.
+single 30- or 50-turn budget before any scored task runs. The bounded sequential
+protocol and fixed alpha spending are specified in
+[`sequential-development-evaluation.md`](sequential-development-evaluation.md).
 
 The first implementation slice is deliberately smaller than a scored run:
 
@@ -62,9 +64,10 @@ The validator fails closed unless all of these hold:
   the frozen exclusion registry;
 - no repository, source PR, source issue, base or merge commit, image/task
   cluster, episode, fork, or backport identity intersects the registry;
-- the 144-task scored cohort spans at least eight languages and 24 repositories,
+- each 144-task scored cohort spans at least eight languages and 24 repositories,
   with no more than eight tasks from one repository;
-- the 24-task pilot is disjoint from the scored cohort and all training data;
+- the 24-task pilot and all three scored cohorts are mutually disjoint and
+  disjoint from all training data;
 - every task is labeled `pilot` or `development`, never `holdout`.
 
 The selection-time exclusion registry covers the 48 completed synthetic
@@ -129,7 +132,8 @@ are insufficient for this experiment.
 
 ## Arms and frozen budget
 
-Run one deterministic paired trial on identical ordered task IDs for:
+Run one deterministic paired trial on identical ordered task IDs for each
+pre-frozen development cohort:
 
 - `base`: pinned Nemotron 3.5 Lightning base, no adapter;
 - `v1`: the current adapter, pinned by config, weights, source, and export hashes;
@@ -139,7 +143,10 @@ All arms use greedy decoding, `max_new_tokens=1536`, a 32,768-token input cap,
 one scored attempt, 120-second shell calls, a 900-second verifier timeout,
 1,800-second total task wall clock, and 12,000-character deterministic tool
 observations plus a full-output hash. The 24-task pilot selects 30 or 50 turns
-using a predeclared rule; the choice is frozen before the 144-task run.
+using a predeclared rule; the choice is frozen before the first 144-task run.
+Primary looks occur only at cumulative N=144, 288 and 432 with one-sided alpha
+0.010, 0.015 and 0.025. Stop at the maximum N=432; never add tasks or open the
+35-task final holdout solely to chase significance.
 
 ## First-slice acceptance
 
