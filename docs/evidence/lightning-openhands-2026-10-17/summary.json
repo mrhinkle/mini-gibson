@@ -1,0 +1,107 @@
+{
+  "study": "Mini-Gibson Nemotron 3.5 Lightning OpenHands fine-tune",
+  "date": "2026-10-17",
+  "status": "complete",
+  "scope": "development_only",
+  "final_holdout_consumed": false,
+  "decision": "do_not_promote",
+  "conclusion": "Directional issue-resolution gain, no statistically established advantage, and a material malformed-response regression.",
+  "stopping_rule": {
+    "maximum_tasks": 48,
+    "required_net_task_gain": 3,
+    "required_discordant_pairs": 8,
+    "required_one_sided_exact_p_lte": 0.05
+  },
+  "outcomes": {
+    "stage1": {
+      "n": 24,
+      "base_pass": 6,
+      "tuned_pass": 12,
+      "tuned_only_win": 8,
+      "base_only_win": 2,
+      "both_pass": 4,
+      "both_fail": 10,
+      "difference_percentage_points": 25.0,
+      "one_sided_exact_p": 0.0546875,
+      "paired_bootstrap_90_ci_percentage_points": [4.1666666667, 45.8333333333]
+    },
+    "stage2": {
+      "n": 24,
+      "base_pass": 3,
+      "tuned_pass": 4,
+      "tuned_only_win": 4,
+      "base_only_win": 3,
+      "both_pass": 0,
+      "both_fail": 17,
+      "difference_percentage_points": 4.1666666667,
+      "one_sided_exact_p": 0.5,
+      "paired_bootstrap_90_ci_percentage_points": [-12.5, 20.8333333333]
+    },
+    "combined": {
+      "n": 48,
+      "base_pass": 9,
+      "tuned_pass": 16,
+      "tuned_only_win": 12,
+      "base_only_win": 5,
+      "both_pass": 4,
+      "both_fail": 27,
+      "difference_percentage_points": 14.5833333333,
+      "one_sided_exact_p": 0.0717315673828125,
+      "paired_bootstrap_90_ci_percentage_points": [0.0, 29.1666666667]
+    }
+  },
+  "tool_reliability": {
+    "base": {
+      "invalid_responses": 8,
+      "generations": 443,
+      "invalid_response_rate": 0.0180586907,
+      "tasks_affected": 8
+    },
+    "tuned": {
+      "invalid_responses": 21,
+      "generations": 250,
+      "invalid_response_rate": 0.084,
+      "tasks_affected": 21
+    },
+    "paired_task_incidence": {
+      "tuned_only_affected": 14,
+      "base_only_affected": 1,
+      "both_affected": 7,
+      "one_sided_exact_p_tuned_worse": 0.00048828125
+    }
+  },
+  "training": {
+    "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    "model_revision": "a9904d24bcc1d289a1950fa9d2b978c47cf903b9",
+    "source_dataset": "nvidia/SWE-Hero-openhands-trajectories",
+    "source_dataset_revision": "150bc119e52c647216fce285fd801f16b6fd745b",
+    "train_examples": 188,
+    "development_examples": 30,
+    "optimizer_steps": 94,
+    "final_train_loss": 0.48766979575157166,
+    "final_validation_loss": 0.4860481321811676,
+    "training_data_manifest_sha256": "adcc36778c0d64221133fb7d06e6b204bf972ec7f665049a0b22fbc7dbcbd704",
+    "training_config_sha256": "b93a8961fef50dd78d64d9448586dfe23d6c49d4627d1c7269d77fe27aad07d8"
+  },
+  "adapter": {
+    "source_weights_sha256": "7acf4381661099918c3d41c8196f919dbebd6e496831e1af5c59de6bf857a612",
+    "inference_weights_sha256": "a7c6f56ea24527816a0a2c4aa652b7e28e4766ba902deaebb9186727d9bda23c",
+    "inference_config_sha256": "1f2871fa1b90e1d546e5fb319ad39db4451514415535432d1764847e7513d410",
+    "export_manifest_sha256": "6585c0051daa5df84a4069450eefaaec8f1c22cdde50613a537c61b003d15a7b",
+    "loaded_tensors": 188,
+    "loaded_parameters": 6749696,
+    "offline_reload_smoke": "passed"
+  },
+  "integrity": {
+    "harness_errors": 0,
+    "policy_violations": 0,
+    "tests_tampered": 0,
+    "unauthorized_changes": 0,
+    "stage1_harness_sha256": "43e48f468b962b55566c80d4eb09a9ce2f5b135fd415a0226ac9ed928d2a369f",
+    "stage1_lock_sha256": "0dc5ad19637e1f6c9925c4a3002dd884baf9f1fdfb0b491f53f039151424ac68",
+    "stage1_fixture_tree_sha256": "6ab467372b242132e76408d3be06624ba209afc601499f4244268766014ddc81",
+    "stage2_harness_sha256": "77fe13ff512e99fc8a1e64d42b9f7fa33a3001c8c32a243b0276783abc4bf625",
+    "stage2_lock_sha256": "212a540bd33c35cb93463fba7c6abdd51d2e7b870967df406c56aba8b14e19a6",
+    "stage2_fixture_tree_sha256": "6fa7d526643f67becaa623be09c7bf485e6e56aaed1704d2746cdfa16f5ac0bc"
+  }
+}
