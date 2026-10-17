@@ -35,3 +35,30 @@ the fixed cumulative looks at N=144/288/432. See
 The next implementation slice is a hardened Docker broker and repeated
 base-fail/gold-pass qualification smoke on a small upstream sample. Until that
 exists, no candidate report can become a frozen lock or a scored result.
+
+## Frozen 2026-10-17 candidate sequence
+
+The outcome-blind pilot plus development A/B/C candidate sequence is committed
+under
+[`frozen/mini-gibson-v2-sequential-2026-10-17/`](frozen/mini-gibson-v2-sequential-2026-10-17/).
+It binds the exact public Parquet revision and SHA-256, the pre-plan exclusion
+registry, all 456 ordered task IDs and public fingerprints, and the candidate
+selector/validator/schema source hashes. The committed reports are still
+non-runnable: immutable image digests, AST-edit fingerprints, executed parser
+source hashes, sealed verifier bytes, and two-by-two qualification receipts
+remain required before an execution freeze can be finalized.
+
+Regenerate from the exact pinned Parquet bytes with an environment that has
+`pyarrow` installed:
+
+```bash
+python -m evaluation.freeze_real_cohorts \
+  --parquet /bounded/path/train-00000-of-00001.parquet \
+  --output-dir evaluation/frozen/mini-gibson-v2-sequential-2026-10-17 \
+  --repo-root .
+```
+
+The command reads only the twelve eligibility/provenance columns listed in the
+freeze evidence and does not inspect model outcomes. It does not read or run
+the 35-task Gibson Bench final holdout; the stronger repository boundary in the
+committed v1 training manifest excludes all three internal holdout repositories.

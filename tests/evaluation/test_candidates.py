@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 
 import pytest
 
-from evaluation.candidates import CandidateSelectionError, _source_pr, select_candidates
+from evaluation.candidates import (
+    CandidateSelectionError,
+    _source_pr,
+    prepare_candidate_pool,
+    select_candidates,
+    select_prepared_candidates,
+)
 
 LANGUAGES = ("python", "ts", "go", "rust", "java", "ruby")
 
@@ -81,7 +87,25 @@ def test_candidate_selection_is_deterministic_non_runnable_and_non_leaking() -> 
     assert len({item["language"] for item in first["candidates"]}) >= 6
     assert len({item["repo"] for item in first["candidates"]}) >= 12
     encoded = json.dumps(first).casefold()
-    for forbidden in ("fail_to_pass", "pass_to_pass", "test_patch\"", "\"patch\"", "problem_statement"):
+    for forbidden in (
+        "fail_to_pass",
+        "pass_to_pass",
+        'test_patch"',
+        '"patch"',
+        "problem_statement",
+    ):
+        assert forbidden not in encoded
+
+
+def test_prepared_pool_matches_direct_selection_without_retaining_patches() -> None:
+    rows = [record(index) for index in range(36)]
+    direct = select_candidates(rows, registry(), mode="pilot", seed=414)
+    pool = prepare_candidate_pool(iter(rows))
+    prepared = select_prepared_candidates(pool, registry(), mode="pilot", seed=414)
+    assert prepared == direct
+    assert pool.records_seen == 36
+    encoded = json.dumps(pool.eligible).casefold()
+    for forbidden in ('"patch"', '"test_patch"', "problem_statement"):
         assert forbidden not in encoded
 
 
@@ -99,7 +123,13 @@ def test_registry_overlap_and_unsafe_records_are_counted() -> None:
 
 def test_frozen_cardinality_cannot_be_overridden() -> None:
     with pytest.raises(CandidateSelectionError, match="frozen pilot size"):
-        select_candidates([record(index) for index in range(36)], registry(), mode="pilot", seed=1, target=23)
+        select_candidates(
+            [record(index) for index in range(36)],
+            registry(),
+            mode="pilot",
+            seed=1,
+            target=23,
+        )
 
 
 def test_source_pr_prefers_official_url_then_uses_instance_suffix() -> None:
@@ -112,9 +142,41 @@ def test_source_pr_prefers_official_url_then_uses_instance_suffix() -> None:
     )
 
 
+def test_candidate_issues_keep_only_numeric_same_repo_urls() -> None:
+    rows = [record(index) for index in range(36)]
+    urls = rows[0]["meta"]["llm_metadata"]["external_urls"]
+    urls.extend(
+        [
+            "https://github.com/upstream0/project0/issues/1000#issuecomment-7",
+            "https://github.com/upstream0/project0/issues/new",
+            "https://github.com/other/project/issues/22",
+            "https://github.com/upstream0/project0/issues/23/comments",
+        ]
+    )
+    pool = prepare_candidate_pool(rows)
+    prepared = {row["instance_id"]: row for row in pool.eligible}
+    assert prepared[rows[0]["instance_id"]]["source_issue_urls"] == [
+        "https://github.com/upstream0/project0/issues/1000"
+    ]
+
+
 def test_insufficient_diversity_fails() -> None:
     rows = [record(index) for index in range(30)]
     for row in rows:
         row["language"] = "python"
     with pytest.raises(CandidateSelectionError, match="language diversity"):
+        select_candidates(rows, registry(), mode="pilot", seed=414)
+
+
+def test_selection_fails_closed_when_unique_fingerprints_cannot_fill_target() -> None:
+    rows = [record(index) for index in range(36)]
+    for index, row in enumerate(rows):
+        row["patch"] = (
+            "diff --git a/src/shared.py b/src/shared.py\n"
+            "--- a/src/shared.py\n+++ b/src/shared.py\n"
+            f"@@ -1 +1 @@\n-old {index}\n+new {index}\n"
+        )
+    with pytest.raises(
+        CandidateSelectionError, match="could not reserve|cannot fill target"
+    ):
         select_candidates(rows, registry(), mode="pilot", seed=414)

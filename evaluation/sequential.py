@@ -26,7 +26,11 @@ from functools import cache, lru_cache
 from pathlib import Path
 from typing import Any
 
-from .candidates import _load_jsonl, select_candidates
+from .candidates import (
+    _load_jsonl,
+    prepare_candidate_pool,
+    select_prepared_candidates,
+)
 from .cohort import (
     DATASET,
     DATASET_REVISION,
@@ -376,20 +380,22 @@ def freeze_sequential_plan(
 ) -> dict[str, Any]:
     """Freeze the pilot and all 432 development candidates in one operation.
 
-    The input records are materialized before selection so generators and lists
-    produce identical output.  Previously selected identities and fingerprints
-    become fail-closed exclusions for every later cohort.
+    The input records are reduced to safe, outcome-blind projections in one
+    streaming pass. Previously selected identities and fingerprints become
+    fail-closed exclusions for every later cohort.
     """
 
     _nonempty(plan_id, "plan_id")
     _integer(master_seed, "master_seed", 0)
     validate_registry(registry)
-    rows = tuple(records)
+    pool = prepare_candidate_pool(records)
     working_registry = deepcopy(registry)
     cohorts: list[dict[str, Any]] = []
     for spec in COHORT_SPECS:
         seed = master_seed + spec["seed_offset"]
-        report = select_candidates(rows, working_registry, mode=spec["mode"], seed=seed)
+        report = select_prepared_candidates(
+            pool, working_registry, mode=spec["mode"], seed=seed
+        )
         wrapper = {
             "cohort_id": spec["cohort_id"],
             "mode": spec["mode"],
