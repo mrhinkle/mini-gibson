@@ -46,6 +46,10 @@ The paired task-incidence test for the malformed-response regression is one-side
 
 The remote training-data manifest attested in every tuned row was recovered and included as `training/training-data-manifest.json`; its SHA-256 is `adcc36778c0d64221133fb7d06e6b204bf972ec7f665049a0b22fbc7dbcbd704`.
 
+## Post-study token-cap diagnostic
+
+All 21 malformed tuned responses ended exactly at the original 512-token limit. A bounded rerun of only those affected development tasks at 1024 tokens reduced malformed tasks from 21 to 4 and recovered 8 passes, confirming a material evaluator/scaffold mismatch. It did not remove the reliability problem: 13 tasks still failed, 17 produced execution errors, and one attempted to modify a test file. A final 1536-token check recovered two of the four residual tasks; two still truncated. These adaptively selected reruns are diagnostic and do not change the frozen 48-task statistics or decision. See [the complete diagnostic report](diagnostics/token-cap/REPORT.md).
+
 ## Decision
 
 Do not promote this adapter or spend the untouched final holdout. The next experiment should first address tool-format validity and increase diverse, successful, contamination-screened OpenHands supervision. Then run a newly preregistered paired study. The recommended data plan is in [DATASET-STRATEGY.md](DATASET-STRATEGY.md).

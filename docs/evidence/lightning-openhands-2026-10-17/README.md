@@ -10,6 +10,7 @@ Start with:
 - [figures/effect-estimates.svg](figures/effect-estimates.svg) — directly labeled effect estimates.
 - [summary.json](summary.json) — machine-readable outcomes and provenance.
 - [DATASET-STRATEGY.md](DATASET-STRATEGY.md) — recommended next training-data mix.
+- [diagnostics/token-cap/REPORT.md](diagnostics/token-cap/REPORT.md) — bounded 512→1024→1536 truncation diagnosis; it does not replace the frozen comparison.
 - [verify_evidence.py](verify_evidence.py) — standard-library integrity and outcome verification.
 - [SHA256SUMS](SHA256SUMS) — immutable file hashes, generated after packaging.
 
@@ -19,6 +20,7 @@ Start with:
 - All 48 public synthetic development fixtures.
 - Frozen evaluator source and locks for both stages.
 - The exact fine-tuning configuration and the recovered training-data manifest whose hash is attested in every tuned evaluation row.
+- The post-study token-cap diagnostic, including exact evaluator variants, locks, complete result rows, and an independent verifier.
 - Training and adapter provenance, but not model weights.
 
 ## Deliberately excluded

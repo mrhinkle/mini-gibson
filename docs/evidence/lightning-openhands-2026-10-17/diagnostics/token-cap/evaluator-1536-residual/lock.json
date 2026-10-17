@@ -1,0 +1,15 @@
+{
+  "agent_contract_sha256": "fe8bafed9e0e789421a9b09506407ca1094b6557207cac03d0809680ec480451",
+  "entrypoint_sha256": "6bf73b9b373d21733fe594a1f2b13846aebbecbf6d85e9d90dbadb47b299760a",
+  "evaluation_task_ids": [
+    "fresh-c-format-bytes",
+    "fresh-c-nested-update",
+    "fresh-d-luhn-check",
+    "fresh-d-dependency-order"
+  ],
+  "fixtures_sha256": "6fa7d526643f67becaa623be09c7bf485e6e56aaed1704d2746cdfa16f5ac0bc",
+  "harness_sha256": "5d82507fbbb8237284cb952aac07e2aa5f748aa364a9d339cf526b612af87818",
+  "observability_sha256": "ce83967c04fc1413d9db03db42180328458daeec02361fe960797e9759ce417f",
+  "system_prompt_sha256": "317479fb2f76d3f77a50e0e4f5e7f15bda7851bf3f4f6668a0752a2f11acc500",
+  "tools_sha256": "f3c3bfa919fe6c5e85fef28c00e70e6ca737ff42101fcc3a21f98105cd8588bf"
+}
