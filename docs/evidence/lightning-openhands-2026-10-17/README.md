@@ -11,6 +11,7 @@ Start with:
 - [summary.json](summary.json) — machine-readable outcomes and provenance.
 - [DATASET-STRATEGY.md](DATASET-STRATEGY.md) — recommended next training-data mix.
 - [diagnostics/token-cap/REPORT.md](diagnostics/token-cap/REPORT.md) — bounded 512→1024→1536 truncation diagnosis; it does not replace the frozen comparison.
+- [ARCHIVE-RECEIPT.md](ARCHIVE-RECEIPT.md) — off-host bundle hashes and restored-copy reload verification.
 - [verify_evidence.py](verify_evidence.py) — standard-library integrity and outcome verification.
 - [SHA256SUMS](SHA256SUMS) — immutable file hashes, generated after packaging.
 
@@ -21,6 +22,7 @@ Start with:
 - Frozen evaluator source and locks for both stages.
 - The exact fine-tuning configuration and the recovered training-data manifest whose hash is attested in every tuned evaluation row.
 - The post-study token-cap diagnostic, including exact evaluator variants, locks, complete result rows, and an independent verifier.
+- An integrity receipt for the off-host artifact bundle and restored-copy adapter smoke.
 - Training and adapter provenance, but not model weights.
 
 ## Deliberately excluded

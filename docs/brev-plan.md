@@ -31,3 +31,9 @@ Secrets are injected at runtime, never embedded.
 `gibson experiment doctor experiment.yaml`
 
 The environment is not considered reproducible until a fresh Launchable passes doctor and a model/tool smoke task.
+
+## Observed lifecycle constraint (2026-10-17)
+
+The `hyperstack_H100x2` allocation used for the Lightning fine-tune did not support stop/resume. `brev stop mini-gibson-lightning-ft` returned `instance "mini-gibson-lightning-ft" does not support stop`, and the Brev web console exposed Delete—but no Stop or Suspend—in the instance actions.
+
+Treat this as provider- and instance-type-specific evidence, not a permanent platform guarantee. Before a future launch that must pause without losing its disk, require a stoppable offering and verify the lifecycle controls before training. For a non-stoppable allocation, copy and hash required artifacts before requesting deletion; deletion is the only observed way to end that allocation.
