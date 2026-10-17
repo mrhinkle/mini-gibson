@@ -52,3 +52,13 @@ These are dated snapshots, not current commands or approved experiment settings:
 
 Each snapshot carries a superseded header. Current guides take precedence over
 old filenames, pre-export counts, strict-order proposals and candidate pins.
+
+## Archived code package
+
+The [October 15 source overlay](archive/2026-10-15/mini-gibson-readiness-code.zip)
+is preserved as a public-safe archive. All 11 source files and the code hash
+manifest are byte-identical to the reviewed package and current main. The README
+retains dated context, with private host paths and corpus fingerprints removed.
+The archive has no corpus, token arrays, private session logs, weights or
+credentials. Its overlay instructions are historical; use the current guides
+above instead of applying it over main.
