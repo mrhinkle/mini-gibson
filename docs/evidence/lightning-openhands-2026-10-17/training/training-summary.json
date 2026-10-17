@@ -1,0 +1,39 @@
+{
+  "run": {
+    "optimizer_steps_completed": 94,
+    "optimizer_steps_planned": 94,
+    "exit_code": 0,
+    "final_train_loss": 0.48766979575157166,
+    "validation_loss": {
+      "24": 0.5334498,
+      "49": 0.4986342,
+      "74": 0.4889666,
+      "93": 0.4860481321811676
+    }
+  },
+  "environment": {
+    "container_image": "nvcr.io/nvidia/nemo-automodel:26.06.00",
+    "container_image_digest": "sha256:1837cd72ad6e347904f32f86e012b28d3b16135ec8fca187d135dccb6a662da0",
+    "gpu_count": 2,
+    "gpu_model": "NVIDIA H100 PCIe"
+  },
+  "checkpoint": {
+    "relative_path": "output-lightning/checkpoints/epoch_0_step_93",
+    "source_adapter_tensor_count": 202,
+    "source_adapter_parameter_count": 7072256,
+    "source_adapter_weights_sha256": "7acf4381661099918c3d41c8196f919dbebd6e496831e1af5c59de6bf857a612",
+    "source_adapter_config_sha256": "eab35041a6f748319ff9450f8305e00a6789f7b005185bfd0d7a1ee605faf819",
+    "checkpoint_config_sha256": "95db5d7ea66f16d2888fab54f85bec4a8cedc28113b1e5b45cc23698a87b3c97"
+  },
+  "inference_export": {
+    "excluded_nemo_mtp_tensors": 14,
+    "tensor_count": 188,
+    "parameter_count": 6749696,
+    "adapter_weights_sha256": "a7c6f56ea24527816a0a2c4aa652b7e28e4766ba902deaebb9186727d9bda23c",
+    "adapter_config_sha256": "1f2871fa1b90e1d546e5fb319ad39db4451514415535432d1764847e7513d410",
+    "export_manifest_sha256": "6585c0051daa5df84a4069450eefaaec8f1c22cdde50613a537c61b003d15a7b",
+    "offline_exact_reload": "passed",
+    "max_logit_delta_vs_base": 4.0,
+    "generated_text": "READY"
+  }
+}
