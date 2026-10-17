@@ -1,6 +1,6 @@
 {
   "scene": "frame-09",
-  "duration_s": 37.054,
+  "duration_s": 33.588898,
   "rules": [
     "waterfall-entry",
     "svg-path-draw"
@@ -13,5 +13,5 @@
     "vector": "0 px/s at first frame; headline begins downward-offset arrival at 0.08s",
     "from_rest": true
   },
-  "revision": "Human bottleneck narrative; established animation proportionally retimed"
+  "revision": "3m30s pacing; narration and established motion accelerated together, final hold retained"
 }

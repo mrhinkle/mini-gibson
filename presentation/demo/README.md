@@ -9,13 +9,15 @@ handoff, failed check, and repair waiting for a person?
 
 [![Why The Gibson?](poster.png)](mini-gibson-demo.mp4)
 
-This approximately 3:51 demo introduces Mark Hinkle and John Willis, the human
+This approximately 3:30 demo introduces Mark Hinkle and John Willis, the human
 bottleneck, The Gibson, Agent Kontrol, the two model/data tracks, vLLM, and the
 proposed NeMo Gym, Jev, and Langfuse connections. Narration uses Mark's authorized
 ElevenLabs voice clone. The editable project uses the frozen audio; no voice API
 credential is required to replay or render it.
 
 The “Why The Gibson?” segment uses Mark's supplied still from *Hackers* (1995) and his self-deprecating naming joke, then returns to the engineering process. The [film/image source note](evidence/gibson-name-source.json) records the attribution and asset hash.
+
+The final narration runs about 10.3% faster with its pitch preserved, bringing the video to 3:30. Captions and visual cues are retimed together, with a three-second closing hold. See the [audio pacing record](project/audio_meta.json).
 
 ## What the slow start taught us
 

@@ -1,6 +1,6 @@
 {
   "scene": "frame-06",
-  "duration_s": 20.5056462585034,
+  "duration_s": 18.588062,
   "rules": [
     "waterfall-entry",
     "svg-path-draw"
@@ -13,5 +13,5 @@
     "vector": "stationary 0 px/s; arrival begins at 0.04-0.05s",
     "from_rest": true
   },
-  "revision": "Hackers naming origin followed by cue-synchronized Gibson process"
+  "revision": "3m30s pacing; narration and established motion accelerated together, final hold retained"
 }

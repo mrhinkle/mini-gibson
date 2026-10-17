@@ -1,17 +1,18 @@
 {
-  "checked_at_utc": "2026-10-17T20:49:26.902330+00:00",
+  "checked_at_utc": "2026-10-17T21:00:55.681120+00:00",
   "reviewer": "Claude, independent of Codex author",
   "source_and_facts": "PASS",
-  "revision": "Hackers naming origin and supplied film still",
+  "revision": "3:30 pacing with pitch preserved",
   "reviewed_source_sha256": {
     "presentation/demo/project/narration.txt": "35dbd7c02ca7461b0194d8c1819f70d3241e9c431ae8fabfba7449404c89f053",
-    "presentation/demo/project/index.html": "4f8b6bc5c73955a353a81b556ec88785c0c3e25e38145a9af9a89bb802b0d785",
-    "presentation/demo/project/compositions/frames/frame-06.html": "99ccbdf274d0343d142c0e19408d998ac477beb5475efc01db41ae359aa9331f",
-    "presentation/demo/project/runtime-source-notes.txt": "498ec516c799f43a66a754717a4b88c889aa5e0a8c132caf84be4dcf6a7ae4a1"
+    "presentation/demo/project/index.html": "0e87f6f541bbcc17a3c2e42d1235a80aa3a72e2fbb6779b17df06367e3afe227",
+    "presentation/demo/project/compositions/frames/frame-01.html": "f2b3a677b82555b8c217480d2ea8f75f7198e6d2e0e26bc84d2f8c95aaf3fd74",
+    "presentation/demo/project/compositions/frames/frame-06.html": "41a1331c5f78a31fcf0d5f03affb0a11705cc25b966e8bc0dad3dbbed99984e6",
+    "presentation/demo/project/compositions/frames/frame-11.html": "0cc17d08c80dcdacfd48e085ff0d886c8fc0e5522870f6c26f5ba2d708aceafc"
   },
-  "previous_review_commit": "d5feefa7ca6f5b32cfa0714982999e0e4fb108c7",
-  "previous_review_sha256": "65fde9f5af8f1f56df9a106be74bc432a664031c8ef2142e084ba93d926ac7b6",
-  "measurement_metadata_sha256": "c1fdc53ba269980b8bf9d8911a9bc14232e1f18c91a1990951fa29b66e49e594",
+  "previous_review_commit": "ebe10e6a55099e1c991c87c2f839770e90e7bf9e",
+  "previous_review_sha256": "8a04453fbe93440e664d0c7c3d7a680a7ef92b90684c2c77de08c5b36889e2d7",
+  "measurement_metadata_sha256": "e5b874a1fa4692a23b5f9170ff2184f0bf4b7275b8f91fe517faab98e56763fc",
   "measurement_note": "Source levels were refreshed with FFmpeg after the bounded narration edit. Decoded MP4 levels are in verification.json.",
   "scope": "Independent source, timing, cue, claim and mechanism review of this bounded edit; visual stills inspected separately. Existing reviewed runtime evidence retained. No training, inference, quality-gain or deployment approval."
 }

@@ -1,7 +1,7 @@
 {
-  "bytes": 24394148,
-  "sha256": "442c63301d7f253a63d476473cda5aef560da1c838098a247f6cf32a1284489b",
-  "duration_seconds": 231.366667,
+  "bytes": 22751476,
+  "sha256": "a4b16a7e31f505559367def3de76e1acbd21141afc8f3dd7693316fdd199c179",
+  "duration_seconds": 210.0,
   "width": 1920,
   "height": 1080,
   "fps": "30/1",
@@ -11,46 +11,46 @@
   "audio_sample_rate": "48000",
   "audio_channels": 2,
   "audio_volume_db": {
-    "mean_volume": -25.3,
-    "max_volume": -1.0
+    "mean_volume": -25.6,
+    "max_volume": -1.5
   },
   "full_decode": "passed",
   "narration_sha256": "35dbd7c02ca7461b0194d8c1819f70d3241e9c431ae8fabfba7449404c89f053",
-  "audio_sha256": "fc9a3c77cec4e63af610563dc226ed313306094de1302f527dc9ae9b071d844d",
+  "audio_sha256": "191c01c1e8ea7773e7d6450ff9711b4cd8f2e8a9e866e02ebfd52ca40aa1f2a2",
   "startup_report": "Provider overload is Mark Hinkle firsthand report. Logged build and image failures are separately documented; root cause is not independently established.",
   "claim_limits": "7BvLLMchecks passed per execution report; realcodingtaskfailed/noedit. Separate30BTransformers/PEFTv7developmentcounts6/24base,12/24adapter. Trainingrecordunresolved;finalheldoutquality/humaninterventiongainsunproven. No new GPU work performed for video.",
   "preview_comparisons": [
     {
-      "seconds": 7,
-      "ssim": 0.989624
+      "seconds": 6.345,
+      "ssim": 0.989669
     },
     {
-      "seconds": 32.801,
-      "ssim": 0.989314
+      "seconds": 29.734,
+      "ssim": 0.989329
     },
     {
-      "seconds": 108.9,
-      "ssim": 0.984469
+      "seconds": 98.716,
+      "ssim": 0.984467
     },
     {
-      "seconds": 122.8,
-      "ssim": 0.98698
+      "seconds": 111.316,
+      "ssim": 0.987011
     },
     {
-      "seconds": 161.15,
-      "ssim": 0.984851
+      "seconds": 146.08,
+      "ssim": 0.984858
     },
     {
-      "seconds": 198.15,
-      "ssim": 0.980465
+      "seconds": 179.62,
+      "ssim": 0.980445
     },
     {
-      "seconds": 230.5,
-      "ssim": 0.982211
+      "seconds": 209.5,
+      "ssim": 0.982217
     }
   ],
   "capture_backend": "drawelement; hardware GPU",
   "hyperframes_version": "0.8.169",
   "measured_quality_gains": "unproven; development observations only",
-  "narrative_revision": "Why The Gibson? with supplied Hackers still, then the engineering process"
+  "narrative_revision": "3:30 delivery with pitch-preserving voice speed-up; Hackers origin and reviewed experiment story retained"
 }

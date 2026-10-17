@@ -2,7 +2,7 @@
 
 ## Frame 1 — Why is everything waiting for me?
 
-Start: 0.000s. Duration: 12.092s.
+Start: 0.000s. Duration: 10.961s.
 
 Visual: Actual supplied GitHub graph, start date, then the human-bottleneck question.
 
@@ -10,7 +10,7 @@ Voiceover: I started vibecoding on February fourteenth, twenty twenty-six. AI he
 
 ## Frame 2 — The old guys are dusting off their keyboards.
 
-Start: 12.092s. Duration: 27.612s.
+Start: 10.961s. Duration: 25.030s.
 
 Visual: Real Mark and John portraits, supplied/corroborated leadership bios, old-guys keyboard line.
 
@@ -18,7 +18,7 @@ Voiceover: I'm Mark Hinkle, co-founder of All Things AI. I've been executive dir
 
 ## Frame 3 — Everything comes back to me.
 
-Start: 39.704s. Duration: 13.121s.
+Start: 35.991s. Duration: 11.894s.
 
 Visual: Explain/Handoff/Check/Fix/Verify and waiting-for-me implication.
 
@@ -26,7 +26,7 @@ Voiceover: I'm explaining the same context, handing work between agents, checkin
 
 ## Frame 4 — Can we keep work moving with less help?
 
-Start: 52.825s. Duration: 18.609s.
+Start: 47.885s. Duration: 16.869s.
 
 Visual: Less human intervention plus small model and real work history. Final hypothesis pending.
 
@@ -34,7 +34,7 @@ Voiceover: Mini Gibson is our experiment. We want a small model to learn concret
 
 ## Frame 5 — Slow start. Real lessons. / Two tracks. Different evidence.
 
-Start: 71.434s. Duration: 31.720s.
+Start: 64.754s. Duration: 28.754s.
 
 Visual: Opening: slow start, provider pressure and stalled builds; then transition to separate 7B completed rehearsal/vLLM serving and 30B loaded/development-tested evidence using Transformers/PEFT.
 
@@ -42,7 +42,7 @@ Voiceover: Getting started took longer than we expected. We hit overloaded provi
 
 ## Frame 6 — Why The Gibson? / An engineering process
 
-Start: 103.154s. Duration: 20.506s.
+Start: 93.508s. Duration: 18.588s.
 
 Visual: Supplied Hackers still and naming-origin joke; then transition to The Gibson logo, Task → Isolated change → Checks → Review. Model connection remains pending.
 
@@ -50,7 +50,7 @@ Voiceover: Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a 
 
 ## Frame 7 — Agent Kontrol: where work waits for us
 
-Start: 123.660s. Duration: 17.097s.
+Start: 112.096s. Duration: 15.498s.
 
 Visual: Actual existing Agent Kontrol screenshot; working/finished/needs-you states.
 
@@ -58,7 +58,7 @@ Voiceover: This is our existing Agent Kontrol dashboard. It shows Claude, Grok, 
 
 ## Frame 8 — Good JSON wasn't enough.
 
-Start: 140.757s. Duration: 21.588s.
+Start: 127.594s. Duration: 19.569s.
 
 Visual: Good JSON was not enough: 283 source records become 188 train/30 development rows after filtering and real tokenization at 2,048 tokens. Separate 30B OpenHands training record remains unmatched.
 
@@ -66,7 +66,7 @@ Voiceover: For the seven B rehearsal, two hundred eighty-three source records be
 
 ## Frame 9 — A connection is not a finished job.
 
-Start: 162.345s. Duration: 37.054s.
+Start: 147.163s. Duration: 33.589s.
 
 Visual: Connection and required-tool checks pass, but real 7B coding task fails with no edit. Separate exploratory 30B development comparison: 6/24 base, 12/24 adapter. Final quality and human intervention remain unproven.
 
@@ -74,7 +74,7 @@ Voiceover: Our biggest lesson: a working connection isn't a finished job. The se
 
 ## Frame 10 — Optional extensions — still proposed
 
-Start: 199.399s. Duration: 17.962s.
+Start: 180.752s. Duration: 16.282s.
 
 Visual: Gym/Jev/Langfuse optional connections clearly proposed.
 
@@ -82,7 +82,7 @@ Voiceover: Three optional pieces could help. Nemo Gym would organize repeatable 
 
 ## Frame 11 — Keep the work moving.
 
-Start: 217.361s. Duration: 13.994s.
+Start: 197.034s. Duration: 12.965s.
 
 Visual: Keepworkmoving and public repository link; final quality gains pending.
 

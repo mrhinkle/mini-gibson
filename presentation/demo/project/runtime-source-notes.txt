@@ -26,3 +26,7 @@ The 7B data report records 39 prefilter rejections and 26 further rows dropped b
 # The Gibson naming origin
 
 Mark supplied the Hackers film still and requested the naming joke. “Ridiculous” and “buffoons” express his affectionate, self-deprecating interpretation. Film metadata: Hackers (1995), MGM listing on Apple TV: https://tv.apple.com/us/movie/hackers/umc.cmc.4ug4r0vwr7og0d35al431d6zc . Image SHA256: cf60e7f4f8afcb1b6851c04de2101b1e2758ca068839fcf6b21bcb6c2e80ce3b
+
+# Delivery pacing
+
+The same frozen narration was accelerated by 1.103162x with FFmpeg atempo. No new voice generation, training, inference or experimental result was introduced. Timeline, captions and source alignment were scaled by the same factor. The closing hold remains three seconds.

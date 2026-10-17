@@ -1,352 +1,352 @@
 [
   {
-    "start": 0.109434,
-    "end": 3.559434,
+    "start": 0.0992,
+    "end": 3.226574,
     "text": "I started vibecoding on February fourteenth, twenty twenty-six."
   },
   {
-    "start": 3.559434,
-    "end": 5.827358,
+    "start": 3.226574,
+    "end": 5.282413,
     "text": "AI helped me turn ideas into software."
   },
   {
-    "start": 5.827358,
-    "end": 7.327358,
+    "start": 5.282413,
+    "end": 6.642141,
     "text": "My GitHub graph turned green."
   },
   {
-    "start": 7.327358,
-    "end": 10.580189,
+    "start": 6.642141,
+    "end": 9.590783,
     "text": "Then I noticed a problem: the agents could keep building, but too much of"
   },
   {
-    "start": 10.580189,
-    "end": 12.082075,
+    "start": 9.590783,
+    "end": 10.952221,
     "text": "the work still came back to me."
   },
   {
-    "start": 12.091509,
-    "end": 12.310377,
+    "start": 10.960773,
+    "end": 11.159173,
     "text": "I'm"
   },
   {
-    "start": 12.310377,
-    "end": 14.776415,
+    "start": 11.159173,
+    "end": 13.3946,
     "text": "Mark Hinkle, co-founder of All Things AI."
   },
   {
-    "start": 14.785849,
-    "end": 18.553774,
+    "start": 13.403152,
+    "end": 16.818719,
     "text": "I've been executive director of the Node.js Foundation, VP of developer"
   },
   {
-    "start": 18.553774,
-    "end": 22.75,
+    "start": 16.818719,
+    "end": 20.622536,
     "text": "relations at Cloud.com, and VP of marketing at the Linux Foundation."
   },
   {
-    "start": 22.956604,
-    "end": 25.433019,
+    "start": 20.809819,
+    "end": 23.054652,
     "text": "John Willis co-wrote The DevOps Handbook."
   },
   {
-    "start": 25.453774,
-    "end": 29.35283,
+    "start": 23.073466,
+    "end": 26.607902,
     "text": "He led training and services at Opscode, now Chef, worked at Enstratius,"
   },
   {
-    "start": 29.35283,
-    "end": 33.066981,
+    "start": 26.607902,
+    "end": 29.974725,
     "text": "acquired by Dell, and co-founded SocketPlane, acquired by Docker."
   },
   {
-    "start": 33.383019,
-    "end": 37.15283,
+    "start": 30.261209,
+    "end": 33.678486,
     "text": "We know process, but lately we've spent more time managing than coding."
   },
   {
-    "start": 37.316038,
-    "end": 39.703774,
+    "start": 33.826432,
+    "end": 35.990879,
     "text": "Today, the old guys are dusting off their keyboards."
   },
   {
-    "start": 39.703774,
-    "end": 39.900943,
+    "start": 35.990879,
+    "end": 36.16961,
     "text": "I'm"
   },
   {
-    "start": 39.900943,
-    "end": 43.591509,
+    "start": 36.16961,
+    "end": 39.515053,
     "text": "explaining the same context, handing work between agents, checking results,"
   },
   {
-    "start": 43.591509,
-    "end": 48.127358,
+    "start": 39.515053,
+    "end": 43.626732,
     "text": "and rescuing failed attempts. More code means more decisions waiting for me."
   },
   {
-    "start": 48.388679,
-    "end": 51.510377,
+    "start": 43.863616,
+    "end": 46.693388,
     "text": "The question is how to improve the system so the human doesn't become the"
   },
   {
-    "start": 51.510377,
-    "end": 53.109434,
+    "start": 46.693388,
+    "end": 48.14291,
     "text": "bottleneck. Mini"
   },
   {
-    "start": 53.109434,
-    "end": 57.207547,
+    "start": 48.14291,
+    "end": 51.857788,
     "text": "Gibson is our experiment. We want a small model to learn concrete handoffs,"
   },
   {
-    "start": 57.216981,
-    "end": 60.427358,
+    "start": 51.86634,
+    "end": 54.776499,
     "text": "responses to failed tests, and evidence of what changed."
   },
   {
-    "start": 60.688679,
-    "end": 64.55566,
+    "start": 55.013382,
+    "end": 58.518743,
     "text": "We'll compare the base model, the model inside Gibson, and the tuned model"
   },
   {
-    "start": 64.55566,
-    "end": 69.024528,
+    "start": 58.518743,
+    "end": 62.569705,
     "text": "inside Gibson. Our hypothesis is fewer requests for human help while the"
   },
   {
-    "start": 69.024528,
-    "end": 70.964151,
+    "start": 62.569705,
+    "end": 64.327944,
     "text": "work meets the same quality bar."
   },
   {
-    "start": 71.433962,
-    "end": 71.740566,
+    "start": 64.753821,
+    "end": 65.031753,
     "text": "Getting"
   },
   {
-    "start": 71.740566,
-    "end": 73.62547199999999,
+    "start": 65.031753,
+    "end": 66.740392,
     "text": "started took longer than we expected."
   },
   {
-    "start": 74.007547,
-    "end": 77.0,
+    "start": 67.086737,
+    "end": 69.799351,
     "text": "We hit overloaded providers and stalled builds."
   },
   {
-    "start": 77.316038,
-    "end": 80.996226,
+    "start": 70.085835,
+    "end": 73.42187,
     "text": "Once we got past that, we could run our datasets and learn from actual"
   },
   {
-    "start": 80.996226,
-    "end": 86.133019,
+    "start": 73.42187,
+    "end": 78.078297,
     "text": "failures. Our seven B model completed twenty training steps on Brev, using"
   },
   {
-    "start": 86.133019,
-    "end": 88.54433999999999,
+    "start": 78.078297,
+    "end": 80.264123,
     "text": "one H one hundred and NeMo Automodel."
   },
   {
-    "start": 89.013208,
-    "end": 92.771698,
+    "start": 80.689145,
+    "end": 84.09616,
     "text": "vLLM serves that adapter and passed connection checks."
   },
   {
-    "start": 93.329245,
-    "end": 97.36132099999999,
+    "start": 84.601568,
+    "end": 88.256585,
     "text": "Separately, thirty B Lightning has a loaded adapter and development results,"
   },
   {
-    "start": 97.622642,
-    "end": 99.69434,
+    "start": 88.493469,
+    "end": 90.371432,
     "text": "tested with Transformers and PEFT."
   },
   {
-    "start": 100.250943,
-    "end": 102.486792,
+    "start": 90.875984,
+    "end": 92.902748,
     "text": "We keep their datasets and results separate."
   },
   {
-    "start": 103.187019,
-    "end": 107.60117,
+    "start": 93.537493,
+    "end": 97.538855,
     "text": "Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch"
   },
   {
-    "start": 107.60117,
-    "end": 109.485132,
+    "start": 97.538855,
+    "end": 99.246639,
     "text": "of buffoons. We thought it was apropos."
   },
   {
-    "start": 109.485132,
-    "end": 113.975698,
+    "start": 99.246639,
+    "end": 103.31727,
     "text": "Our Gibson defines tasks, isolates changes, runs checks, and requires"
   },
   {
-    "start": 113.975698,
-    "end": 118.08324499999999,
+    "start": 103.31727,
+    "end": 107.0407,
     "text": "independent review. Gibson Environment runs the tools and checks results."
   },
   {
-    "start": 118.14834,
-    "end": 119.867208,
+    "start": 107.099708,
+    "end": 108.657836,
     "text": "Connecting the model is still ahead."
   },
   {
-    "start": 119.867208,
-    "end": 123.659967,
+    "start": 108.657836,
+    "end": 112.095915,
     "text": "The model proposes repairs; checks and approval rules stay in place."
   },
   {
-    "start": 123.659967,
-    "end": 126.431665,
+    "start": 112.095915,
+    "end": 114.608418,
     "text": "This is our existing Agent Kontrol dashboard."
   },
   {
-    "start": 126.901476,
-    "end": 131.786382,
+    "start": 115.034295,
+    "end": 119.462389,
     "text": "It shows Claude, Grok, and Codex across the fleet: working, finished, or"
   },
   {
-    "start": 131.786382,
-    "end": 135.20525,
+    "start": 119.462389,
+    "end": 122.561542,
     "text": "waiting for me. We can see where work gets stuck."
   },
   {
-    "start": 135.762797,
-    "end": 139.398646,
+    "start": 123.06695,
+    "end": 126.362793,
     "text": "The experiment asks whether a specialized model can reduce the work that"
   },
   {
-    "start": 139.398646,
-    "end": 140.495816,
+    "start": 126.362793,
+    "end": 127.357361,
     "text": "needs our attention."
   },
   {
-    "start": 140.757137,
-    "end": 144.579778,
+    "start": 127.594245,
+    "end": 131.059412,
     "text": "For the seven B rehearsal, two hundred eighty-three source records became"
   },
   {
-    "start": 144.579778,
-    "end": 148.075061,
+    "start": 131.059412,
+    "end": 134.227834,
     "text": "one hundred eighty-eight training rows and thirty development rows."
   },
   {
-    "start": 148.543929,
-    "end": 152.48921199999998,
+    "start": 134.652856,
+    "end": 138.229196,
     "text": "Some examples were broken; others lost the answer at the token limit."
   },
   {
-    "start": 152.618457,
-    "end": 155.60996699999998,
+    "start": 138.346354,
+    "end": 141.058114,
     "text": "We saved and reloaded a small LoRA adapter."
   },
   {
-    "start": 155.992042,
-    "end": 160.142986,
+    "start": 141.404459,
+    "end": 145.167228,
     "text": "The thirty B OpenHands track still needs its training-data record matched to"
   },
   {
-    "start": 160.142986,
-    "end": 161.78826899999999,
+    "start": 145.167228,
+    "end": 146.658652,
     "text": "the evaluated adapter."
   },
   {
-    "start": 162.344872,
-    "end": 165.664684,
+    "start": 147.163204,
+    "end": 150.172564,
     "text": "Our biggest lesson: a working connection isn't a finished job."
   },
   {
-    "start": 166.134495,
-    "end": 170.033552,
+    "start": 150.598441,
+    "end": 154.132878,
     "text": "The seven B adapter passed a required tool call, but failed a real"
   },
   {
-    "start": 170.033552,
-    "end": 175.553363,
+    "start": 154.132878,
+    "end": 159.136504,
     "text": "repository change. Automatic mode returned prose; forced calls repeatedly"
   },
   {
-    "start": 175.553363,
-    "end": 178.775061,
+    "start": 159.136504,
+    "end": 162.056926,
     "text": "targeted the wrong file. No edit was applied."
   },
   {
-    "start": 178.981665,
-    "end": 183.35242,
+    "start": 162.244209,
+    "end": 166.206233,
     "text": "In the separate thirty B development run, the base passed six of twenty-four"
   },
   {
-    "start": 183.35242,
-    "end": 186.10242,
+    "start": 166.206233,
+    "end": 168.699067,
     "text": "tasks; the adapter passed twelve."
   },
   {
-    "start": 186.769401,
-    "end": 189.20242,
+    "start": 169.303676,
+    "end": 171.509171,
     "text": "Those are exploratory development results."
   },
   {
-    "start": 189.46374,
-    "end": 193.70242,
+    "start": 171.746054,
+    "end": 175.588354,
     "text": "We still need to match the training records, lock the comparison, and test"
   },
   {
-    "start": 193.70242,
-    "end": 198.423174,
+    "start": 175.588354,
+    "end": 179.867647,
     "text": "on untouched tasks. Better quality and fewer human interruptions are still"
   },
   {
-    "start": 198.423174,
-    "end": 199.191099,
+    "start": 179.867647,
+    "end": 180.56376,
     "text": "unproven."
   },
   {
-    "start": 199.398646,
-    "end": 201.184495,
+    "start": 180.751898,
+    "end": 182.370743,
     "text": "Three optional pieces could help."
   },
   {
-    "start": 201.501476,
-    "end": 204.15336299999998,
+    "start": 182.658082,
+    "end": 185.061978,
     "text": "Nemo Gym would organize repeatable trials."
   },
   {
-    "start": 204.414684,
-    "end": 208.60053299999998,
+    "start": 185.298861,
+    "end": 189.093271,
     "text": "Jev would turn locked results into advice for John and me to review."
   },
   {
-    "start": 209.070344,
-    "end": 212.86091,
+    "start": 189.519148,
+    "end": 192.955239,
     "text": "Langfuse would show the sequence of model calls, tools, and checks."
   },
   {
-    "start": 213.527891,
-    "end": 216.804306,
+    "start": 193.559848,
+    "end": 196.529869,
     "text": "Those connections are proposed; we're not claiming they're running."
   },
   {
-    "start": 217.36091,
-    "end": 221.326004,
+    "start": 197.034422,
+    "end": 200.628721,
     "text": "We want useful work that passes checks and independent review, with less"
   },
   {
-    "start": 221.326004,
-    "end": 222.959023,
+    "start": 200.628721,
+    "end": 202.109028,
     "text": "chasing and rescuing from us."
   },
   {
-    "start": 223.122231,
-    "end": 225.927891,
+    "start": 202.256974,
+    "end": 204.800263,
     "text": "That's how we keep the human from becoming the bottleneck."
   },
   {
-    "start": 226.396759,
-    "end": 228.271288,
+    "start": 205.225284,
+    "end": 206.924517,
     "text": "Follow the repository on screen."
   }
 ]

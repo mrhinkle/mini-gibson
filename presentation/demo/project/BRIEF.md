@@ -34,3 +34,7 @@ Mark reported that provider overload slowed the start. Logged build failures and
 ## Why The Gibson?
 
 Mark requested a brief naming-origin joke using his supplied still from Hackers (1995). Use his self-deprecating description of a ridiculous supercomputer operated by buffoons, followed immediately by the real engineering-process explanation. The opinion is Mark's joke, not a factual evaluation of real people. The supplied still is film material, not an original or open-licensed project illustration. The MP4 export and existing review delivery remain authorized.
+
+## Faster final delivery
+
+Mark requested a voice speed-up toward 3:30 and the updated video in the repository. Accelerated the existing narration by 1.103162x with pitch preserved, retimed every visual/caption cue, and retained a three-second closing hold. No wording or experimental claims changed. Final authored duration: 209.999s.
