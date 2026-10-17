@@ -1,92 +1,100 @@
 # Mini-Gibson final-loop recovery checkpoint
 
-Checkpointed at `2026-10-17T21:42:30Z` so the laptop can be shut down without losing the experiment state.
+Checkpoint refreshed at `2026-10-17T23:54:06Z`. This document separates completed, merged work from the GPU-dependent work that has not run.
 
-## Safety and scope
+## Current status
 
-- The 35-task Gibson Bench v0.1 final holdout remains sealed. Do not run it until the preregistered development gates pass.
-- Do not stop or delete any Brev instance without fresh explicit confirmation from Mark.
-- Keep total compute at or below the approved `$30/hour` cap. Do not create another instance until current hourly prices have been verified.
-- Keep hosted Jev and Langfuse credentials out of scored runs. Local append-only evidence is authoritative.
+- GitHub `main` at the evidence cutoff: `3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374`.
+- Open pull requests: none.
+- Experiment status: infrastructure and outcome-blind cohort freeze complete; v2 qualification, training, and formal evaluation not run.
+- Final 35-task Gibson Bench v0.1 holdout: sealed and unconsumed.
+- Brev inventory: only stopped `weird-white-ocelot` (`ds7uiptfk`, 2xA100) is listed. No Brev Connect nodes are listed.
+- The former H100 environments are not listed. Do not assume their ephemeral files still exist.
+- The last start attempt for the A100 environment failed because the Brev account reported exhausted credits. Do not purchase credits or create replacement compute without Mark's explicit billing decision.
+- Active GPU compute rate: `$0/hour` while the listed instance remains stopped.
+
+The complete evidence/status report is [`docs/evidence/mini-gibson-final-loop-2026-10-17.md`](evidence/mini-gibson-final-loop-2026-10-17.md).
+
+## Safety and claim boundary
+
+- Never add tasks or change thresholds merely to obtain statistical significance.
+- Do not open the final holdout until every preregistered development efficacy and safety gate passes.
+- Do not stop or delete a Brev instance without fresh explicit confirmation from Mark.
+- Do not create compute that exceeds the approved `$30/hour` total cap.
+- Keep hosted Jev and Langfuse credentials out of scored runs. Local append-only receipts are authoritative.
 - Do not post another Slack update unless Mark explicitly asks.
+- Do not claim that v2 is trained, evaluated, significant, or promotable until the corresponding receipts are committed.
 
-## Durable GitHub state
+## Durable merged state
 
-- `origin/main`: `23b4c28a25a2bd1cff03b9c39ce2ec4bb3d6a24d`
-- Merged evidence/lifecycle PR #21: head `befe81539d99c98bb2e7ee05e147487874368dc2`, merge `f378f215982e5b3dc36620c74bb6f82a09da71c8`
-- Merged real-repository cohort tooling PR #24: head `d72d1c15b7e8cf0fc80fb96d088ca699dc53c783`, merge `23b4c28a25a2bd1cff03b9c39ce2ec4bb3d6a24d`
-- Editable demo PR #18 remains open at `af68f70efb6687ae28ec47dae301bd5f1701d772`; do not merge it until the evidence-hash review finding is fixed and cross-vendor review passes.
-- The combined demo MP4 is already merged by PR #23 under `presentation/combined-demo/`.
+| Work | PR | Head | Merge |
+| --- | ---: | --- | --- |
+| Editable demo evidence fix | [#18](https://github.com/mrhinkle/mini-gibson/pull/18) | `e6380ea9782e939822e8314c28d1ddd2e77ed24f` | `7ad03e97f96b5d53fa6a1cd7a892743a738beb37` |
+| Bounded sequential evaluation | [#26](https://github.com/mrhinkle/mini-gibson/pull/26) | `7c48c8be2e688367c67fbd5825cc45010f027e6e` | `d7d5eace68679c5dbd7ce82d48b1b621f2eb3308` |
+| Hardened networkless evaluator | [#27](https://github.com/mrhinkle/mini-gibson/pull/27) | `05a35fba8cbc15efd681a8b8c76143c6f0bea5d1` | `3ff5dfdc37835b8db658e3f2e805e02b231be473` |
+| Real outcome-blind cohort freeze | [#28](https://github.com/mrhinkle/mini-gibson/pull/28) | `29cff1ccfe25b073517382259dabf32ed6cd58f3` | `91b5c4aa110e5b5131061408c9508d372220f7ca` |
+| Resumable qualification orchestrator | [#29](https://github.com/mrhinkle/mini-gibson/pull/29) | `d19bf65dc245b3b128afd9bec3d438b15bea4472` | `3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374` |
 
-## Durable adapter archive
+The PR #29 exact tree passed the complete repository suite in an isolated environment: `281 passed`. Its independent Claude pre-push review returned `VERDICT: PASS`.
 
-- Brev: `/ephemeral/mini-gibson-lightning/exports/mini-gibson-lightning-20261017.tgz`
-- Laptop copy: `/Users/mrhinkle/Documents/Codex/2026-10-17/did/work/lightning-artifacts/mini-gibson-lightning-20261017.tgz`
-- Archive SHA-256: `75881702a163aa163cc3cfc7270c298bc1c4b0e84587b8fb2348d84c1a42c7ef`
-- Path-list SHA-256: `cf5ea3b6de49934d523f8272a1a67c85b8f891bd4f17962d4c78c81d0d0112ed`
-- Restored-copy offline adapter reload smoke: PASS.
+## Frozen source and cohorts
 
-## Brev instances at checkpoint
+- Dataset: `nebius/SWE-rebench-V2`.
+- Revision: `10483de0f50fe5da545942705a76c6150171af7f`.
+- Parquet SHA-256: `0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad`.
+- Source rows: `32,079`; eligible before exclusions: `17,822`.
+- Frozen sequence: `24` pilot tasks plus three formal cohorts of `144`, for `456` unique tasks and a maximum formal sample of `432`.
+- All candidate IDs and issue, product-patch, test-patch, changed-file, and image-cluster fingerprints are cross-cohort disjoint.
+- `sequential-plan.json` file SHA-256: `28c92eab536d2bd0cae6dc1596ae4fca245d7ba005caf15d355d6dc22cc3df9e`.
+- `sequential-plan.json` canonical SHA-256: `961ee3c99b89248316f34dcbf8b30caa32291aebb5b239f8a2523634abbd6427`.
+- `pre-plan-exclusions.json` file SHA-256: `5660348a58783a6e600db8b5864eec301fddc8c351d39061c8adffb13f01aad8`.
+- `pre-plan-exclusions.json` canonical SHA-256: `e683db581e7db3a773793b08b1edb2e9fc769e15f43ea9e8cd8c0a9c3e47b454`.
+- `freeze-evidence.json` SHA-256: `ca1ba1c045a883ef256ee74f45fe21d6a7d24e8962715275d6bb4fc847271210`.
 
-| Name | ID | Machine | State |
-| --- | --- | --- | --- |
-| `mini-gibson-lightning-ft` | `3f81y01fz` | `hyperstack_H100x2` | running, healthy/ready |
-| `weird-white-ocelot` | `ds7uiptfk` | `a100-80gb.2x` | running, healthy/ready |
-| `mini-gibson-ocr7b-lora` | `c23h8vmme` | `massedcompute_H100` | running, healthy/ready |
+A verified local dataset copy exists at:
 
-The known Lightning price is `$6/hour`. Verify the other two current prices before scheduling parallel GPU work so the combined rate remains within the cap.
+`/Users/mrhinkle/Documents/Codex/2026-10-17/did/work/freeze-real-cohorts-20261017-local/pinned-swe-rebench-v2/10483de0f50fe5da545942705a76c6150171af7f/train-00000-of-00001.parquet`
 
-## Work in progress
+## Frozen statistical design
 
-- Backend branch: `codex/rebench-docker-backend-20261017`
-- Backend worktree: `/Users/mrhinkle/Documents/Codex/2026-10-17/did/work/mini-gibson-rebench-backend`
-- Cohort branch: `codex/rebench-cohort-freeze-20261017`
-- Cohort worktree: `/Users/mrhinkle/Documents/Codex/2026-10-17/did/work/mini-gibson-rebench-cohort`
-- Recovery branch: `codex/final-loop-recovery-20261017`
-- Demo source worktree: `/Users/mrhinkle/Code/mini-gibson-wt/demo-progress-20261017`
+- The 24-task pilot selects the 30-versus-50-turn budget only and is excluded from confirmatory inference and v2 training.
+- Formal looks occur only at cumulative `N=144`, `288`, and `432`.
+- Primary comparison: v2 versus base, paired task-level resolved outcome.
+- Exact one-sided McNemar local alpha budgets: `0.01`, `0.015`, and `0.025`.
+- Efficacy also requires at least `+5` percentage points observed absolute uplift.
+- Frozen mathematical-impossibility and conditional-power futility rules apply at interim looks.
+- Promotion additionally requires the conservative malformed-response safety gate and zero verified tampering, isolation, parser, or receipt failures.
+- Stop at `N=432` if no success. Anything beyond that is a new experiment with fresh tasks and fresh alpha.
 
-Local agents pause when the laptop is off. On recovery, inspect each worktree before restarting or replacing its task. Never run two agents in one worktree.
+## Current scientific finding
 
-## Resume sequence
+The v1 adapter is not promotable. Across 48 fresh development issues it resolved `16/48`, compared with base `9/48`, an observed gain of `7` tasks or `14.58` percentage points. Paired outcomes were 12 tuned-only wins and 5 base-only wins; the one-sided exact paired p-value was `0.0717316`, above the frozen `0.05` boundary.
 
-1. Refresh `origin/main`, GitHub PR state, Brev instance state, GPU health, disk capacity, and current hourly prices.
-2. Inspect the backend worktree and recover the Docker-backed networkless evaluator implementation. Run its focused tests and independent cross-vendor review.
-3. Finish and freeze the disjoint 24-task pilot plus 144-task development cohort from SWE-rebench V2 revision `10483de0f50fe5da545942705a76c6150171af7f`.
-4. Freeze the training/evaluation exclusion registry before selecting v2 rows. Split by repository and image/task cluster, not only instance ID.
-5. Run qualification twice: base must fail the declared fail-to-pass set, and the gold patch must pass fail-to-pass plus pass-to-pass. Store image digests and receipts.
-6. Use only the 24-task pilot to freeze the 30-versus-50-turn budget.
-7. Build the v2 mixture from successful executable OpenHands trajectories, Scale-SWE-Distilled, and at most 10–20% SWE-smith auxiliary data after exclusions.
-8. Run a one-step training smoke, then the bounded v2 fine-tune. Persist logs, checkpoints, manifests, hashes, and state under the remote final-loop root below.
-9. Evaluate base, v1, and v2 on all 144 development tasks with identical locked settings and the hardened networkless verifier.
-10. Apply the preregistered promotion gates. Run the 35 final holdouts only if the development gates pass.
-11. Fix PR #18 evidence hashing, replace provisional claims with the final verified findings, render and inspect the video, obtain cross-vendor review, then merge.
+Tool reliability regressed materially: malformed responses affected `21/48` tuned tasks versus `8/48` base tasks. The one-sided paired degradation p-value was `0.000488`. The supported conclusion is: **promising issue-resolution signal, unsafe tool-format regression, no statistically established upgrade**.
 
-## Remote final-loop root
+## Resume sequence after Brev credits are restored
 
-Use this durable Brev path for resumable state:
-
-`/ephemeral/mini-gibson-lightning/final-loop-20261017/`
-
-The machine-readable checkpoint is `RECOVERY.json`, SHA-256 `2a5ce9a8daad123edefc9bc3c5579c0cac727e335e01f3317ced2de8655ad803`. The laptop and Brev copies matched at checkpoint time.
-
-Every remote stage must write append-only JSONL or atomic JSON state, immutable hashes, the exact Git SHA, and a completion marker. Long-running jobs must run in a persistent remote process (`tmux`, `systemd-run`, or equivalent), not an SSH session tied to the laptop.
+1. Refresh GitHub, Brev inventory, GPU health, disk, and the exact hourly rate before starting anything.
+2. Copy the pinned dataset to durable remote storage and re-verify its SHA-256.
+3. Build the sealed 456-row material/parser/AST package and immutable 456-image lock.
+4. Run `python -m evaluation.qualify_candidates --dry-run` and resolve every reported prerequisite without weakening a gate.
+5. Qualify in bounded batches. Each task must produce two base-fail and two gold-pass receipts through the hardened networkless backend.
+6. Finalize runnable cohort locks and the complete v2 training exclusion registry only after all 456 tasks qualify.
+7. Select successful executable OpenHands/Scale-SWE trajectories outside the pilot, all 432 development tasks, and the final holdout. Keep SWE-smith auxiliary data at or below the frozen 10–20% cap.
+8. Run a one-step v2 training smoke, then bounded resumable training with remote logs/checkpoints and completion markers.
+9. Use the 24-task pilot to freeze the turn budget.
+10. Evaluate base, v1, and v2 identically at the three formal development looks, applying efficacy, futility, and safety rules exactly.
+11. Open the final holdout only if all development promotion gates pass.
+12. Replace provisional demo findings with final verified results, render and inspect the video, obtain cross-vendor review, and merge through a new PR.
 
 ## Fast recovery checks
 
 ```bash
 gh pr list --repo mrhinkle/mini-gibson --state open
-gh pr view 18 --repo mrhinkle/mini-gibson --json state,headRefOid,reviewDecision,statusCheckRollup
-brev ls
+gh api repos/mrhinkle/mini-gibson/commits/main --jq .sha
+brev ls --json
+brev ls nodes --json
 git -C /Users/mrhinkle/Code/mini-gibson fetch origin --prune
-git -C /Users/mrhinkle/Code/mini-gibson worktree list --porcelain
 ```
 
-Then verify the remote checkpoint:
-
-```bash
-brev exec mini-gibson-lightning-ft -- bash -lc 'cat /ephemeral/mini-gibson-lightning/final-loop-20261017/RECOVERY.json'
-```
-
-## Current scientific result
-
-The v1 adapter is not promotable. Across 48 development tasks it resolved `16/48` versus base `9/48` (`+14.58` percentage points), but the one-sided exact McNemar result was `p=0.0717316`, and malformed-response task incidence worsened materially (`21/48` tuned versus `8/48` base; one-sided sign `p=0.000488`). The next valid step is the larger real-repository development evaluation and a v2 data mixture, not use of the sealed final holdout.
+Do not retry `brev start` on a schedule while the credit state is unchanged. Mark must resolve the billing block first.
