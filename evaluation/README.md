@@ -32,9 +32,14 @@ registry only after every qualified lock supplies all fingerprints, and assesses
 the fixed cumulative looks at N=144/288/432. See
 [`docs/sequential-development-evaluation.md`](../docs/sequential-development-evaluation.md).
 
-The next implementation slice is a hardened Docker broker and repeated
-base-fail/gold-pass qualification smoke on a small upstream sample. Until that
-exists, no candidate report can become a frozen lock or a scored result.
+The hardened Docker broker and receipt verifier are now wrapped by
+`python -m evaluation.qualify_candidates`. The wrapper verifies the frozen
+plan, exclusions, evidence and exact pinned Parquet before any run; seals image,
+parser, verifier and task-material hashes; journals each complete two-by-two
+qualification with an fsynced hash chain; and resumes without reclassifying a
+prior row. See the
+[qualification runbook](../docs/rebench-qualification-runbook.md). No candidate
+report becomes a runnable lock until all 456 receipts qualify.
 
 ## Frozen 2026-10-17 candidate sequence
 

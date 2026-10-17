@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/qualification-materials.v1.schema.json",
+  "title": "Mini Gibson sealed qualification materials v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "source", "candidate_plan_sha256",
+    "ast_fingerprint_spec", "parser_files", "tasks"
+  ],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-qualification-materials/v1"},
+    "source": {"$ref": "#/$defs/source"},
+    "candidate_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "ast_fingerprint_spec": {"const": "mini-gibson-ast-edits/v1"},
+    "parser_files": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/file_ref"}
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 456,
+      "maxItems": 456,
+      "items": {"$ref": "#/$defs/task"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "revision", "split", "file", "sha256", "rows"],
+      "properties": {
+        "dataset": {"const": "nebius/SWE-rebench-V2"},
+        "revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+        "split": {"const": "train"},
+        "file": {"const": "data/train-00000-of-00001.parquet"},
+        "sha256": {"const": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad"},
+        "rows": {"const": 32079}
+      }
+    },
+    "file_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^parsers/[A-Za-z0-9_.-]+\\.py$"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merge_commit", "episode_ids"],
+      "properties": {
+        "merge_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "episode_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "ast_edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path", "operation", "node_type", "symbol",
+        "before_sha256", "after_sha256"
+      ],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "operation": {"enum": ["add", "delete", "update", "move"]},
+        "node_type": {"type": "string", "minLength": 1},
+        "symbol": {"type": "string"},
+        "before_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "after_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instance_id", "problem_statement", "gold_patch", "test_patch",
+        "fail_to_pass", "pass_to_pass", "install_config",
+        "source_identity", "ast_edits"
+      ],
+      "properties": {
+        "instance_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "problem_statement": {"type": "string", "minLength": 1},
+        "gold_patch": {"type": "string", "minLength": 1},
+        "test_patch": {"type": "string", "minLength": 1},
+        "fail_to_pass": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "pass_to_pass": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "install_config": {"type": "object"},
+        "source_identity": {"$ref": "#/$defs/source_identity"},
+        "ast_edits": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/ast_edit"}}
+      }
+    }
+  }
+}

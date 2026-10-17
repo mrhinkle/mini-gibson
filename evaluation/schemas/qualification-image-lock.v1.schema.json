@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/qualification-image-lock.v1.schema.json",
+  "title": "Mini Gibson qualification image lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "candidate_plan_sha256", "platform", "entries"],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-qualification-image-lock/v1"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "revision", "split", "file", "sha256", "rows"],
+      "properties": {
+        "dataset": {"const": "nebius/SWE-rebench-V2"},
+        "revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+        "split": {"const": "train"},
+        "file": {"const": "data/train-00000-of-00001.parquet"},
+        "sha256": {"const": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad"},
+        "rows": {"const": 32079}
+      }
+    },
+    "candidate_plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "platform": {"const": "linux/amd64"},
+    "entries": {
+      "type": "array",
+      "minItems": 456,
+      "maxItems": 456,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instance_id", "image_name", "reference", "digest", "workdir"],
+        "properties": {
+          "instance_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+          "image_name": {"type": "string", "minLength": 1},
+          "reference": {"type": "string", "pattern": "^[^\\s@]+@sha256:[0-9a-f]{64}$"},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "workdir": {"type": "string", "pattern": "^/[^/].+"}
+        }
+      }
+    }
+  }
+}
