@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "checkpointed_at": "2026-10-17T21:42:30Z",
+  "repository": "mrhinkle/mini-gibson",
+  "main_sha": "23b4c28a25a2bd1cff03b9c39ce2ec4bb3d6a24d",
+  "recovery_document": "docs/FINAL-LOOP-RECOVERY.md",
+  "final_holdout_state": "sealed",
+  "active_brev_instance": {
+    "name": "mini-gibson-lightning-ft",
+    "id": "3f81y01fz",
+    "machine": "hyperstack_H100x2",
+    "action_policy": "do_not_stop_or_delete_without_fresh_explicit_confirmation"
+  },
+  "adapter_archive": {
+    "remote_path": "/ephemeral/mini-gibson-lightning/exports/mini-gibson-lightning-20261017.tgz",
+    "sha256": "75881702a163aa163cc3cfc7270c298bc1c4b0e84587b8fb2348d84c1a42c7ef",
+    "path_list_sha256": "cf5ea3b6de49934d523f8272a1a67c85b8f891bd4f17962d4c78c81d0d0112ed",
+    "offline_reload_smoke": "pass"
+  },
+  "in_progress_branches": [
+    "codex/rebench-docker-backend-20261017",
+    "codex/rebench-cohort-freeze-20261017",
+    "codex/demo-progress-20261017"
+  ],
+  "resume_stage": "finish_hardened_backend_then_freeze_disjoint_pilot_and_dev_cohort",
+  "remote_final_loop_root": "/ephemeral/mini-gibson-lightning/final-loop-20261017"
+}
