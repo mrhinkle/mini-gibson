@@ -20,6 +20,8 @@ from evaluation.verify_rebench import (
     QualificationTask,
     RebenchVerificationError,
     VerifierMaterial,
+    _runner_script,
+    build_verifier_payload,
     load_pinned_parser,
     load_pinned_parser_bytes,
     patch_paths,
@@ -428,6 +430,106 @@ def _git(root: Path, *args: str, input_text: str | None = None) -> str:
     )
     assert result.returncode == 0, result.stderr
     return result.stdout
+
+
+def _init_runner_repo(root: Path, files: dict[str, str]) -> None:
+    root.mkdir()
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "test@example.invalid")
+    _git(root, "config", "user.name", "Test")
+    for name, content in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "base")
+
+
+def _run_local_runner(
+    root: Path,
+    verifier_material: VerifierMaterial,
+    protected: tuple[str, ...],
+) -> subprocess.CompletedProcess[bytes]:
+    token = "f" * 32
+    payload = build_verifier_payload(
+        product_patch="",
+        material=verifier_material,
+        protected=protected,
+        marker_token=token,
+    )
+    return subprocess.run(
+        ["/bin/bash", "-c", _runner_script(token)],
+        cwd=root,
+        input=payload,
+        capture_output=True,
+        check=False,
+    )
+
+
+def test_runner_rejects_git_status_failure_even_with_empty_stdout(tmp_path: Path) -> None:
+    root = tmp_path / "corrupt-status"
+    _init_runner_repo(root, {"src/value.py": "old\n"})
+    verifier_material = material(
+        test_patch=_patch("src/value.py"),
+        test_command="true",
+    )
+    (root / ".git/index").write_bytes(b"not a git index")
+
+    result = _run_local_runner(root, verifier_material, ("src/value.py",))
+
+    assert result.returncode == 84
+    assert result.stdout == b""
+    assert MARKER_PREFIX.encode() not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "mutated_path",
+    ["src/pkg/checks.py", "conftest.py", "pytest.ini", "tox.ini"],
+)
+def test_runner_hashes_every_sealed_helper_and_tracked_root_config(
+    tmp_path: Path,
+    mutated_path: str,
+) -> None:
+    root = tmp_path / mutated_path.replace("/", "-")
+    files = {"src/pkg/checks.py": "old\n"}
+    files.setdefault(mutated_path, "stable\n")
+    _init_runner_repo(root, files)
+    test_patch = _patch("src/pkg/checks.py")
+    verifier_material = material(
+        test_patch=test_patch,
+        test_command=f"printf 'tampered\\n' > {mutated_path}",
+    )
+
+    result = _run_local_runner(root, verifier_material, ("src/pkg/checks.py",))
+
+    assert result.returncode == 97
+    marker = re.search(
+        rf"{MARKER_PREFIX}:{'f' * 32}:0:([0-9a-f]{{64}}):([0-9a-f]{{64}})",
+        result.stderr.decode(),
+    )
+    assert marker is not None
+    assert marker.group(1) != marker.group(2)
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    ["", "/absolute", "../escape", "src//checks.py", "src/../checks.py", "src\\checks.py", "src/\tchecks.py"],
+)
+def test_runner_rejects_noncanonical_sealed_protected_paths(
+    tmp_path: Path,
+    unsafe_path: str,
+) -> None:
+    root = tmp_path / "unsafe-protected"
+    _init_runner_repo(root, {"src/value.py": "old\n"})
+    verifier_material = material(
+        test_patch=_patch("src/value.py"),
+        test_command="true",
+    )
+
+    result = _run_local_runner(root, verifier_material, (unsafe_path,))
+
+    assert result.returncode == 94
+    assert MARKER_PREFIX.encode() not in result.stderr
 
 
 def _snapshot(root: Path) -> dict[str, bytes]:

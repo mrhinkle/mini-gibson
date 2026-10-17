@@ -574,7 +574,8 @@ trap 'rm -rf "$stage"' EXIT
 tar -xf - -C "$stage" || exit 81
 cd "$PWD" || exit 82
 test -d .git || exit 83
-test -z "$(git status --porcelain=v1 --untracked-files=no)" || exit 84
+status_output="$(git status --porcelain=v1 --untracked-files=no)" || exit 84
+test -z "$status_output" || exit 84
 if test -s "$stage/product.patch"; then
   git apply -p1 --check --whitespace=nowarn "$stage/product.patch" || exit 85
   git apply -p1 --whitespace=nowarn "$stage/product.patch" || exit 86
@@ -582,12 +583,28 @@ fi
 git apply -p1 --check --whitespace=nowarn "$stage/test.patch" || exit 87
 git apply -p1 --whitespace=nowarn "$stage/test.patch" || exit 88
 
-{{ git ls-files; cat "$stage/protected-paths"; }} | awk '
+git ls-files > "$stage/tracked-files" || exit 92
+awk '
   /(^|\/)(tests?|__tests__|specs?)(\/|$)/ ||
   /(^|\/)(test_|spec_)[^\/]*$/ ||
   /\.(test|spec)\.[^\/]*$/ ||
-  /_(test|spec)\.[^\/]*$/ {{ print }}
-' | LC_ALL=C sort -u > "$stage/all-protected"
+  /_(test|spec)\.[^\/]*$/ ||
+  /(^|\/)(conftest\.py|pytest\.ini|tox\.ini)$/ {{ print }}
+' "$stage/tracked-files" > "$stage/tracked-protected" || exit 93
+
+: > "$stage/sealed-protected" || exit 94
+while IFS= read -r path || test -n "$path"; do
+  case "$path" in
+    ""|/*|*/|*//*|.|./*|*/.|*/./*|..|../*|*/..|*/../*|.git|.git/*|*\\*) exit 94 ;;
+  esac
+  if [[ "$path" =~ [[:cntrl:]] ]]; then
+    exit 94
+  fi
+  printf '%s\n' "$path" >> "$stage/sealed-protected" || exit 94
+done < "$stage/protected-paths"
+
+LC_ALL=C sort -u "$stage/tracked-protected" "$stage/sealed-protected" \
+  > "$stage/all-protected" || exit 95
 
 hash_protected() {{
   while IFS= read -r path; do
