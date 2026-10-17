@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import sys
 
 import pytest
 
-from evaluation.docker_backend import DockerBackend, DockerIsolationError, DockerLimits
+from evaluation.docker_backend import (
+    DockerBackend,
+    DockerIsolationError,
+    DockerLimits,
+    _CapturedStream,
+    _ExecutionResult,
+)
 
 
 DIGEST = "sha256:" + "a" * 64
@@ -18,7 +26,26 @@ class RecordingBackend(DockerBackend):
 
     def _execute(self, argv, stdin, timeout_s, max_output_bytes):
         self.calls.append((list(argv), stdin, timeout_s, max_output_bytes))
-        return 0, "ok", "", False, False
+        return _ExecutionResult(
+            0,
+            _CapturedStream(
+                "ok",
+                hashlib.sha256(b"ok").hexdigest(),
+                hashlib.sha256(b"ok").hexdigest(),
+                hashlib.sha256(b"ok").hexdigest(),
+                2,
+                False,
+            ),
+            _CapturedStream(
+                "",
+                hashlib.sha256(b"").hexdigest(),
+                hashlib.sha256(b"").hexdigest(),
+                hashlib.sha256(b"").hexdigest(),
+                0,
+                False,
+            ),
+            False,
+        )
 
 
 def _flag_value(command: list[str], flag: str) -> str:
@@ -62,6 +89,7 @@ def test_command_enforces_hard_isolation_without_host_mounts_or_secrets() -> Non
         "registry.example/task@sha256:1234",
         f"registry.example/task@{DIGEST.upper()}",
         f"registry.example/task@{DIGEST} extra",
+        f"--evil@{DIGEST}",
     ],
 )
 def test_mutable_or_malformed_images_are_rejected(image: str) -> None:
@@ -139,7 +167,26 @@ def test_invalid_workdir_timeout_and_role_fail_before_docker() -> None:
 def test_output_and_timeout_states_are_preserved_fail_closed() -> None:
     class TimeoutBackend(DockerBackend):
         def _execute(self, argv, stdin, timeout_s, max_output_bytes):
-            return -9, "partial", "deadline", True, True
+            return _ExecutionResult(
+                -9,
+                _CapturedStream(
+                    "partial",
+                    hashlib.sha256(b"partial").hexdigest(),
+                    hashlib.sha256(b"partial").hexdigest(),
+                    hashlib.sha256(b"partial").hexdigest(),
+                    7,
+                    True,
+                ),
+                _CapturedStream(
+                    "deadline",
+                    hashlib.sha256(b"deadline").hexdigest(),
+                    hashlib.sha256(b"deadline").hexdigest(),
+                    hashlib.sha256(b"deadline").hexdigest(),
+                    8,
+                    False,
+                ),
+                True,
+            )
 
         def _remove_timed_out_container(self, name):
             self.removed = name
@@ -155,3 +202,19 @@ def test_output_and_timeout_states_are_preserved_fail_closed() -> None:
     assert result.timed_out is True
     assert result.output_truncated is True
     assert backend.removed == result.container_name
+
+
+def test_execute_kills_at_host_memory_cap_without_growing_a_temp_file() -> None:
+    backend = DockerBackend()
+    result = backend._execute(
+        [sys.executable, "-c", "import sys; sys.stdout.write('x' * 20000); sys.stdout.flush()"],
+        b"",
+        5,
+        4096,
+    )
+    assert result.stdout.truncated is True
+    assert result.stdout.captured_bytes == 4096
+    assert result.stdout.text == "x" * 4096
+    assert result.stdout.sha256 == hashlib.sha256(b"x" * 4096).hexdigest()
+    assert result.stdout.head_sha256 == hashlib.sha256(b"x" * 4096).hexdigest()
+    assert result.stdout.tail_sha256 == hashlib.sha256(b"x" * 4096).hexdigest()

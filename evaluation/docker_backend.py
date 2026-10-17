@@ -11,15 +11,16 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import selectors
 import subprocess
-import tempfile
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Sequence
 
 
-IMAGE_RE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+IMAGE_RE = re.compile(r"^(?!-)[^\s@]+@sha256:[0-9a-f]{64}$")
 USER_RE = re.compile(r"^(?P<uid>[1-9][0-9]*)(?::(?P<gid>[1-9][0-9]*))?$")
 MEMORY_RE = re.compile(r"^[1-9][0-9]*(?:[bkmg])$", re.I)
 
@@ -61,6 +62,83 @@ class DockerRunResult:
     output_truncated: bool
     container_name: str
     command_sha256: str
+    stdout_sha256: str = ""
+    stderr_sha256: str = ""
+    stdout_head_sha256: str = ""
+    stdout_tail_sha256: str = ""
+    stderr_head_sha256: str = ""
+    stderr_tail_sha256: str = ""
+    stdout_captured_bytes: int = -1
+    stderr_captured_bytes: int = -1
+
+    def __post_init__(self) -> None:
+        # Direct construction is useful for deterministic tests.  Production
+        # execution supplies hashes over the raw captured bytes so invalid
+        # UTF-8 replacement never changes the receipt evidence.
+        for stream in ("stdout", "stderr"):
+            raw = getattr(self, stream).encode()
+            if not getattr(self, f"{stream}_sha256"):
+                object.__setattr__(self, f"{stream}_sha256", hashlib.sha256(raw).hexdigest())
+            if not getattr(self, f"{stream}_head_sha256"):
+                object.__setattr__(
+                    self,
+                    f"{stream}_head_sha256",
+                    hashlib.sha256(raw[:4096]).hexdigest(),
+                )
+            if not getattr(self, f"{stream}_tail_sha256"):
+                object.__setattr__(
+                    self,
+                    f"{stream}_tail_sha256",
+                    hashlib.sha256(raw[-4096:]).hexdigest(),
+                )
+            if getattr(self, f"{stream}_captured_bytes") < 0:
+                object.__setattr__(self, f"{stream}_captured_bytes", len(raw))
+
+
+@dataclass(frozen=True)
+class _CapturedStream:
+    text: str
+    sha256: str
+    head_sha256: str
+    tail_sha256: str
+    captured_bytes: int
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class _ExecutionResult:
+    returncode: int | None
+    stdout: _CapturedStream
+    stderr: _CapturedStream
+    timed_out: bool
+
+
+class _StreamCollector:
+    """Keep at most ``limit`` bytes while hashing a deterministic prefix."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self.data = bytearray()
+        self.truncated = False
+
+    def add(self, block: bytes) -> bool:
+        remaining = self.limit - len(self.data)
+        if remaining > 0:
+            self.data.extend(block[:remaining])
+        if len(block) > remaining:
+            self.truncated = True
+        return self.truncated
+
+    def finish(self) -> _CapturedStream:
+        raw = bytes(self.data)
+        return _CapturedStream(
+            text=raw.decode("utf-8", errors="replace"),
+            sha256=hashlib.sha256(raw).hexdigest(),
+            head_sha256=hashlib.sha256(raw[:4096]).hexdigest(),
+            tail_sha256=hashlib.sha256(raw[-4096:]).hexdigest(),
+            captured_bytes=len(raw),
+            truncated=self.truncated,
+        )
 
 
 def _validate_image(image: str) -> str:
@@ -195,21 +273,29 @@ class DockerBackend:
         )
         command_sha256 = hashlib.sha256("\0".join(argv).encode()).hexdigest()
         try:
-            returncode, stdout, stderr, timed_out, truncated = self._execute(
+            executed = self._execute(
                 argv, stdin, timeout_s, self.limits.max_output_bytes
             )
         except OSError as exc:
             raise DockerIsolationError(f"could not execute Docker: {exc}") from exc
-        if timed_out:
+        if executed.timed_out or executed.stdout.truncated or executed.stderr.truncated:
             self._remove_timed_out_container(name)
         return DockerRunResult(
-            returncode=returncode,
-            stdout=stdout,
-            stderr=stderr,
-            timed_out=timed_out,
-            output_truncated=truncated,
+            returncode=executed.returncode,
+            stdout=executed.stdout.text,
+            stderr=executed.stderr.text,
+            timed_out=executed.timed_out,
+            output_truncated=executed.stdout.truncated or executed.stderr.truncated,
             container_name=name,
             command_sha256=command_sha256,
+            stdout_sha256=executed.stdout.sha256,
+            stderr_sha256=executed.stderr.sha256,
+            stdout_head_sha256=executed.stdout.head_sha256,
+            stdout_tail_sha256=executed.stdout.tail_sha256,
+            stderr_head_sha256=executed.stderr.head_sha256,
+            stderr_tail_sha256=executed.stderr.tail_sha256,
+            stdout_captured_bytes=executed.stdout.captured_bytes,
+            stderr_captured_bytes=executed.stderr.captured_bytes,
         )
 
     def run_agent(
@@ -258,33 +344,98 @@ class DockerBackend:
         stdin: bytes,
         timeout_s: int,
         max_output_bytes: int,
-    ) -> tuple[int | None, str, str, bool, bool]:
-        """Execute Docker with disk-backed bounded output collection."""
+    ) -> _ExecutionResult:
+        """Execute Docker with a hard in-memory output-growth boundary.
+
+        Pipes are drained concurrently.  Once either stream exceeds its byte
+        cap, Docker is killed immediately and no more output is retained.  At
+        most two capped bytearrays plus OS pipe buffers exist; untrusted output
+        can never grow a host file before the process exits.
+        """
 
         host_env = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}
-        with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
-            process = subprocess.Popen(
-                list(argv),
-                stdin=subprocess.PIPE,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                env=host_env,
-            )
-            timed_out = False
-            try:
-                process.communicate(input=stdin, timeout=timeout_s)
-            except subprocess.TimeoutExpired:
-                timed_out = True
-                process.kill()
-                process.communicate()
-            stdout_size = stdout_file.tell()
-            stderr_size = stderr_file.tell()
-            truncated = stdout_size > max_output_bytes or stderr_size > max_output_bytes
-            stdout_file.seek(0)
-            stderr_file.seek(0)
-            stdout = stdout_file.read(max_output_bytes).decode("utf-8", errors="replace")
-            stderr = stderr_file.read(max_output_bytes).decode("utf-8", errors="replace")
-            return process.returncode, stdout, stderr, timed_out, truncated
+        process = subprocess.Popen(
+            list(argv),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=host_env,
+            bufsize=0,
+        )
+        if process.stdin is None or process.stdout is None or process.stderr is None:
+            process.kill()
+            raise DockerIsolationError("Docker pipes could not be created")
+
+        selector = selectors.DefaultSelector()
+        for pipe, label, events in (
+            (process.stdout, "stdout", selectors.EVENT_READ),
+            (process.stderr, "stderr", selectors.EVENT_READ),
+            (process.stdin, "stdin", selectors.EVENT_WRITE),
+        ):
+            os.set_blocking(pipe.fileno(), False)
+            selector.register(pipe, events, label)
+
+        collectors = {
+            "stdout": _StreamCollector(max_output_bytes),
+            "stderr": _StreamCollector(max_output_bytes),
+        }
+        input_offset = 0
+        timed_out = False
+        killed_for_output = False
+        deadline = time.monotonic() + timeout_s
+        try:
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 and process.poll() is None:
+                    timed_out = True
+                    process.kill()
+                events = selector.select(timeout=max(0.0, min(0.1, remaining)))
+                if not events and process.poll() is not None:
+                    # The pipes will report EOF on the next selector turn.
+                    continue
+                for key, _mask in events:
+                    pipe = key.fileobj
+                    label = key.data
+                    if label == "stdin":
+                        try:
+                            if input_offset < len(stdin):
+                                input_offset += os.write(pipe.fileno(), stdin[input_offset : input_offset + 65536])
+                            if input_offset >= len(stdin):
+                                selector.unregister(pipe)
+                                pipe.close()
+                        except BlockingIOError:
+                            continue
+                        except (BrokenPipeError, OSError):
+                            selector.unregister(pipe)
+                            pipe.close()
+                        continue
+                    try:
+                        block = os.read(pipe.fileno(), 65536)
+                    except BlockingIOError:
+                        continue
+                    if not block:
+                        selector.unregister(pipe)
+                        pipe.close()
+                        continue
+                    if collectors[label].add(block) and not killed_for_output:
+                        killed_for_output = True
+                        if process.poll() is None:
+                            process.kill()
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        finally:
+            selector.close()
+            for pipe in (process.stdin, process.stdout, process.stderr):
+                if pipe is not None and not pipe.closed:
+                    pipe.close()
+        return _ExecutionResult(
+            returncode=process.returncode,
+            stdout=collectors["stdout"].finish(),
+            stderr=collectors["stderr"].finish(),
+            timed_out=timed_out,
+        )
 
     def _remove_timed_out_container(self, name: str) -> None:
         # This targets only the random name created by this backend.  Cleanup is
