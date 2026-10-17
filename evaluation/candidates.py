@@ -8,12 +8,15 @@ receipts must be added by the later qualification lane.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import urlparse
 
 from .cohort import (
@@ -24,23 +27,37 @@ from .cohort import (
     validate_registry,
 )
 
-
 HIGH_RISK_LICENSES = {"", "unknown", "noassertion", "proprietary", "unlicensed"}
 HIGH_RISK_TEXT = re.compile(
     r"\b(migrations?|database|postgres|mysql|mongodb|redis|credentials?|secrets?|"
     r"submodules?|production|terraform|kubernetes|aws|gcp|azure)\b",
-    re.I,
+    re.IGNORECASE,
 )
 BINARY_PATCH = re.compile(r"(^|\n)(GIT binary patch|Binary files .+ differ)(\n|$)")
-DIFF_PATH = re.compile(r"^diff --git a/(.+?) b/(.+?)$", re.M)
+DIFF_PATH = re.compile(r"^diff --git a/(.+?) b/(.+?)$", re.MULTILINE)
 NETWORK_OR_SERVICE_CMD = re.compile(
     r"\b(curl|wget|nc|ncat|ssh|scp|psql|mysql|mongosh|redis-cli|docker|kubectl|terraform)\b",
-    re.I,
+    re.IGNORECASE,
 )
 
 
 class CandidateSelectionError(ValueError):
     """Pinned records cannot satisfy the frozen candidate policy."""
+
+
+@dataclass(frozen=True)
+class PreparedCandidatePool:
+    """Outcome-blind eligibility results reusable across frozen cohorts.
+
+    Raw patches and test patches are reduced to public fingerprints during the
+    single streaming pass.  Keeping only these safe projections avoids
+    materializing the multi-gigabyte Parquet export in Python memory while
+    preserving the source row and rejection counts in every candidate report.
+    """
+
+    records_seen: int
+    eligible: tuple[dict[str, Any], ...]
+    rejected_by_reason: Mapping[str, int]
 
 
 def _digest_text(value: str) -> str:
@@ -72,7 +89,9 @@ def _github_pr_number(url: str) -> int | None:
         return None
 
 
-def _source_pr(record: Mapping[str, Any], meta: Mapping[str, Any]) -> tuple[str | None, int | None]:
+def _source_pr(
+    record: Mapping[str, Any], meta: Mapping[str, Any]
+) -> tuple[str | None, int | None]:
     raw_url = meta.get("pr_url")
     if isinstance(raw_url, str):
         number = _github_pr_number(raw_url)
@@ -85,18 +104,29 @@ def _source_pr(record: Mapping[str, Any], meta: Mapping[str, Any]) -> tuple[str 
     return None, None
 
 
-def _issue_urls(metadata: Mapping[str, Any]) -> list[str]:
+def _issue_urls(metadata: Mapping[str, Any], repo: str) -> list[str]:
     raw = metadata.get("external_urls", [])
     if not isinstance(raw, list):
         return []
+    expected_repo = repo.casefold().split("/", 1)
     result = []
     for url in raw:
         if not isinstance(url, str):
             continue
         parsed = urlparse(url)
         parts = [part for part in parsed.path.split("/") if part]
-        if parsed.netloc.casefold() == "github.com" and "issues" in parts:
-            result.append(url)
+        if (
+            parsed.scheme == "https"
+            and parsed.netloc.casefold() == "github.com"
+            and len(parts) == 4
+            and [part.casefold() for part in parts[:2]] == expected_repo
+            and parts[2] == "issues"
+            and parts[3].isdigit()
+            and int(parts[3]) > 0
+        ):
+            result.append(
+                f"https://github.com/{parts[0]}/{parts[1]}/issues/{int(parts[3])}"
+            )
     return sorted(set(result))
 
 
@@ -107,7 +137,12 @@ def _rename_only(patch: str) -> bool:
             continue
         if line.startswith(("+", "-")):
             changed.append(line)
-    return bool(patch.strip()) and not changed and "rename from " in patch and "rename to " in patch
+    return (
+        bool(patch.strip())
+        and not changed
+        and "rename from " in patch
+        and "rename to " in patch
+    )
 
 
 def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] | None]:
@@ -163,7 +198,8 @@ def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] |
     risky_paths = [
         path
         for path in changed_files
-        if HIGH_RISK_TEXT.search(path) or path.endswith((".sql", ".pem", ".key", ".p12"))
+        if HIGH_RISK_TEXT.search(path)
+        or path.endswith((".sql", ".pem", ".key", ".p12"))
     ]
     if risky_paths or HIGH_RISK_TEXT.search(record["problem_statement"]):
         reasons.append("high_risk_task_surface")
@@ -179,7 +215,11 @@ def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] |
     if llm.get("intent_completeness") != "complete":
         reasons.append("incomplete_intent")
     confidence = llm.get("confidence")
-    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or confidence < 0.9:
+    if (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, (int, float))
+        or confidence < 0.9
+    ):
         reasons.append("low_quality_confidence")
     if llm.get("code") != "A":
         reasons.append("quality_code_not_a")
@@ -200,7 +240,9 @@ def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] |
     patch_sha256 = _digest_text(patch)
     test_patch_sha256 = _digest_text(test_patch)
     changed_files_sha256 = _canonical_json_digest(changed_files)
-    image_cluster_sha256 = _digest_text(f"{record['repo'].casefold()}\0{record['image_name']}")
+    image_cluster_sha256 = _digest_text(
+        f"{record['repo'].casefold()}\0{record['image_name']}"
+    )
     safe = {
         "instance_id": record["instance_id"],
         "repo": record["repo"],
@@ -210,7 +252,7 @@ def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] |
         "license": license_name,
         "source_pr_url": pr_url,
         "source_pr_number": pr_number,
-        "source_issue_urls": _issue_urls(llm),
+        "source_issue_urls": _issue_urls(llm, record["repo"]),
         "difficulty": llm.get("difficulty", "unknown"),
         "num_modified_files": meta.get("num_modified_files"),
         "num_modified_lines": meta.get("num_modified_lines"),
@@ -227,7 +269,9 @@ def _eligibility(record: Mapping[str, Any]) -> tuple[list[str], dict[str, Any] |
     return [], safe
 
 
-def _registry_overlap(candidate: Mapping[str, Any], exclusions: Mapping[str, set[str]]) -> str | None:
+def _registry_overlap(
+    candidate: Mapping[str, Any], exclusions: Mapping[str, set[str]]
+) -> str | None:
     values = {
         "instance_id": candidate["instance_id"].casefold(),
         "repo": candidate["repo"].casefold(),
@@ -259,33 +303,68 @@ def _choose(
     repo_cap: int,
     seed: int,
 ) -> list[dict[str, Any]]:
-    ordered = sorted(candidates, key=lambda row: (_stable_key(row, seed), row["instance_id"]))
+    ordered = sorted(
+        candidates, key=lambda row: (_stable_key(row, seed), row["instance_id"])
+    )
     by_language = Counter(row["language"] for row in ordered)
-    languages = [name for name, _ in sorted(by_language.items(), key=lambda item: (-item[1], item[0]))]
+    languages = [
+        name
+        for name, _ in sorted(by_language.items(), key=lambda item: (-item[1], item[0]))
+    ]
     if len(languages) < min_languages:
-        raise CandidateSelectionError("eligible records have insufficient language diversity")
+        raise CandidateSelectionError(
+            "eligible records have insufficient language diversity"
+        )
     if len({row["repo"].casefold() for row in ordered}) < min_repositories:
-        raise CandidateSelectionError("eligible records have insufficient repository diversity")
+        raise CandidateSelectionError(
+            "eligible records have insufficient repository diversity"
+        )
 
     selected: list[dict[str, Any]] = []
     selected_ids: set[str] = set()
     repo_counts: Counter[str] = Counter()
     language_counts: Counter[str] = Counter()
     difficulty_counts: Counter[str] = Counter()
+    fingerprint_values: dict[str, set[str]] = {
+        name: set()
+        for name in (
+            "issue_text_sha256",
+            "patch_sha256",
+            "test_patch_sha256",
+            "changed_files_sha256",
+            "image_cluster_sha256",
+        )
+    }
+
+    def can_add(row: Mapping[str, Any]) -> bool:
+        repo = row["repo"].casefold()
+        return (
+            row["instance_id"] not in selected_ids
+            and repo_counts[repo] < repo_cap
+            and all(
+                value not in fingerprint_values[name]
+                for name, value in row["fingerprints"].items()
+            )
+        )
 
     def add(row: dict[str, Any]) -> bool:
-        repo = row["repo"].casefold()
-        if row["instance_id"] in selected_ids or repo_counts[repo] >= repo_cap:
+        if not can_add(row):
             return False
+        repo = row["repo"].casefold()
         selected.append(row)
         selected_ids.add(row["instance_id"])
         repo_counts[repo] += 1
         language_counts[row["language"]] += 1
         difficulty_counts[row["difficulty"]] += 1
+        for name, value in row["fingerprints"].items():
+            fingerprint_values[name].add(value)
         return True
 
     for language in languages[:min_languages]:
-        row = next((item for item in ordered if item["language"] == language and add(item)), None)
+        row = next(
+            (item for item in ordered if item["language"] == language and add(item)),
+            None,
+        )
         if row is None:
             raise CandidateSelectionError(f"could not reserve language {language!r}")
 
@@ -299,18 +378,16 @@ def _choose(
                 _stable_key(row, seed),
             )
         )
-        if not unselected or not add(unselected[0]):
+        chosen = next((row for row in unselected if add(row)), None)
+        if chosen is None:
             raise CandidateSelectionError("could not satisfy repository diversity")
 
     while len(selected) < target:
-        choices = [
-            row
-            for row in ordered
-            if row["instance_id"] not in selected_ids
-            and repo_counts[row["repo"].casefold()] < repo_cap
-        ]
+        choices = [row for row in ordered if can_add(row)]
         if not choices:
-            raise CandidateSelectionError("eligible records cannot fill target under repository cap")
+            raise CandidateSelectionError(
+                "eligible records cannot fill target under repository cap"
+            )
         choices.sort(
             key=lambda row: (
                 language_counts[row["language"]],
@@ -338,13 +415,19 @@ def select_candidates(
 ) -> dict[str, Any]:
     """Return a deterministic, non-runnable candidate report."""
 
-    if mode not in {"pilot", "development"}:
-        raise CandidateSelectionError("mode must be 'pilot' or 'development'")
-    frozen_target = 24 if mode == "pilot" else 144
-    if target is not None and target != frozen_target:
-        raise CandidateSelectionError(f"target must equal frozen {mode} size {frozen_target}")
-    min_languages, min_repositories, repo_cap = (6, 12, 4) if mode == "pilot" else (8, 24, 8)
-    exclusions, registry_sources = validate_registry(registry)
+    return select_prepared_candidates(
+        prepare_candidate_pool(records),
+        registry,
+        mode=mode,
+        seed=seed,
+        target=target,
+    )
+
+
+def prepare_candidate_pool(
+    records: Iterable[Mapping[str, Any]],
+) -> PreparedCandidatePool:
+    """Stream records once and retain only outcome-blind safe projections."""
 
     eligible: list[dict[str, Any]] = []
     rejection_counts: Counter[str] = Counter()
@@ -356,17 +439,49 @@ def select_candidates(
         if safe is not None and safe["instance_id"] in seen_ids:
             reasons.append("duplicate_instance_id")
             safe = None
-        if safe is not None:
-            overlap = _registry_overlap(safe, exclusions)
-            if overlap:
-                reasons.append(f"registry_overlap_{overlap}")
-                safe = None
         if reasons:
             rejection_counts.update(set(reasons))
             continue
         assert safe is not None
         seen_ids.add(safe["instance_id"])
         eligible.append(safe)
+    return PreparedCandidatePool(
+        records_seen=total,
+        eligible=tuple(eligible),
+        rejected_by_reason=dict(sorted(rejection_counts.items())),
+    )
+
+
+def select_prepared_candidates(
+    pool: PreparedCandidatePool,
+    registry: Mapping[str, Any],
+    *,
+    mode: str,
+    seed: int,
+    target: int | None = None,
+) -> dict[str, Any]:
+    """Select one cohort from a reusable, outcome-blind candidate pool."""
+
+    if mode not in {"pilot", "development"}:
+        raise CandidateSelectionError("mode must be 'pilot' or 'development'")
+    frozen_target = 24 if mode == "pilot" else 144
+    if target is not None and target != frozen_target:
+        raise CandidateSelectionError(
+            f"target must equal frozen {mode} size {frozen_target}"
+        )
+    min_languages, min_repositories, repo_cap = (
+        (6, 12, 4) if mode == "pilot" else (8, 24, 8)
+    )
+    exclusions, registry_sources = validate_registry(registry)
+
+    eligible: list[dict[str, Any]] = []
+    rejection_counts: Counter[str] = Counter(pool.rejected_by_reason)
+    for prepared in pool.eligible:
+        overlap = _registry_overlap(prepared, exclusions)
+        if overlap:
+            rejection_counts[f"registry_overlap_{overlap}"] += 1
+            continue
+        eligible.append(copy.deepcopy(prepared))
 
     selected = _choose(
         eligible,
@@ -392,7 +507,7 @@ def select_candidates(
         },
         "registry_sources": registry_sources,
         "counts": {
-            "records_seen": total,
+            "records_seen": pool.records_seen,
             "eligible": len(eligible),
             "selected": len(selected),
             "rejected_by_reason": dict(sorted(rejection_counts.items())),
@@ -416,7 +531,9 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--records", type=Path, required=True, help="Pinned SWE-rebench JSONL export")
+    parser.add_argument(
+        "--records", type=Path, required=True, help="Pinned SWE-rebench JSONL export"
+    )
     parser.add_argument("--registry", type=Path, required=True)
     parser.add_argument("--mode", choices=("pilot", "development"), required=True)
     parser.add_argument("--seed", type=int, required=True)
@@ -425,7 +542,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     records = _load_jsonl(args.records)
     registry = json.loads(args.registry.read_text(encoding="utf-8"))
     report = select_candidates(records, registry, mode=args.mode, seed=args.seed)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return 0
 
 

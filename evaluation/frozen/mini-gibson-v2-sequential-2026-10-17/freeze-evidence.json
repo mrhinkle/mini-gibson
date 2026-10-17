@@ -1,0 +1,100 @@
+{
+  "artifacts": {
+    "base_exclusion_registry": {
+      "canonical_sha256": "e683db581e7db3a773793b08b1edb2e9fc769e15f43ea9e8cd8c0a9c3e47b454",
+      "file_sha256": "5660348a58783a6e600db8b5864eec301fddc8c351d39061c8adffb13f01aad8",
+      "path": "pre-plan-exclusions.json"
+    },
+    "sequential_plan": {
+      "canonical_sha256": "961ee3c99b89248316f34dcbf8b30caa32291aebb5b239f8a2523634abbd6427",
+      "file_sha256": "28c92eab536d2bd0cae6dc1596ae4fca245d7ba005caf15d355d6dc22cc3df9e",
+      "path": "sequential-plan.json"
+    }
+  },
+  "candidate_summary": {
+    "cohort_sizes": {
+      "development-a": 144,
+      "development-b": 144,
+      "development-c": 144,
+      "pilot-budget": 24
+    },
+    "development_candidates": 432,
+    "log_parsers": [
+      "parse_java_mvn",
+      "parse_log_cargo",
+      "parse_log_dart_v3",
+      "parse_log_elixir",
+      "parse_log_gotest",
+      "parse_log_gradle_custom",
+      "parse_log_gradlew_v1",
+      "parse_log_js",
+      "parse_log_js_2",
+      "parse_log_js_3",
+      "parse_log_js_4",
+      "parse_log_julia",
+      "parse_log_junit",
+      "parse_log_ocaml_v2",
+      "parse_log_phpunit",
+      "parse_log_pytest",
+      "parse_log_r",
+      "parse_log_scala_v2",
+      "parse_log_swift"
+    ],
+    "total_candidates": 456,
+    "unique_fingerprint_sets": {
+      "changed_files_sha256": 456,
+      "image_cluster_sha256": 456,
+      "issue_text_sha256": 456,
+      "patch_sha256": 456,
+      "test_patch_sha256": 456
+    },
+    "unique_image_clusters": 456,
+    "unique_instance_ids": 456
+  },
+  "final_holdout": {
+    "boundary": "three blocked internal repositories from committed v1 training manifest",
+    "status": "sealed_not_read_or_run"
+  },
+  "frozen_on": "2026-10-17",
+  "plan_id": "mini-gibson-v2-sequential-2026-10-17",
+  "qualification_boundary": {
+    "ast_edit_fingerprints": "pending_qualification",
+    "executed_parser_source_sha256": "pending_qualification",
+    "immutable_image_digests": "pending_qualification",
+    "qualification_receipts": "pending_two_base_fail_and_two_gold_pass_runs",
+    "sealed_verifier_package_sha256": "pending_qualification",
+    "status": "pending_not_runnable"
+  },
+  "schema_version": "mini-gibson-real-cohort-freeze-evidence/v1",
+  "source": {
+    "columns_read": [
+      "base_commit",
+      "image_name",
+      "instance_id",
+      "language",
+      "license",
+      "patch",
+      "problem_statement",
+      "repo",
+      "test_patch",
+      "FAIL_TO_PASS",
+      "install_config",
+      "meta"
+    ],
+    "dataset": "nebius/SWE-rebench-V2",
+    "file": "data/train-00000-of-00001.parquet",
+    "model_outcome_columns_read": [],
+    "revision": "10483de0f50fe5da545942705a76c6150171af7f",
+    "rows": 32079,
+    "sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "split": "train"
+  },
+  "tooling": {
+    "candidate_selector_sha256": "131b53e3c355b4e1baae59d23eea4faefd30a88b619b6ca7e4f22461696bc273",
+    "cohort_validator_sha256": "d2c6586c9444c17e18b0bb1156ab7a86681982e4fde9b234126f23439183eed8",
+    "evidence_schema_sha256": "da8621c442eaa06bd552fd37da723c2144ecedee29f79745e7f6723fb81101de",
+    "freeze_generator_sha256": "46d8fccc9f9b8d625401f3ad3d5d228100db0148476d19c72a6c1b260f592c0f",
+    "plan_schema_sha256": "ab17f936a66cee282be1f339d59774f5091eb816253856bc863d1240a8187be2",
+    "sequential_freezer_sha256": "6c4d964b84f9400474cad5d15a314b9d98ddd4aa127846066e28791bd68eec05"
+  }
+}

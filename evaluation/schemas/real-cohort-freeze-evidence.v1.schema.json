@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/real-cohort-freeze-evidence.v1.schema.json",
+  "title": "Mini Gibson real cohort pre-outcome freeze evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plan_id", "frozen_on", "source", "artifacts",
+    "tooling", "candidate_summary", "qualification_boundary", "final_holdout"
+  ],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-real-cohort-freeze-evidence/v1"},
+    "plan_id": {"const": "mini-gibson-v2-sequential-2026-10-17"},
+    "frozen_on": {"const": "2026-10-17"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset", "revision", "split", "file", "sha256", "rows",
+        "columns_read", "model_outcome_columns_read"
+      ],
+      "properties": {
+        "dataset": {"const": "nebius/SWE-rebench-V2"},
+        "revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+        "split": {"const": "train"},
+        "file": {"const": "data/train-00000-of-00001.parquet"},
+        "sha256": {"const": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad"},
+        "rows": {"const": 32079},
+        "columns_read": {
+          "const": [
+            "base_commit", "image_name", "instance_id", "language", "license",
+            "patch", "problem_statement", "repo", "test_patch", "FAIL_TO_PASS",
+            "install_config", "meta"
+          ]
+        },
+        "model_outcome_columns_read": {"const": []}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_exclusion_registry", "sequential_plan"],
+      "properties": {
+        "base_exclusion_registry": {"$ref": "#/$defs/artifact"},
+        "sequential_plan": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "tooling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_selector_sha256", "cohort_validator_sha256",
+        "freeze_generator_sha256", "sequential_freezer_sha256",
+        "evidence_schema_sha256", "plan_schema_sha256"
+      ],
+      "properties": {
+        "candidate_selector_sha256": {"$ref": "#/$defs/sha256"},
+        "cohort_validator_sha256": {"$ref": "#/$defs/sha256"},
+        "freeze_generator_sha256": {"$ref": "#/$defs/sha256"},
+        "sequential_freezer_sha256": {"$ref": "#/$defs/sha256"},
+        "evidence_schema_sha256": {"$ref": "#/$defs/sha256"},
+        "plan_schema_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "candidate_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cohort_sizes", "total_candidates", "development_candidates",
+        "unique_instance_ids", "unique_fingerprint_sets", "unique_image_clusters",
+        "log_parsers"
+      ],
+      "properties": {
+        "cohort_sizes": {
+          "const": {
+            "pilot-budget": 24,
+            "development-a": 144,
+            "development-b": 144,
+            "development-c": 144
+          }
+        },
+        "total_candidates": {"const": 456},
+        "development_candidates": {"const": 432},
+        "unique_instance_ids": {"const": 456},
+        "unique_fingerprint_sets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issue_text_sha256", "patch_sha256", "test_patch_sha256",
+            "changed_files_sha256", "image_cluster_sha256"
+          ],
+          "properties": {
+            "issue_text_sha256": {"const": 456},
+            "patch_sha256": {"const": 456},
+            "test_patch_sha256": {"const": 456},
+            "changed_files_sha256": {"const": 456},
+            "image_cluster_sha256": {"const": 456}
+          }
+        },
+        "unique_image_clusters": {"const": 456},
+        "log_parsers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "qualification_boundary": {
+      "const": {
+        "status": "pending_not_runnable",
+        "immutable_image_digests": "pending_qualification",
+        "ast_edit_fingerprints": "pending_qualification",
+        "qualification_receipts": "pending_two_base_fail_and_two_gold_pass_runs",
+        "executed_parser_source_sha256": "pending_qualification",
+        "sealed_verifier_package_sha256": "pending_qualification"
+      }
+    },
+    "final_holdout": {
+      "const": {
+        "status": "sealed_not_read_or_run",
+        "boundary": "three blocked internal repositories from committed v1 training manifest"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_sha256", "canonical_sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "file_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
