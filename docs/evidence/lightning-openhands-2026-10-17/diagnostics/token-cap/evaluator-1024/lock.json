@@ -1,0 +1,32 @@
+{
+  "agent_contract_sha256": "fe8bafed9e0e789421a9b09506407ca1094b6557207cac03d0809680ec480451",
+  "entrypoint_sha256": "6bf73b9b373d21733fe594a1f2b13846aebbecbf6d85e9d90dbadb47b299760a",
+  "evaluation_task_ids": [
+    "fresh-a-chunked",
+    "fresh-a-merge-spans",
+    "fresh-a-moving-average",
+    "fresh-a-parse-duration",
+    "fresh-b-chunk-list",
+    "fresh-b-date-range",
+    "fresh-c-roman-numeral",
+    "fresh-c-posix-normalize",
+    "fresh-c-two-sum-pair",
+    "fresh-c-template-expand",
+    "fresh-c-flatten-mapping",
+    "fresh-c-histogram-buckets",
+    "fresh-c-compress-integers",
+    "fresh-c-word-wrap",
+    "fresh-c-format-bytes",
+    "fresh-c-nested-update",
+    "fresh-c-shallow-mapping-diff",
+    "fresh-d-csv-record",
+    "fresh-d-max-concurrent",
+    "fresh-d-luhn-check",
+    "fresh-d-dependency-order"
+  ],
+  "fixtures_sha256": "6fa7d526643f67becaa623be09c7bf485e6e56aaed1704d2746cdfa16f5ac0bc",
+  "harness_sha256": "0b3a0832851bf408f2c3bf4f4928cd1afbdbb47d40eade7a8c493d49f49592ba",
+  "observability_sha256": "ce83967c04fc1413d9db03db42180328458daeec02361fe960797e9759ce417f",
+  "system_prompt_sha256": "317479fb2f76d3f77a50e0e4f5e7f15bda7851bf3f4f6668a0752a2f11acc500",
+  "tools_sha256": "f3c3bfa919fe6c5e85fef28c00e70e6ca737ff42101fcc3a21f98105cd8588bf"
+}

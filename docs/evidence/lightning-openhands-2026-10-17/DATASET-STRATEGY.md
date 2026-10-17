@@ -10,6 +10,17 @@ The important unit is not a raw task or pull request. It is a **successful, exec
 4. Consider [SWE-bench-extra](https://huggingface.co/datasets/nebius/SWE-bench-extra) plus its [SWE-agent trajectories](https://huggingface.co/datasets/nebius/SWE-agent-trajectories) for additional real-repository diversity after converting the action schema.
 5. Defer [CommitPackFT](https://huggingface.co/datasets/bigcode/commitpackft) in the next comparison. Its large single-file commit corpus is useful as an edit prior but does not teach repository exploration, testing, or tool recovery.
 
+## Ray/Devstral-informed protocol changes
+
+Ray Myers pointed us to the closest published analogue: [Devstral](https://arxiv.org/html/2509.25193v1), a 24B coding model trained from OpenHands CodeAct trajectories. Its procedure suggests four concrete changes for the next Mini-Gibson run:
+
+1. Use a two-stage curriculum: first train on a broad set of executable, heuristically filtered successful rollouts; then finish on a smaller strict-quality tranche with clean verification, valid tools, minimal edits, no test changes, and useful recovery behavior.
+2. Render matched examples in both the evaluator's XML tool syntax and native function-calling syntax. Split those renderings by underlying task so format variants of one task cannot cross train/development boundaries.
+3. Keep deterministic pass@1 as the primary comparison. Report up to three attempts as a separate robustness measure, never as a replacement score or a way to retry until success.
+4. Run a preregistered turn-budget ablation on new development tasks. Devstral found a large gain moving from 30 to 50 iterations and no further gain at 100; Mini-Gibson should test whether its current 10-turn limit is measuring coding ability or premature termination without rewriting the frozen 48-task result.
+
+The [OpenHands Index analysis](https://www.openhands.dev/blog/analyzing-and-improving-openhands-index) also argues for behavior-level exploit audits, not just aggregate pass rates. New fixtures should use shallow or history-free clones, remain networkless, retain test-tamper and changed-file checks, and cluster traces for shortcut behavior. Evaluation should add secondary slices for testing and information-gathering behavior while preserving issue resolution as the primary endpoint.
+
 ## Non-negotiable contamination controls
 
 Freeze one exclusion registry before sampling. It should contain:
@@ -31,4 +42,4 @@ That funnel should be the primary data-quality graphic. Large source-row counts 
 
 ## Next hypothesis
 
-Tool reliability is the immediate bottleneck. The next training run should test whether more successful, exact-schema trajectories reduce malformed responses without erasing the directional issue-resolution gain. Predeclare a maximum sample, the paired analysis, the malformed-response non-inferiority gate, and promotion criteria before inference begins.
+Tool reliability is the immediate bottleneck, but the 1024-token diagnostic showed that output length is only part of it. The next training run should test whether concise, successful, exact-schema trajectories reduce truncation, repeated execution errors, and boundary violations without erasing the directional issue-resolution gain. Predeclare a maximum sample, paired analysis, malformed-response and policy non-inferiority gates, and promotion criteria before inference begins.
