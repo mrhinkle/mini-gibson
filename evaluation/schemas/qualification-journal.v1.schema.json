@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/qualification-journal.v1.schema.json",
+  "title": "Mini Gibson qualification journal record v1",
+  "oneOf": [
+    {"$ref": "#/$defs/header"},
+    {"$ref": "#/$defs/receipt_record"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "base": {
+      "type": "object",
+      "required": [
+        "schema_version", "record_type", "sequence",
+        "previous_record_sha256", "record_sha256"
+      ],
+      "properties": {
+        "schema_version": {"const": "mini-gibson-qualification-journal/v1"},
+        "record_type": {"enum": ["header", "qualification_receipt"]},
+        "sequence": {"type": "integer", "minimum": 0},
+        "previous_record_sha256": {"$ref": "#/$defs/sha256"},
+        "record_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "header": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version", "record_type", "sequence",
+            "previous_record_sha256", "invariants", "record_sha256"
+          ],
+          "properties": {
+            "schema_version": {"const": "mini-gibson-qualification-journal/v1"},
+            "record_type": {"const": "header"},
+            "sequence": {"const": 0},
+            "previous_record_sha256": {"const": "0000000000000000000000000000000000000000000000000000000000000000"},
+            "invariants": {"type": "object"},
+            "record_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    "receipt_record": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version", "record_type", "sequence",
+            "previous_record_sha256", "cohort_id", "selection_rank",
+            "instance_id", "input_sha256", "receipt", "record_sha256"
+          ],
+          "properties": {
+            "schema_version": {"const": "mini-gibson-qualification-journal/v1"},
+            "record_type": {"const": "qualification_receipt"},
+            "sequence": {"type": "integer", "minimum": 1},
+            "previous_record_sha256": {"$ref": "#/$defs/sha256"},
+            "cohort_id": {"enum": ["pilot-budget", "development-a", "development-b", "development-c"]},
+            "selection_rank": {"type": "integer", "minimum": 1, "maximum": 144},
+            "instance_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+            "input_sha256": {"$ref": "#/$defs/sha256"},
+            "receipt": {"type": "object"},
+            "record_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    }
+  }
+}

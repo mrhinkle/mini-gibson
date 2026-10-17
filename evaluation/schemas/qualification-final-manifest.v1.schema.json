@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-gibson.invalid/schemas/qualification-final-manifest.v1.schema.json",
+  "title": "Mini Gibson completed qualification manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "candidate_plan_sha256",
+    "dataset_revision", "dataset_sha256", "material_package_sha256",
+    "image_lock_sha256", "parser_source_sha256", "tooling",
+    "journal_head_sha256", "qualification_receipts", "qualified_receipts",
+    "qualified_locks", "training_exclusion_registry", "execution_freeze",
+    "formal_model_outcomes_observed", "final_holdout_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "mini-gibson-qualification-final-manifest/v1"},
+    "status": {"const": "qualification_complete_runnable"},
+    "candidate_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "dataset_revision": {"const": "10483de0f50fe5da545942705a76c6150171af7f"},
+    "dataset_sha256": {"const": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad"},
+    "material_package_sha256": {"$ref": "#/$defs/sha256"},
+    "image_lock_sha256": {"$ref": "#/$defs/sha256"},
+    "parser_source_sha256": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    },
+    "tooling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orchestrator_sha256", "docker_backend_sha256",
+        "verifier_sha256", "cohort_validator_sha256"
+      ],
+      "properties": {
+        "orchestrator_sha256": {"$ref": "#/$defs/sha256"},
+        "docker_backend_sha256": {"$ref": "#/$defs/sha256"},
+        "verifier_sha256": {"$ref": "#/$defs/sha256"},
+        "cohort_validator_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "journal_head_sha256": {"$ref": "#/$defs/sha256"},
+    "qualification_receipts": {"const": 456},
+    "qualified_receipts": {"const": 456},
+    "qualified_locks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pilot-budget", "development-a", "development-b", "development-c"],
+      "properties": {
+        "pilot-budget": {"$ref": "#/$defs/artifact"},
+        "development-a": {"$ref": "#/$defs/artifact"},
+        "development-b": {"$ref": "#/$defs/artifact"},
+        "development-c": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "training_exclusion_registry": {"$ref": "#/$defs/artifact"},
+    "execution_freeze": {"$ref": "#/$defs/artifact"},
+    "formal_model_outcomes_observed": {"const": false},
+    "final_holdout_status": {"const": "sealed_not_read_or_run"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "canonical_sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
