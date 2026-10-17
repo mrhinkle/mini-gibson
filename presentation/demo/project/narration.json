@@ -87,23 +87,23 @@
     },
     {
       "id": "09",
-      "duration_seconds": 33.588898,
-      "screen_headline": "A connection is not a finished job.",
-      "spoken": "Our biggest lesson: a working connection isn't a finished job. The seven B adapter passed a required tool call, but failed a real repository change. Automatic mode returned prose; forced calls repeatedly targeted the wrong file. No edit was applied. In the separate thirty B development run, the base passed six of twenty-four tasks; the adapter passed twelve. Those are exploratory development results. We still need to match the training records, lock the comparison, and test on untouched tasks. Better quality and fewer human interruptions are still unproven.",
-      "word_count": 88,
+      "duration_seconds": 37.743616,
+      "screen_headline": "Tool calling: more room helped, but was not enough",
+      "spoken": "Our biggest lesson was tool calling. The seven B adapter passed a forced call but failed a real code change. On thirty B, the first development batch looked promising; the next barely improved. Long tool calls kept getting cut off. On selected retries, doubling the response limit recovered eight of twenty-one failures; four calls still broke. More room helped, but wasn't enough. One attempt changed a test file; our checks flagged it and kept it failed. Next, teach shorter valid calls, inspect before editing, and recover from errors. These retries are diagnostics. Final quality and fewer human interruptions are still unproven.",
+      "word_count": 101,
       "text_start": 2790,
-      "text_end": 3353,
+      "text_end": 3423,
       "start_seconds": 147.163
     },
     {
       "id": "10",
-      "duration_seconds": 16.282285,
-      "screen_headline": "Optional extensions — still proposed",
-      "spoken": "Three optional pieces could help. Nemo Gym would organize repeatable trials. Jev would turn locked results into advice for John and me to review. Langfuse would show the sequence of model calls, tools, and checks. Those connections are proposed; we're not claiming they're running.",
-      "word_count": 44,
-      "text_start": 3355,
-      "text_end": 3636,
-      "start_seconds": 180.751898
+      "duration_seconds": 12.127567,
+      "screen_headline": "Local traces now. Optional connections next.",
+      "spoken": "Local traces helped us see those failures. Hosted Langfuse is still proposed. Nemo Gym could organize repeatable trials. Jev could turn locked results into advice for John and me to review. Those connections aren't running.",
+      "word_count": 35,
+      "text_start": 3425,
+      "text_end": 3648,
+      "start_seconds": 184.906616
     },
     {
       "id": "11",
@@ -111,21 +111,31 @@
       "screen_headline": "Keep the work moving.",
       "spoken": "We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.",
       "word_count": 32,
-      "text_start": 3638,
-      "text_end": 3832,
+      "text_start": 3650,
+      "text_end": 3844,
       "start_seconds": 197.034183
     }
   ],
-  "total_word_count": 614,
+  "total_word_count": 618,
   "total_duration_seconds": 209.999,
   "synthesis_status": "Generated using confirmed Mark Hinkle voice ID; timestamp alignment from ElevenLabs",
-  "narrative_revision": "2026-10-17: 7B vLLM pass/coding fail; separate30B Lightning v7 development6/24 vs12/24; provenance unresolved",
-  "measurement_status": "Exploratory development counts only; final held-out quality and reduced human intervention remain unproven.",
+  "narrative_revision": "Tool-call truncation, selected response-cap retries, test-boundary failure and proposed shorter-call curriculum; final quality pending",
+  "measurement_status": "Separate v7/v8 development batches; selected adapter-only diagnostics; final held-out quality and less human intervention unproven.",
   "audio_duration_seconds": 206.999388,
   "pacing_revision": {
     "previous_duration_seconds": 231.355,
     "tempo_multiplier": 1.103162115942029,
     "pitch_preserved": true,
     "method": "FFmpeg atempo; seekable motion, captions and alignment scaled by the same factor; three-second closing hold retained"
+  },
+  "tool_calling_edit": {
+    "old_section_start": 147.163,
+    "old_section_end": 197.034183,
+    "new_section_start": 147.163,
+    "new_section_end": 197.034183,
+    "pitch_preserving_tempo_multiplier": 1.1612029937208428,
+    "source_voice_speed": 1.07,
+    "section_gain_db": -2.6999999999999993,
+    "method": "Authorized clone; timed section replacement with pitch-preserving atempo; rest of narration retained"
   }
 }

@@ -15,3 +15,7 @@ Final held-out quality, reliable autonomous repository work, and reductions in h
 [Startup and dataset lessons](startup-lessons-source.json) identify Mark's firsthand report and the separately documented setup and data failures. The local logs do not independently establish provider overload as their root cause.
 
 [The Gibson naming origin](gibson-name-source.json) records Mark's movie reference and supplied film still. It is a presentation detail, not experimental evidence.
+
+## Tool-calling lessons update
+
+[Tool-calling receipts and verifier](tool-calling/README.md) add the fresh v8 development batch and selected 1,024/1,536-token diagnostics. Different cohort harnesses remain separate. Selected retry passes are not added to the paired development scores. Final quality and reduced human intervention remain unproven.

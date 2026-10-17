@@ -6,10 +6,10 @@
   "captions": "captions.srt",
   "alignment": "assets/narration.alignment.json",
   "mix_gain_db": 3.8,
-  "source_mean_db": -29.3,
-  "source_max_db": -5.3,
-  "predicted_mix_max_db": -1.5,
-  "narrative_revision": "Same narration and Hackers origin; faster 3m30s delivery",
+  "source_mean_db": -29.8,
+  "source_max_db": -5.7,
+  "predicted_mix_max_db": -1.9,
+  "narrative_revision": "Tool-call truncation, selected response-cap retries, test-boundary failure and proposed shorter-call curriculum; final quality pending",
   "mix_gain_linear": 1.548816619,
   "source_edit_history": [
     {
@@ -27,5 +27,15 @@
     "tempo_multiplier": 1.103162115942029,
     "pitch_preserved": true,
     "method": "FFmpeg atempo; seekable motion, captions and alignment scaled by the same factor; three-second closing hold retained"
+  },
+  "section_edit": {
+    "old_section_start": 147.163,
+    "old_section_end": 197.034183,
+    "new_section_start": 147.163,
+    "new_section_end": 197.034183,
+    "pitch_preserving_tempo_multiplier": 1.1612029937208428,
+    "source_voice_speed": 1.07,
+    "section_gain_db": -2.6999999999999993,
+    "method": "Authorized clone; timed section replacement with pitch-preserving atempo; rest of narration retained"
   }
 }

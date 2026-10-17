@@ -30,3 +30,5 @@ Mark supplied the Hackers film still and requested the naming joke. “Ridiculou
 # Delivery pacing
 
 The same frozen narration was accelerated by 1.103162x with FFmpeg atempo. No new voice generation, training, inference or experimental result was introduced. Timeline, captions and source alignment were scaled by the same factor. The closing hold remains three seconds.
+
+TOOL-CALLING UPDATE: saved source hashes and separate cohort/selected-diagnostic counts are published in evidence/tool-calling/summary.json. v7 and v8 use different harness revisions. Local Langfuse-shaped trace records were inspected, not hosted Langfuse or authenticated Jev. Final quality pending.

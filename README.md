@@ -10,12 +10,15 @@ The [narrated demo and editable project](presentation/demo/README.md) explain ou
 question: can a specialized small model reduce the checking, coordination, and
 rescue that makes the human a development bottleneck?
 
-The reviewed records now include a completed 20-step 7B rehearsal, subsequent
-vLLM connection checks, a failed 7B repository coding attempt, and a separate
-30B Lightning development comparison: 6/24 base tasks passed versus 12/24 with
-an adapter. These are exploratory development results. The 30B training-data
-record still needs reconciliation; final held-out quality and reductions in
-human intervention remain unproven. See the demo's
+The reviewed records include a completed 20-step 7B rehearsal, subsequent
+vLLM connection checks, and a failed 7B repository coding attempt. Separate
+30B development batches passed 6/24 base versus 12/24 adapter tasks in v7,
+and 3/24 versus 4/24 on the fresh v8 batch; the harness revision differs between
+batches. Selected response-limit retries exposed cut-off tool calls, recovery,
+and a test-file edit that was flagged and remained failed. These are development
+observations and adapter-only diagnostics, not final evaluation. The 30B
+training-data record still needs reconciliation; final held-out quality and
+reductions in human intervention remain unproven. See the demo's
 [sanitized evidence](presentation/demo/evidence/README.md) for the boundaries.
 
 ## Question

@@ -25,7 +25,7 @@ Final held-out quality, promotion readiness, reliable autonomous work and reduce
 
 ## Delivery
 
-ElevenLabs authorized clone,614 spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
+ElevenLabs authorized clone,618 spoken words; actual runtime recorded in narration.json. Pinned HyperFrames0.8.169. Use bundled Arimo and ArchivoBlack fonts with their SIL Open Font License notices. Exclude local systemfonts, rawTTSresponses, credentials, privatecorpus, rawconversations, hostnames and localfilesystempaths from the public GitHub package. Commit selected demo paths only on the isolated branch; independent Claude review and rendered media verification precede pushing.
 
 ## Startup and lessons revision
 
@@ -38,3 +38,7 @@ Mark requested a brief naming-origin joke using his supplied still from Hackers 
 ## Faster final delivery
 
 Mark requested a voice speed-up toward 3:30 and the updated video in the repository. Accelerated the existing narration by 1.103162x with pitch preserved, retimed every visual/caption cue, and retained a three-second closing hold. No wording or experimental claims changed. Final authored duration: 209.999s.
+
+## Tool-calling lessons revision
+
+Update the existing 3:30 cut with saved v7 and fresh v8 development counts, shown separately because their harness revisions differ. Selected adapter-only response-limit diagnostics recovered 8/21 tasks at 1,024 tokens with four still malformed; at 1,536 tokens 2/4 residual tasks passed with two still malformed. Do not add diagnostic passes to paired development scores. A test-file modification was flagged and remained failed. Next training candidates should teach concise valid calls, source inspection and recovery without test tampering. This curriculum is proposed. Local trace records were used; hosted Langfuse, Jev and NeMo Gym connections remain proposed. Final held-out quality and reduced human intervention remain unproven. Only sections09/10 were resynthesized with the authorized voice clone, pitch-preserved and fitted to their existing combined slot; the full video stays 3:30.

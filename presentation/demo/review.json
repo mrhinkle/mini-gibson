@@ -1,18 +1,29 @@
 {
-  "checked_at_utc": "2026-10-17T21:00:55.681120+00:00",
+  "checked_at_utc": "2026-10-17T21:45:26.165202+00:00",
   "reviewer": "Claude, independent of Codex author",
   "source_and_facts": "PASS",
-  "revision": "3:30 pacing with pitch preserved",
+  "revision": "3:30 tool-calling lessons",
   "reviewed_source_sha256": {
-    "presentation/demo/project/narration.txt": "35dbd7c02ca7461b0194d8c1819f70d3241e9c431ae8fabfba7449404c89f053",
-    "presentation/demo/project/index.html": "0e87f6f541bbcc17a3c2e42d1235a80aa3a72e2fbb6779b17df06367e3afe227",
-    "presentation/demo/project/compositions/frames/frame-01.html": "f2b3a677b82555b8c217480d2ea8f75f7198e6d2e0e26bc84d2f8c95aaf3fd74",
-    "presentation/demo/project/compositions/frames/frame-06.html": "41a1331c5f78a31fcf0d5f03affb0a11705cc25b966e8bc0dad3dbbed99984e6",
-    "presentation/demo/project/compositions/frames/frame-11.html": "0cc17d08c80dcdacfd48e085ff0d886c8fc0e5522870f6c26f5ba2d708aceafc"
+    "presentation/demo/project/narration.txt": "74271b3c190388ecd1b937cdb38e4d968b55b163ca3d5456cd8e31e2e1ffbb21",
+    "presentation/demo/project/narration.json": "ec45bac41f9d23cd95faadb5a3494030a31aba2f9956879aa66f2732f88e2af1",
+    "presentation/demo/project/index.html": "53cd5c5c37071b83c08a6c93763684aa9bbdd54e61245217c0778aaa73e244d7",
+    "presentation/demo/project/compositions/frames/frame-09.html": "8b45b0c7974c0189612a18d1481b606add0311f17230446b77f1a671bba42c4c",
+    "presentation/demo/project/compositions/frames/frame-10.html": "42d14e241eef78cf814561f862618f741bc0083d5d34840771fc832e16d832af",
+    "presentation/demo/project/compositions/captions.html": "a5daf6e33070ac334410853e3f4db8fffac51e7427d2d35379702bfbe1eb3a04",
+    "presentation/demo/project/audio_meta.json": "c08032f359f000c3a2339210223665aefa2da04c3fea2cb3898f87ffeec8106b",
+    "presentation/demo/README.md": "0b53c1c2860f1f01d4b609eb67fa148dcab9e8d4564a6d630239c7ef00c6bccf",
+    "presentation/demo/evidence/tool-calling/summary.json": "34ceecd1d4d3a6e94119e6cd032e7618ee4a088fc519f0ff8785ee922be0f461",
+    "presentation/demo/evidence/tool-calling/verify_tool_calling_evidence.py": "bf51d881ca733119ef50a58e92f2f9ed205db12fd0b272877ac98c1e5955c685",
+    "presentation/demo/verify_tool_calling_evidence.py": "7dadfaa4e23e294f4abe5f8cf60542fd0b0b277e02abfece2fa0d4f23b233cb9",
+    "README.md": "bef113400dd9959f3ea719fe3b4e3f2fffcd8c1a13b7d9d1a9fcf2661d6c747d"
   },
-  "previous_review_commit": "ebe10e6a55099e1c991c87c2f839770e90e7bf9e",
-  "previous_review_sha256": "8a04453fbe93440e664d0c7c3d7a680a7ef92b90684c2c77de08c5b36889e2d7",
-  "measurement_metadata_sha256": "e5b874a1fa4692a23b5f9170ff2184f0bf4b7275b8f91fe517faab98e56763fc",
-  "measurement_note": "Source levels were refreshed with FFmpeg after the bounded narration edit. Decoded MP4 levels are in verification.json.",
-  "scope": "Independent source, timing, cue, claim and mechanism review of this bounded edit; visual stills inspected separately. Existing reviewed runtime evidence retained. No training, inference, quality-gain or deployment approval."
+  "previous_review_commit": "af68f70efb6687ae28ec47dae301bd5f1701d772",
+  "previous_review_sha256": "193a5268dd3e48f779dac903f95d2ebdc5bb5a23d70fda8c9fcf17dc4867a597",
+  "readme_followup": "PASS; source-batch disclosure and recovery wording clarified",
+  "root_readme_review": "PASS",
+  "poster_alt_label_change": {
+    "description": "Poster alt label updated to Tool-calling lessons after image inspection; no experimental claim changed",
+    "current_readme_sha256": "3dc63b06533b0a850d4d9f2061bf8e80af477c77f2b22ef78c5a5f8fb88f6ac9"
+  },
+  "scope": "Independent source/timing/claims/privacy review at recorded hashes; later poster alt-label change identified separately. Actual rendered pixels, full decode and audio levels verified separately. No live serving, training, inference, held-out quality or promotion approval."
 }

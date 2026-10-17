@@ -21,7 +21,7 @@
   },
   {
     "start": 9.590783,
-    "end": 10.952221,
+    "end": 10.960773,
     "text": "the work still came back to me."
   },
   {
@@ -31,7 +31,7 @@
   },
   {
     "start": 11.159173,
-    "end": 13.3946,
+    "end": 13.403152,
     "text": "Mark Hinkle, co-founder of All Things AI."
   },
   {
@@ -41,12 +41,12 @@
   },
   {
     "start": 16.818719,
-    "end": 20.622536,
+    "end": 20.631887000000003,
     "text": "relations at Cloud.com, and VP of marketing at the Linux Foundation."
   },
   {
     "start": 20.809819,
-    "end": 23.054652,
+    "end": 23.064004,
     "text": "John Willis co-wrote The DevOps Handbook."
   },
   {
@@ -56,12 +56,12 @@
   },
   {
     "start": 26.607902,
-    "end": 29.974725,
+    "end": 29.984076,
     "text": "acquired by Dell, and co-founded SocketPlane, acquired by Docker."
   },
   {
     "start": 30.261209,
-    "end": 33.678486,
+    "end": 33.687838,
     "text": "We know process, but lately we've spent more time managing than coding."
   },
   {
@@ -81,7 +81,7 @@
   },
   {
     "start": 39.515053,
-    "end": 43.626732,
+    "end": 43.636084000000004,
     "text": "and rescuing failed attempts. More code means more decisions waiting for me."
   },
   {
@@ -96,12 +96,12 @@
   },
   {
     "start": 48.14291,
-    "end": 51.857788,
+    "end": 51.86634,
     "text": "Gibson is our experiment. We want a small model to learn concrete handoffs,"
   },
   {
     "start": 51.86634,
-    "end": 54.776499,
+    "end": 54.78585,
     "text": "responses to failed tests, and evidence of what changed."
   },
   {
@@ -116,7 +116,7 @@
   },
   {
     "start": 62.569705,
-    "end": 64.327944,
+    "end": 64.337296,
     "text": "work meets the same quality bar."
   },
   {
@@ -126,12 +126,12 @@
   },
   {
     "start": 65.031753,
-    "end": 66.740392,
+    "end": 66.749743,
     "text": "started took longer than we expected."
   },
   {
     "start": 67.086737,
-    "end": 69.799351,
+    "end": 69.808703,
     "text": "We hit overloaded providers and stalled builds."
   },
   {
@@ -146,27 +146,27 @@
   },
   {
     "start": 78.078297,
-    "end": 80.264123,
+    "end": 80.27347499999999,
     "text": "one H one hundred and NeMo Automodel."
   },
   {
     "start": 80.689145,
-    "end": 84.09616,
+    "end": 84.10551199999999,
     "text": "vLLM serves that adapter and passed connection checks."
   },
   {
     "start": 84.601568,
-    "end": 88.256585,
+    "end": 88.265936,
     "text": "Separately, thirty B Lightning has a loaded adapter and development results,"
   },
   {
     "start": 88.493469,
-    "end": 90.371432,
+    "end": 90.380783,
     "text": "tested with Transformers and PEFT."
   },
   {
     "start": 90.875984,
-    "end": 92.902748,
+    "end": 92.912099,
     "text": "We keep their datasets and results separate."
   },
   {
@@ -186,7 +186,7 @@
   },
   {
     "start": 103.31727,
-    "end": 107.0407,
+    "end": 107.050051,
     "text": "independent review. Gibson Environment runs the tools and checks results."
   },
   {
@@ -201,7 +201,7 @@
   },
   {
     "start": 112.095915,
-    "end": 114.608418,
+    "end": 114.61777,
     "text": "This is our existing Agent Kontrol dashboard."
   },
   {
@@ -211,7 +211,7 @@
   },
   {
     "start": 119.462389,
-    "end": 122.561542,
+    "end": 122.570893,
     "text": "waiting for me. We can see where work gets stuck."
   },
   {
@@ -221,7 +221,7 @@
   },
   {
     "start": 126.362793,
-    "end": 127.357361,
+    "end": 127.36671299999999,
     "text": "needs our attention."
   },
   {
@@ -231,17 +231,17 @@
   },
   {
     "start": 131.059412,
-    "end": 134.227834,
+    "end": 134.23718499999998,
     "text": "one hundred eighty-eight training rows and thirty development rows."
   },
   {
     "start": 134.652856,
-    "end": 138.229196,
+    "end": 138.23854699999998,
     "text": "Some examples were broken; others lost the answer at the token limit."
   },
   {
     "start": 138.346354,
-    "end": 141.058114,
+    "end": 141.067465,
     "text": "We saved and reloaded a small LoRA adapter."
   },
   {
@@ -251,83 +251,88 @@
   },
   {
     "start": 145.167228,
-    "end": 146.658652,
+    "end": 146.668004,
     "text": "the evaluated adapter."
   },
   {
-    "start": 147.163204,
-    "end": 150.172564,
-    "text": "Our biggest lesson: a working connection isn't a finished job."
+    "start": 147.182807,
+    "end": 149.062858,
+    "text": "Our biggest lesson was tool calling."
   },
   {
-    "start": 150.598441,
-    "end": 154.132878,
-    "text": "The seven B adapter passed a required tool call, but failed a real"
+    "start": 149.182457,
+    "end": 152.992403,
+    "text": "The seven B adapter passed a forced call but failed a real code change."
   },
   {
-    "start": 154.132878,
-    "end": 159.136504,
-    "text": "repository change. Automatic mode returned prose; forced calls repeatedly"
+    "start": 153.251513,
+    "end": 157.480748,
+    "text": "On thirty B, the first development batch looked promising; the next barely"
   },
   {
-    "start": 159.136504,
-    "end": 162.056926,
-    "text": "targeted the wrong file. No edit was applied."
+    "start": 157.480748,
+    "end": 160.600892,
+    "text": "improved. Long tool calls kept getting cut off."
   },
   {
-    "start": 162.244209,
-    "end": 166.206233,
-    "text": "In the separate thirty B development run, the base passed six of twenty-four"
+    "start": 160.810915,
+    "end": 164.299539,
+    "text": "On selected retries, doubling the response limit recovered eight of"
   },
   {
-    "start": 166.206233,
-    "end": 168.699067,
-    "text": "tasks; the adapter passed twelve."
+    "start": 164.299539,
+    "end": 166.919339,
+    "text": "twenty-one failures; four calls still broke."
   },
   {
-    "start": 169.303676,
-    "end": 171.509171,
-    "text": "Those are exploratory development results."
+    "start": 167.229259,
+    "end": 169.07916799999998,
+    "text": "More room helped, but wasn't enough."
   },
   {
-    "start": 171.746054,
-    "end": 175.588354,
-    "text": "We still need to match the training records, lock the comparison, and test"
+    "start": 169.469177,
+    "end": 173.94825699999998,
+    "text": "One attempt changed a test file; our checks flagged it and kept it failed."
   },
   {
-    "start": 175.588354,
-    "end": 179.867647,
-    "text": "on untouched tasks. Better quality and fewer human interruptions are still"
+    "start": 174.208228,
+    "end": 178.317759,
+    "text": "Next, teach shorter valid calls, inspect before editing, and recover from"
   },
   {
-    "start": 179.867647,
-    "end": 180.56376,
-    "text": "unproven."
+    "start": 178.317759,
+    "end": 180.967701,
+    "text": "errors. These retries are diagnostics."
   },
   {
-    "start": 180.751898,
-    "end": 182.370743,
-    "text": "Three optional pieces could help."
+    "start": 181.126915,
+    "end": 184.646645,
+    "text": "Final quality and fewer human interruptions are still unproven."
   },
   {
-    "start": 182.658082,
-    "end": 185.061978,
-    "text": "Nemo Gym would organize repeatable trials."
+    "start": 184.906616,
+    "end": 187.076779,
+    "text": "Local traces helped us see those failures."
   },
   {
-    "start": 185.298861,
-    "end": 189.093271,
-    "text": "Jev would turn locked results into advice for John and me to review."
+    "start": 187.076779,
+    "end": 188.986006,
+    "text": "Hosted Langfuse is still proposed."
   },
   {
-    "start": 189.519148,
-    "end": 192.955239,
-    "text": "Langfuse would show the sequence of model calls, tools, and checks."
+    "start": 188.986006,
+    "end": 191.195887,
+    "text": "Nemo Gym could organize repeatable trials."
   },
   {
-    "start": 193.559848,
-    "end": 196.529869,
-    "text": "Those connections are proposed; we're not claiming they're running."
+    "start": 191.505807,
+    "end": 194.985061,
+    "text": "Jev could turn locked results into advice for John and me to review."
+  },
+  {
+    "start": 195.37507,
+    "end": 196.914956,
+    "text": "Those connections aren't running."
   },
   {
     "start": 197.034422,
@@ -336,17 +341,17 @@
   },
   {
     "start": 200.628721,
-    "end": 202.109028,
+    "end": 202.11838,
     "text": "chasing and rescuing from us."
   },
   {
     "start": 202.256974,
-    "end": 204.800263,
+    "end": 204.80961399999998,
     "text": "That's how we keep the human from becoming the bottleneck."
   },
   {
     "start": 205.225284,
-    "end": 206.924517,
+    "end": 206.933868,
     "text": "Follow the repository on screen."
   }
 ]

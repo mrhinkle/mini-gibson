@@ -87,3 +87,7 @@ Start: 197.034s. Duration: 12.965s.
 Visual: Keepworkmoving and public repository link; final quality gains pending.
 
 Voiceover: We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.
+
+## Tool-calling revision
+
+Scene09 now reveals three successive beats: separate 7B task failure and 30B v7/v8 counts; selected response-limit diagnostics; then test-boundary failure and proposed training behavior. Scene10 distinguishes local traces used from proposed hosted connections. Final quality remains unproven.
