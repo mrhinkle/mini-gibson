@@ -30,7 +30,8 @@ from .docker_backend import (
 
 RECEIPT_SCHEMA_V1 = "mini-gibson-rebench-qualification/v1"
 RECEIPT_SCHEMA = "mini-gibson-rebench-qualification/v2"
-PREFLIGHT_RECEIPT_SCHEMA = "mini-gibson-rebench-compatibility/v1"
+PREFLIGHT_RECEIPT_SCHEMA_V1 = "mini-gibson-rebench-compatibility/v1"
+PREFLIGHT_RECEIPT_SCHEMA = "mini-gibson-rebench-compatibility/v2"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 STATUS_VALUES = {"passed", "failed", "error", "skipped"}
 MARKER_PREFIX = "__MINI_GIBSON_VERIFIER_V1__"
@@ -1079,7 +1080,15 @@ def preflight_task(
 
     _validate_task(task)
     _validate_material(material)
-    protected = protected_paths(material.gold_patch, material.test_patch)
+    precheck_error: str | None = None
+    try:
+        protected = protected_paths(material.gold_patch, material.test_patch)
+    except RebenchVerificationError as exc:
+        # A frozen task whose patches violate the verifier policy is a genuine
+        # compatibility result, not host infrastructure. Record it once and
+        # continue the all-candidate matrix without entering a container.
+        protected = ()
+        precheck_error = _bounded_receipt_error(str(exc))
     runs = [
         _preflight_run(
             task=task,
@@ -1090,7 +1099,7 @@ def preflight_task(
             backend=backend,
         )
         for phase, patch in (("base", ""), ("gold", material.gold_patch))
-    ]
+    ] if precheck_error is None else []
     receipt: dict[str, object] = {
         "schema_version": PREFLIGHT_RECEIPT_SCHEMA,
         "instance_id": task.instance_id,
@@ -1103,7 +1112,8 @@ def preflight_task(
         "test_patch_sha256": _sha256(material.test_patch),
         "test_command_sha256": _sha256(material.test_command),
         "mechanics_command_sha256": _sha256("true"),
-        "compatible": all(bool(run["compatible"]) for run in runs),
+        "precheck_error": precheck_error,
+        "compatible": precheck_error is None and all(bool(run["compatible"]) for run in runs),
         "runs": runs,
     }
     receipt["receipt_sha256"] = _sha256(dump_canonical_json(receipt))
@@ -1123,6 +1133,7 @@ def verify_preflight_receipt(receipt: Mapping[str, object]) -> bool:
         "test_patch_sha256",
         "test_command_sha256",
         "mechanics_command_sha256",
+        "precheck_error",
         "compatible",
         "runs",
         "receipt_sha256",
@@ -1145,9 +1156,14 @@ def verify_preflight_receipt(receipt: Mapping[str, object]) -> bool:
         "command_sha256",
         "error",
     }
-    if not isinstance(receipt, Mapping) or set(receipt) != receipt_keys:
+    if not isinstance(receipt, Mapping):
         return False
-    if receipt.get("schema_version") != PREFLIGHT_RECEIPT_SCHEMA:
+    schema = receipt.get("schema_version")
+    if schema == PREFLIGHT_RECEIPT_SCHEMA_V1:
+        receipt_keys.remove("precheck_error")
+    elif schema != PREFLIGHT_RECEIPT_SCHEMA:
+        return False
+    if set(receipt) != receipt_keys:
         return False
     claimed = receipt.get("receipt_sha256")
     if not isinstance(claimed, str) or not SHA256_RE.fullmatch(claimed):
@@ -1188,6 +1204,13 @@ def verify_preflight_receipt(receipt: Mapping[str, object]) -> bool:
             return False
     if receipt["mechanics_command_sha256"] != _sha256("true"):
         return False
+    precheck_error = receipt.get("precheck_error") if schema == PREFLIGHT_RECEIPT_SCHEMA else None
+    if precheck_error is not None:
+        return bool(
+            _valid_receipt_error(precheck_error)
+            and receipt["compatible"] is False
+            and receipt.get("runs") == []
+        )
     runs = receipt.get("runs")
     if not isinstance(runs, list) or len(runs) != 2:
         return False

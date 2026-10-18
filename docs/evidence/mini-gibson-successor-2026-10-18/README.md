@@ -10,3 +10,9 @@ No model conclusion is valid at the preflight stage.
 The first controller root stopped before its first task receipt on an
 infrastructure-only archive ownership error. See [RECOVERY-R2.md](RECOVERY-R2.md)
 for the preserved evidence and outcome-blind successor-root repair.
+
+R2 then recorded two compatible tasks and stopped before task 3 because the
+host precheck correctly rejected a gold patch that modifies a test-like path,
+but the v1 compatibility schema could not serialize that precheck result. See
+[RECOVERY-R3.md](RECOVERY-R3.md). R3 keeps every frozen task and records such
+policy failures as immutable incompatibilities without launching a container.

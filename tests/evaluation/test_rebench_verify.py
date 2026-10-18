@@ -275,6 +275,33 @@ def test_compatibility_preflight_records_exact_mechanics_failure_stage() -> None
     assert verify_preflight_receipt(receipt) is True
 
 
+def test_compatibility_preflight_records_policy_precheck_without_a_container() -> None:
+    backend = MechanicsBackend()
+    receipt = preflight_task(
+        task(),
+        material(gold_patch=_patch("src/components/box/box.spec.tsx")),
+        backend=backend,
+    )
+
+    assert backend.calls == []
+    assert receipt["compatible"] is False
+    assert receipt["runs"] == []
+    assert receipt["precheck_error"] == (
+        "product patch touches protected test paths: "
+        "['src/components/box/box.spec.tsx']"
+    )
+    assert verify_preflight_receipt(receipt) is True
+
+
+def test_v1_compatibility_receipt_remains_verifiable() -> None:
+    receipt = preflight_task(task(), material(), backend=MechanicsBackend())
+    receipt["schema_version"] = "mini-gibson-rebench-compatibility/v1"
+    receipt.pop("precheck_error")
+    _rehash_receipt(receipt)
+
+    assert verify_preflight_receipt(receipt) is True
+
+
 def test_qualification_rejects_unsafe_controls_in_test_identifier() -> None:
     for bad in ("", "bad\0selector", "bad\rselector"):
         with pytest.raises(RebenchVerificationError, match="without NUL"):
