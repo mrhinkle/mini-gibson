@@ -15,7 +15,7 @@ import shlex
 import sys
 import tarfile
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence
@@ -28,7 +28,10 @@ from .docker_backend import (
     DockerRunResult,
 )
 
-RECEIPT_SCHEMA = "mini-gibson-rebench-qualification/v1"
+RECEIPT_SCHEMA_V1 = "mini-gibson-rebench-qualification/v1"
+RECEIPT_SCHEMA = "mini-gibson-rebench-qualification/v2"
+PREFLIGHT_RECEIPT_SCHEMA_V1 = "mini-gibson-rebench-compatibility/v1"
+PREFLIGHT_RECEIPT_SCHEMA = "mini-gibson-rebench-compatibility/v2"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 STATUS_VALUES = {"passed", "failed", "error", "skipped"}
 MARKER_PREFIX = "__MINI_GIBSON_VERIFIER_V1__"
@@ -107,6 +110,7 @@ class PinnedParser:
 @dataclass(frozen=True)
 class QualificationTask:
     instance_id: str
+    base_commit: str
     image_reference: str
     image_digest: str
     workdir: str
@@ -216,6 +220,8 @@ def _sha256(data: bytes | str) -> str:
 def _validate_task(task: QualificationTask) -> None:
     if not task.instance_id or any(char in task.instance_id for char in "\0\r\n"):
         raise RebenchVerificationError("instance_id must be a single non-empty line")
+    if not re.fullmatch(r"[0-9a-f]{40}", task.base_commit):
+        raise RebenchVerificationError("base_commit must be a lowercase 40-character Git SHA")
     if not IMAGE_RE.fullmatch(task.image_reference):
         raise RebenchVerificationError("image_reference must be pinned by immutable digest")
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", task.image_digest):
@@ -608,26 +614,29 @@ def _tar_member(archive: tarfile.TarFile, name: str, data: bytes, mode: int = 0o
     archive.addfile(info, io.BytesIO(data))
 
 
-def _runner_script(marker_token: str) -> str:
+def _runner_script(marker_token: str, base_commit: str) -> str:
     # The command itself is sealed input.  Candidate/model input never reaches
     # this script, and no patch content appears in argv or the receipt.
     return rf"""#!/usr/bin/env bash
 set -u
 stage="$(mktemp -d /tmp/mini-gibson-verifier.XXXXXX)" || exit 80
 trap 'rm -rf "$stage"' EXIT
-tar -xf - -C "$stage" || exit 81
+tar --no-same-owner -xf - -C "$stage" || exit 81
 cd "$PWD" || exit 82
 test -d .git || exit 83
-status_output="$(git status --porcelain=v1 --untracked-files=no)" || exit 84
-test -z "$status_output" || exit 84
+git_cmd=(git -c safe.directory="$PWD")
+head_commit="$("${{git_cmd[@]}}" rev-parse --verify HEAD)" || exit 96
+test "$head_commit" = "{base_commit}" || exit 98
+status_output="$("${{git_cmd[@]}}" status --porcelain=v1 --untracked-files=no)" || exit 84
+test -z "$status_output" || exit 99
 if test -s "$stage/product.patch"; then
-  git apply -p1 --check --whitespace=nowarn "$stage/product.patch" || exit 85
-  git apply -p1 --whitespace=nowarn "$stage/product.patch" || exit 86
+  "${{git_cmd[@]}}" apply -p1 --check --whitespace=nowarn "$stage/product.patch" || exit 85
+  "${{git_cmd[@]}}" apply -p1 --whitespace=nowarn "$stage/product.patch" || exit 86
 fi
-git apply -p1 --check --whitespace=nowarn "$stage/test.patch" || exit 87
-git apply -p1 --whitespace=nowarn "$stage/test.patch" || exit 88
+"${{git_cmd[@]}}" apply -p1 --check --whitespace=nowarn "$stage/test.patch" || exit 87
+"${{git_cmd[@]}}" apply -p1 --whitespace=nowarn "$stage/test.patch" || exit 88
 
-git ls-files > "$stage/tracked-files" || exit 92
+"${{git_cmd[@]}}" ls-files > "$stage/tracked-files" || exit 92
 awk '
   /(^|\/)(tests?|__tests__|specs?)(\/|$)/ ||
   /(^|\/)(test_|spec_)[^\/]*$/ ||
@@ -907,7 +916,7 @@ def qualify_task(
                 protected=protected,
                 marker_token=marker_token,
             )
-            script = _runner_script(marker_token)
+            script = _runner_script(marker_token, task.base_commit)
             try:
                 result = backend.run_verifier(
                     image=task.image_reference,
@@ -946,6 +955,7 @@ def qualify_task(
     receipt: dict[str, object] = {
         "schema_version": RECEIPT_SCHEMA,
         "instance_id": task.instance_id,
+        "base_commit": task.base_commit,
         "image_reference": task.image_reference,
         "image_digest": task.image_digest,
         "workdir": task.workdir,
@@ -962,6 +972,287 @@ def qualify_task(
     }
     receipt["receipt_sha256"] = _sha256(dump_canonical_json(receipt))
     return receipt
+
+
+def _preflight_run(
+    *,
+    task: QualificationTask,
+    material: VerifierMaterial,
+    protected: Sequence[str],
+    product_patch: str,
+    phase: str,
+    backend: DockerBackend,
+) -> dict[str, object]:
+    marker_token = uuid.uuid4().hex
+    mechanics_material = replace(material, test_command="true")
+    payload = build_verifier_payload(
+        product_patch=product_patch,
+        material=mechanics_material,
+        protected=protected,
+        marker_token=marker_token,
+    )
+    script = _runner_script(marker_token, task.base_commit)
+    result = backend.run_verifier(
+        image=task.image_reference,
+        workdir=task.workdir,
+        command=("/bin/bash", "-c", script),
+        stdin=payload,
+        timeout_s=task.verify_timeout_s,
+    )
+
+    # This phase classifies image/patch compatibility, not host reliability.
+    # Never seal a transient Docker, timeout, OOM, or output-control failure as
+    # a permanent task incompatibility. The runner's own bounded mechanics
+    # exits are the only non-zero codes eligible for a receipt.
+    mechanics_failure_codes = {82, 83, 84, 85, 86, 87, 88, 92, 93, 94, 95, 96, 98, 99}
+    if result.timed_out:
+        raise DockerIsolationError("compatibility preflight timed out")
+    if result.output_truncated:
+        raise DockerIsolationError("compatibility preflight output exceeded the cap")
+    if result.returncode not in {0, *mechanics_failure_codes}:
+        raise DockerIsolationError(
+            f"compatibility preflight had non-mechanics exit {result.returncode}"
+        )
+
+    integrity_ok, error = _integrity_marker(result.stderr, marker_token)
+    if result.returncode == 0 and not integrity_ok:
+        raise DockerIsolationError(
+            f"compatibility integrity failure: {error or 'marker validation failed'}"
+        )
+    if result.returncode != 0:
+        stage_errors = {
+            80: "temporary verifier staging could not be created",
+            81: "sealed verifier payload could not be extracted",
+            82: "image workdir could not be entered",
+            83: "image workdir is not a Git checkout",
+            84: "Git status could not inspect the checkout",
+            85: "gold patch precheck failed",
+            86: "gold patch application failed",
+            87: "test patch precheck failed",
+            88: "test patch application failed",
+            92: "Git tracked-file enumeration failed",
+            93: "protected-path discovery failed",
+            94: "sealed protected-path input was invalid",
+            95: "protected-path set could not be finalized",
+            96: "Git HEAD could not be resolved",
+            97: "protected test paths changed during mechanics execution",
+            98: "image HEAD disagrees with the frozen base commit",
+            99: "image checkout has tracked modifications before patching",
+        }
+        detail = stage_errors.get(result.returncode, "unclassified mechanics failure")
+        error = (
+            f"compatibility mechanics failed with return code {result.returncode}: {detail}"
+        )
+    compatible = bool(
+        result.returncode == 0
+        and not result.timed_out
+        and not result.output_truncated
+        and integrity_ok
+        and error is None
+    )
+    return {
+        "phase": phase,
+        "compatible": compatible,
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "output_truncated": result.output_truncated,
+        "integrity_ok": integrity_ok,
+        "stdout_sha256": result.stdout_sha256,
+        "stderr_sha256": result.stderr_sha256,
+        "stdout_head_sha256": result.stdout_head_sha256,
+        "stdout_tail_sha256": result.stdout_tail_sha256,
+        "stderr_head_sha256": result.stderr_head_sha256,
+        "stderr_tail_sha256": result.stderr_tail_sha256,
+        "stdout_captured_bytes": result.stdout_captured_bytes,
+        "stderr_captured_bytes": result.stderr_captured_bytes,
+        "command_sha256": result.command_sha256,
+        "error": _bounded_receipt_error(error) if error is not None else None,
+    }
+
+
+def preflight_task(
+    task: QualificationTask,
+    material: VerifierMaterial,
+    *,
+    backend: DockerBackend,
+) -> dict[str, object]:
+    """Check repository and patch mechanics without running tests or a model."""
+
+    _validate_task(task)
+    _validate_material(material)
+    precheck_error: str | None = None
+    try:
+        protected = protected_paths(material.gold_patch, material.test_patch)
+    except RebenchVerificationError as exc:
+        # A frozen task whose patches violate the verifier policy is a genuine
+        # compatibility result, not host infrastructure. Record it once and
+        # continue the all-candidate matrix without entering a container.
+        protected = ()
+        precheck_error = _bounded_receipt_error(str(exc))
+    runs = [
+        _preflight_run(
+            task=task,
+            material=material,
+            protected=protected,
+            product_patch=patch,
+            phase=phase,
+            backend=backend,
+        )
+        for phase, patch in (("base", ""), ("gold", material.gold_patch))
+    ] if precheck_error is None else []
+    receipt: dict[str, object] = {
+        "schema_version": PREFLIGHT_RECEIPT_SCHEMA,
+        "instance_id": task.instance_id,
+        "base_commit": task.base_commit,
+        "image_reference": task.image_reference,
+        "image_digest": task.image_digest,
+        "workdir": task.workdir,
+        "verify_timeout_s": task.verify_timeout_s,
+        "gold_patch_sha256": _sha256(material.gold_patch),
+        "test_patch_sha256": _sha256(material.test_patch),
+        "test_command_sha256": _sha256(material.test_command),
+        "mechanics_command_sha256": _sha256("true"),
+        "precheck_error": precheck_error,
+        "compatible": precheck_error is None and all(bool(run["compatible"]) for run in runs),
+        "runs": runs,
+    }
+    receipt["receipt_sha256"] = _sha256(dump_canonical_json(receipt))
+    return receipt
+
+
+def verify_preflight_receipt(receipt: Mapping[str, object]) -> bool:
+    receipt_keys = {
+        "schema_version",
+        "instance_id",
+        "base_commit",
+        "image_reference",
+        "image_digest",
+        "workdir",
+        "verify_timeout_s",
+        "gold_patch_sha256",
+        "test_patch_sha256",
+        "test_command_sha256",
+        "mechanics_command_sha256",
+        "precheck_error",
+        "compatible",
+        "runs",
+        "receipt_sha256",
+    }
+    run_keys = {
+        "phase",
+        "compatible",
+        "returncode",
+        "timed_out",
+        "output_truncated",
+        "integrity_ok",
+        "stdout_sha256",
+        "stderr_sha256",
+        "stdout_head_sha256",
+        "stdout_tail_sha256",
+        "stderr_head_sha256",
+        "stderr_tail_sha256",
+        "stdout_captured_bytes",
+        "stderr_captured_bytes",
+        "command_sha256",
+        "error",
+    }
+    if not isinstance(receipt, Mapping):
+        return False
+    schema = receipt.get("schema_version")
+    if schema == PREFLIGHT_RECEIPT_SCHEMA_V1:
+        receipt_keys.remove("precheck_error")
+    elif schema != PREFLIGHT_RECEIPT_SCHEMA:
+        return False
+    if set(receipt) != receipt_keys:
+        return False
+    claimed = receipt.get("receipt_sha256")
+    if not isinstance(claimed, str) or not SHA256_RE.fullmatch(claimed):
+        return False
+    body = dict(receipt)
+    body.pop("receipt_sha256", None)
+    try:
+        if _sha256(dump_canonical_json(body)) != claimed:
+            return False
+    except (TypeError, ValueError):
+        return False
+    if (
+        not isinstance(receipt.get("instance_id"), str)
+        or not receipt["instance_id"]
+        or bool(set(receipt["instance_id"]) & {"\0", "\r", "\n"})
+        or not isinstance(receipt.get("base_commit"), str)
+        or not re.fullmatch(r"[0-9a-f]{40}", receipt["base_commit"])
+        or not isinstance(receipt.get("image_reference"), str)
+        or not IMAGE_RE.fullmatch(receipt["image_reference"])
+        or not isinstance(receipt.get("image_digest"), str)
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", receipt["image_digest"])
+        or not receipt["image_reference"].endswith(f"@{receipt['image_digest']}")
+        or not isinstance(receipt.get("workdir"), str)
+        or not receipt["workdir"].startswith("/")
+        or receipt["workdir"] == "/"
+        or ".." in PurePosixPath(receipt["workdir"]).parts
+        or receipt.get("verify_timeout_s") != 900
+        or not isinstance(receipt.get("compatible"), bool)
+    ):
+        return False
+    for name in (
+        "gold_patch_sha256",
+        "test_patch_sha256",
+        "test_command_sha256",
+        "mechanics_command_sha256",
+    ):
+        if not isinstance(receipt.get(name), str) or not SHA256_RE.fullmatch(receipt[name]):
+            return False
+    if receipt["mechanics_command_sha256"] != _sha256("true"):
+        return False
+    precheck_error = receipt.get("precheck_error") if schema == PREFLIGHT_RECEIPT_SCHEMA else None
+    if precheck_error is not None:
+        return bool(
+            _valid_receipt_error(precheck_error)
+            and receipt["compatible"] is False
+            and receipt.get("runs") == []
+        )
+    runs = receipt.get("runs")
+    if not isinstance(runs, list) or len(runs) != 2:
+        return False
+    compatible_values: list[bool] = []
+    for raw, phase in zip(runs, ("base", "gold")):
+        if not isinstance(raw, Mapping) or set(raw) != run_keys or raw.get("phase") != phase:
+            return False
+        for name in ("compatible", "timed_out", "output_truncated", "integrity_ok"):
+            if not isinstance(raw.get(name), bool):
+                return False
+        returncode = raw.get("returncode")
+        if returncode is not None and (isinstance(returncode, bool) or not isinstance(returncode, int)):
+            return False
+        error = raw.get("error")
+        if error is not None and not _valid_receipt_error(error):
+            return False
+        for name in (
+            "stdout_sha256",
+            "stderr_sha256",
+            "stdout_head_sha256",
+            "stdout_tail_sha256",
+            "stderr_head_sha256",
+            "stderr_tail_sha256",
+            "command_sha256",
+        ):
+            if not isinstance(raw.get(name), str) or not SHA256_RE.fullmatch(raw[name]):
+                return False
+        for name in ("stdout_captured_bytes", "stderr_captured_bytes"):
+            value = raw.get(name)
+            if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 20_000_000):
+                return False
+        semantic = bool(
+            returncode == 0
+            and raw["timed_out"] is False
+            and raw["output_truncated"] is False
+            and raw["integrity_ok"] is True
+            and error is None
+        )
+        if raw["compatible"] is not semantic or (not semantic and error is None):
+            return False
+        compatible_values.append(semantic)
+    return receipt["compatible"] is all(compatible_values)
 
 
 def verify_receipt(receipt: Mapping[str, object]) -> bool:
@@ -1008,9 +1299,14 @@ def verify_receipt(receipt: Mapping[str, object]) -> bool:
         "error",
     }
 
-    if not isinstance(receipt, Mapping) or set(receipt) != receipt_keys:
+    if not isinstance(receipt, Mapping):
         return False
-    if receipt.get("schema_version") != RECEIPT_SCHEMA:
+    schema = receipt.get("schema_version")
+    if schema == RECEIPT_SCHEMA:
+        receipt_keys = receipt_keys | {"base_commit"}
+    elif schema != RECEIPT_SCHEMA_V1:
+        return False
+    if set(receipt) != receipt_keys:
         return False
     claimed = receipt.get("receipt_sha256")
     if not isinstance(claimed, str) or not SHA256_RE.fullmatch(claimed):
@@ -1027,6 +1323,7 @@ def verify_receipt(receipt: Mapping[str, object]) -> bool:
     image_reference = receipt.get("image_reference")
     image_digest = receipt.get("image_digest")
     workdir = receipt.get("workdir")
+    base_commit = receipt.get("base_commit")
     if (
         not isinstance(instance_id, str)
         or not instance_id
@@ -1042,6 +1339,8 @@ def verify_receipt(receipt: Mapping[str, object]) -> bool:
         or ".." in PurePosixPath(workdir).parts
         or receipt.get("verify_timeout_s") != 900
         or receipt.get("parser_name") not in SUPPORTED_LOG_PARSERS
+        or (schema == RECEIPT_SCHEMA and not isinstance(base_commit, str))
+        or (schema == RECEIPT_SCHEMA and not re.fullmatch(r"[0-9a-f]{40}", base_commit))
     ):
         return False
     for name in (

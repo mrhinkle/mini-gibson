@@ -79,6 +79,7 @@ def valid_receipt(instance_id: str) -> dict:
     return qualify_task(
         QualificationTask(
             instance_id=instance_id,
+            base_commit="a" * 40,
             image_reference=f"registry.example/task@{DIGEST}",
             image_digest=DIGEST,
             workdir="/testbed",
