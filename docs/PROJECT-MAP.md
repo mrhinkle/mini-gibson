@@ -101,6 +101,16 @@ compatibility preflight:
 Any next run needs a new preregistered protocol, fresh development tasks, and a
 training-exclusion check before these sources can be selected.
 
+## Local NeMo Gym feasibility check
+
+On October 18, we ran [NVIDIA-NeMo/Gym](https://github.com/NVIDIA-NeMo/Gym)
+v0.7.0 at `1f8afc71d45fac14872d86fe300374afa2001e7a` locally. Its
+upstream verifier/session example passed five tests; our
+[Mini Gibson synthetic verifier fixture](../integrations/nemo_gym/README.md)
+passed one test with four cases. This format-only check used no model, scored
+task, GPU, or final holdout. NeMo Gym was **not** part of the completed v1
+fine-tune/evaluation or the successor compatibility preflight.
+
 ## Planned post-run analysis
 
 These tools did not participate in scored runs or the compatibility preflight:
@@ -109,7 +119,6 @@ These tools did not participate in scored runs or the compatibility preflight:
 | --- | --- | --- |
 | Langfuse | [repository](https://github.com/langfuse/langfuse), [documentation](https://langfuse.com/docs) | Redacted trace analysis after immutable local results are finalized. |
 | Jev / TypeSafe | [product](https://typesafe.ai/), [quickstart](https://docs.typesafe.ai/introduction/quickstart), [API](https://docs.typesafe.ai/api), [Python SDK](https://github.com/typesafe-ai/typesafe-sdk-python), [agent skill](https://github.com/typesafe-ai/skills) | Bounded, post-run anomaly classification that cannot change scores or authorize retries. |
-| NeMo Gym | [NVIDIA-NeMo/Gym](https://github.com/NVIDIA-NeMo/Gym) | Proposed repeatable experiment orchestration; it did not participate in the completed runs. |
 
 Jev is a hosted proprietary model. The linked TypeSafe repositories contain
 official integration code, not the Jev model source.

@@ -1,0 +1,7 @@
+mini_gibson_tool_call:
+  resources_servers:
+    mini_gibson_tool_call:
+      entrypoint: app.py
+      domain: coding
+      verified: false
+      description: Non-scored synthetic patch-call-format smoke fixture

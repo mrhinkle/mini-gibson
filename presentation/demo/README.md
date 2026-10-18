@@ -68,7 +68,7 @@ The 21 cut-off outputs comprise six from the earlier v7 source receipts and 15 f
 
 More response space helped, but it did not fix the whole problem. One 1,024-token attempt modified a test file, was flagged by the boundary check, and remained failed. The two successful 1,536-token residual tasks recovered after a tool error. The next proposed training examples focus on shorter valid calls, inspecting files before editing, recovery, and preserving tests. No new fine-tune was run for this video.
 
-The [tool-calling evidence summary](evidence/tool-calling/summary.json) and [sanitized receipts](evidence/) retain counts, source hashes and limitations. Local generation/tool trace records informed this analysis. No hosted Langfuse export or authenticated Jev call is evidenced; hosted Langfuse, Jev and NeMo Gym remain proposed connections.
+The [tool-calling evidence summary](evidence/tool-calling/summary.json) and [sanitized receipts](evidence/) retain counts, source hashes and limitations. Local generation/tool trace records informed this analysis. No hosted Langfuse export or authenticated Jev call is evidenced. Gym was proposed when this video was made; a later [local NeMo Gym verifier smoke](../../integrations/nemo_gym/README.md) passed, without changing any scored result or this rendered video. Hosted Langfuse and Jev connections remain proposed.
 
 ## Inspect and replay
 
