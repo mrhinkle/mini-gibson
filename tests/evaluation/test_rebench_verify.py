@@ -25,8 +25,10 @@ from evaluation.verify_rebench import (
     load_pinned_parser,
     load_pinned_parser_bytes,
     patch_paths,
+    preflight_task,
     protected_paths,
     qualify_task,
+    verify_preflight_receipt,
     verify_receipt,
 )
 
@@ -93,6 +95,7 @@ def _delete_patch(path: str) -> str:
 def task() -> QualificationTask:
     return QualificationTask(
         instance_id="owner__repo-123",
+        base_commit="a" * 40,
         image_reference=f"registry.example/rebench/task@{DIGEST}",
         image_digest=DIGEST,
         workdir="/testbed",
@@ -146,6 +149,29 @@ class FakeBackend:
         )
 
 
+class MechanicsBackend:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def run_verifier(self, *, image, workdir, command, stdin, timeout_s):
+        with tarfile.open(fileobj=io.BytesIO(stdin), mode="r:") as archive:
+            assert archive.extractfile("test-command").read() == b"true"
+            product = archive.extractfile("product.patch").read()
+        phase = "gold" if product else "base"
+        token = re.search(rf"{MARKER_PREFIX}:([0-9a-f]{{32}}):", command[2]).group(1)
+        digest = hashlib.sha256(b"protected").hexdigest()
+        self.calls.append((image, workdir, command, timeout_s, phase))
+        return DockerRunResult(
+            returncode=0,
+            stdout="",
+            stderr=f"{MARKER_PREFIX}:{token}:0:{digest}:{digest}\n",
+            timed_out=False,
+            output_truncated=False,
+            container_name=f"mini-gibson-verifier-{len(self.calls):012x}",
+            command_sha256=hashlib.sha256(phase.encode()).hexdigest(),
+        )
+
+
 def test_qualification_requires_two_fresh_base_fails_and_gold_passes() -> None:
     backend = FakeBackend()
     receipt = qualify_task(task(), material(), parser=PINNED_PARSER, backend=backend)
@@ -192,6 +218,45 @@ def test_qualification_preserves_multiline_test_identifiers() -> None:
     assert receipt["qualified"] is True
     assert all(test_id in run["fail_to_pass_states"] for run in receipt["runs"])
     assert verify_receipt(receipt) is True
+
+
+def test_compatibility_preflight_applies_both_patch_paths_without_running_tests() -> None:
+    backend = MechanicsBackend()
+    receipt = preflight_task(task(), material(), backend=backend)
+
+    assert receipt["compatible"] is True
+    assert [call[-1] for call in backend.calls] == ["base", "gold"]
+    assert receipt["test_command_sha256"] == hashlib.sha256(b"pytest -q -rA").hexdigest()
+    assert verify_preflight_receipt(receipt) is True
+
+    tampered = copy.deepcopy(receipt)
+    tampered["runs"][0]["compatible"] = False
+    _rehash_receipt(tampered)
+    assert verify_preflight_receipt(tampered) is False
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {0: {"returncode": 125}},
+        {0: {"returncode": 137}},
+        {0: {"timed_out": True, "returncode": -9}},
+        {0: {"output_truncated": True}},
+        {0: {"returncode": 0, "stderr": "missing marker"}},
+    ],
+)
+def test_compatibility_preflight_does_not_seal_infrastructure_failures(overrides) -> None:
+    with pytest.raises(DockerIsolationError, match="compatibility"):
+        preflight_task(task(), material(), backend=FakeBackend(overrides))
+
+
+def test_compatibility_preflight_propagates_backend_isolation_failure() -> None:
+    with pytest.raises(DockerIsolationError, match="daemon unavailable"):
+        preflight_task(
+            task(),
+            material(),
+            backend=FakeBackend(docker_error_at=0),
+        )
 
 
 def test_qualification_rejects_unsafe_controls_in_test_identifier() -> None:
@@ -485,6 +550,8 @@ def _run_local_runner(
     root: Path,
     verifier_material: VerifierMaterial,
     protected: tuple[str, ...],
+    *,
+    base_commit: str | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     token = "f" * 32
     payload = build_verifier_payload(
@@ -494,7 +561,14 @@ def _run_local_runner(
         marker_token=token,
     )
     return subprocess.run(
-        ["/bin/bash", "-c", _runner_script(token)],
+        [
+            "/bin/bash",
+            "-c",
+            _runner_script(
+                token,
+                base_commit or _git(root, "rev-parse", "HEAD").strip(),
+            ),
+        ],
         cwd=root,
         input=payload,
         capture_output=True,
@@ -516,6 +590,29 @@ def test_runner_rejects_git_status_failure_even_with_empty_stdout(tmp_path: Path
     assert result.returncode == 84
     assert result.stdout == b""
     assert MARKER_PREFIX.encode() not in result.stderr
+
+
+def test_runner_distinguishes_wrong_head_and_dirty_tracked_state(tmp_path: Path) -> None:
+    root = tmp_path / "wrong-head-dirty"
+    _init_runner_repo(root, {"src/value.py": "old\n"})
+    verifier_material = material(
+        test_patch=_patch("src/value.py"),
+        test_command="true",
+    )
+
+    wrong_head = _run_local_runner(
+        root,
+        verifier_material,
+        ("src/value.py",),
+        base_commit="f" * 40,
+    )
+    assert wrong_head.returncode == 98
+    assert MARKER_PREFIX.encode() not in wrong_head.stderr
+
+    (root / "src/value.py").write_text("dirty\n")
+    dirty = _run_local_runner(root, verifier_material, ("src/value.py",))
+    assert dirty.returncode == 99
+    assert MARKER_PREFIX.encode() not in dirty.stderr
 
 
 @pytest.mark.parametrize(
@@ -897,6 +994,7 @@ def test_task_and_material_contracts_fail_before_any_container() -> None:
         qualify_task(
             QualificationTask(
                 instance_id="task",
+                base_commit="a" * 40,
                 image_reference=f"registry.example/rebench/task@{DIGEST}",
                 image_digest="sha256:" + "c" * 64,
                 workdir="/testbed",
@@ -979,6 +1077,7 @@ def test_image_reference_cannot_begin_with_docker_option_prefix() -> None:
         qualify_task(
             QualificationTask(
                 instance_id="task",
+                base_commit="a" * 40,
                 image_reference=f"--evil@{DIGEST}",
                 image_digest=DIGEST,
                 workdir="/testbed",

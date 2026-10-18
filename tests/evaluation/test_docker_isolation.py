@@ -68,6 +68,7 @@ def test_command_enforces_hard_isolation_without_host_mounts_or_secrets() -> Non
     assert _flag_value(command, "--cap-drop") == "ALL"
     assert _flag_value(command, "--security-opt") == "no-new-privileges:true"
     assert _flag_value(command, "--user") == "1000:1000"
+    assert "HOME=/tmp/home" in command
     assert _flag_value(command, "--cpus") == "1.5"
     assert _flag_value(command, "--memory") == "4g"
     assert _flag_value(command, "--memory-swap") == "4g"
@@ -80,6 +81,25 @@ def test_command_enforces_hard_isolation_without_host_mounts_or_secrets() -> Non
     rendered = "\0".join(command).casefold()
     for forbidden in ("docker.sock", "/users/", "/home/", "aws_secret", "hf_token", "ssh_auth_sock"):
         assert forbidden not in rendered
+
+
+def test_verifier_uses_pinned_image_user_without_weakening_isolation() -> None:
+    backend = DockerBackend()
+    command = backend.build_command(
+        image=IMAGE,
+        workdir="/testbed",
+        command=("true",),
+        role="verifier",
+        container_name="mini-gibson-verifier-123456abcdef",
+    )
+
+    assert "--user" not in command
+    assert "HOME=/tmp/home" not in command
+    assert _flag_value(command, "--network") == "none"
+    assert _flag_value(command, "--cap-drop") == "ALL"
+    assert _flag_value(command, "--security-opt") == "no-new-privileges:true"
+    assert "--volume" not in command
+    assert "--mount" not in command
 
 
 @pytest.mark.parametrize(

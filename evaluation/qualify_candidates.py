@@ -894,6 +894,7 @@ def _validate_prior_record_binding(
     receipt = record["receipt"]
     expected_receipt_fields = {
         "instance_id": instance_id,
+        "base_commit": candidate["base_commit"],
         "image_reference": image["reference"],
         "image_digest": image["digest"],
         "workdir": image["workdir"],
@@ -952,6 +953,7 @@ def _qualify_one(
     receipt = qualify_task(
         QualificationTask(
             instance_id=instance_id,
+            base_commit=candidate["base_commit"],
             image_reference=image["reference"],
             image_digest=image["digest"],
             workdir=image["workdir"],

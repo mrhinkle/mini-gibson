@@ -195,7 +195,7 @@ class DockerBackend:
         limits = self.limits
         # Do not add volume/mount flags or host-derived --env entries here.  The
         # absence of those flags is a security invariant asserted by tests.
-        return [
+        argv = [
             self.docker,
             "run",
             "--rm",
@@ -211,8 +211,6 @@ class DockerBackend:
             "ALL",
             "--security-opt",
             "no-new-privileges:true",
-            "--user",
-            limits.user,
             "--cpus",
             str(limits.cpus),
             "--memory",
@@ -232,8 +230,6 @@ class DockerBackend:
             "--hostname",
             f"mini-gibson-{role}",
             "--env",
-            "HOME=/tmp/home",
-            "--env",
             "HF_HUB_OFFLINE=1",
             "--env",
             "TRANSFORMERS_OFFLINE=1",
@@ -247,9 +243,16 @@ class DockerBackend:
             "NO_PROXY=",
             "--init",
             "-i",
-            image,
-            *command,
         ]
+        # Agent/model code remains forced to a fixed non-root identity. The
+        # verifier uses the immutable image's configured user because
+        # SWE-rebench images bind repository ownership, toolchains, and
+        # editable installs to that identity. Verifier containers remain
+        # fresh, networkless, mountless, capability-free, and no-new-privileges.
+        if role == "agent":
+            argv.extend(("--user", limits.user, "--env", "HOME=/tmp/home"))
+        argv.extend((image, *command))
+        return argv
 
     def run(
         self,
