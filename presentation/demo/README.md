@@ -12,22 +12,23 @@ handoff, failed check, and repair waiting for a person?
 
 [![Tool-calling lessons](poster.png)](mini-gibson-demo.mp4)
 
-This approximately 3:30 demo introduces Mark Hinkle and John Willis, the human
+This 3:44 demo introduces Mark Hinkle and John Willis, the human
 bottleneck, The Gibson, Agent Kontrol, the two model/data tracks, vLLM, and the
 proposed NeMo Gym, Jev, and Langfuse connections. Narration uses Mark's authorized
 ElevenLabs voice clone. The editable project uses the frozen audio; no voice API
 credential is required to replay or render it.
 
-The original spoken track predates the final v1 evidence. The currently
-published approximately 3:30 MP4 is the earlier cut. A revised source with two
-`POST-RUN UPDATE` overlays and a silent terminal findings card is drafted, but
-has not been rendered or verified as a delivery MP4. Treat the current video
-as an introduction; the written v1 report is authoritative for the later
-model result.
+The original spoken track predates the final v1 evidence. Two visible
+`POST-RUN UPDATE` overlays correct superseded spoken claims, and a 14-second
+silent terminal card reports the verified **456 checked / 406 compatible / 50
+incompatible** successor result. The revised MP4 was rendered, fully decoded,
+and visually checked against the preview. The written [v1 report](../../docs/evidence/mini-gibson-v2-2026-10-18/REPORT.md)
+and [successor report](../../docs/evidence/mini-gibson-successor-2026-10-18/REPORT.md)
+remain authoritative for numerical claims.
 
 The “Why The Gibson?” segment uses Mark's supplied still from *Hackers* (1995) and his self-deprecating naming joke, then returns to the engineering process. The [film/image source note](evidence/gibson-name-source.json) records the attribution and asset hash.
 
-The existing tool-calling and observability sections use Mark's authorized voice clone, fitted to the original 3:30 narrated cut with pitch preserved. Captions and visual cues are synchronized, with a three-second closing hold. The draft terminal card would add 14 silent seconds after its counts are verified. See the [audio pacing record](project/audio_meta.json).
+The existing tool-calling and observability sections use Mark's authorized voice clone, fitted to the original 3:30 narrated cut with pitch preserved. Captions and visual cues are synchronized, with a three-second closing hold. The verified terminal card adds 14 silent seconds; no new voice was generated. See the [audio pacing record](project/audio_meta.json).
 
 ## What the slow start taught us
 
@@ -68,7 +69,7 @@ The 21 cut-off outputs comprise six from the earlier v7 source receipts and 15 f
 
 More response space helped, but it did not fix the whole problem. One 1,024-token attempt modified a test file, was flagged by the boundary check, and remained failed. The two successful 1,536-token residual tasks recovered after a tool error. The next proposed training examples focus on shorter valid calls, inspecting files before editing, recovery, and preserving tests. No new fine-tune was run for this video.
 
-The [tool-calling evidence summary](evidence/tool-calling/summary.json) and [sanitized receipts](evidence/) retain counts, source hashes and limitations. Local generation/tool trace records informed this analysis. No hosted Langfuse export or authenticated Jev call is evidenced. Gym was proposed when this video was made; a later [local NeMo Gym verifier smoke](../../integrations/nemo_gym/README.md) passed, without changing any scored result or this rendered video. Hosted Langfuse and Jev connections remain proposed.
+The [tool-calling evidence summary](evidence/tool-calling/summary.json) and [sanitized receipts](evidence/) retain counts, source hashes and limitations. Local generation/tool trace records informed this analysis. No hosted Langfuse export or authenticated Jev call is evidenced. Gym was proposed in the frozen spoken track; a later [local NeMo Gym verifier smoke](../../integrations/nemo_gym/README.md) passed, without changing any scored result. Hosted Langfuse and Jev connections remain proposed.
 
 ## Inspect and replay
 

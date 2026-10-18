@@ -51,3 +51,8 @@ findings card generated from the terminal evidence package. The card must say
 that the adapter was not promoted, the successor stopped at compatibility
 preflight, no new model result was produced, and the public final holdout stayed
 operationally sealed and unconsumed.
+
+The terminal card is bound to the verified full R3 matrix: 456 checked, 406
+compatible, 50 incompatible. A separate pinned local NeMo Gym verifier smoke
+later passed; that does not alter the original spoken proposal, the scored
+model comparison, or the R3 compatibility finding.

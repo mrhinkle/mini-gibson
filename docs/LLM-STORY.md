@@ -36,12 +36,14 @@ a clear reliability regression**. We did not promote the adapter or spend the
 35-task final holdout.
 
 The later v2 run stopped before model evaluation because its frozen
-qualification gate failed on the first task. The successor R3 run is a
-456-task **evaluator-compatibility preflight**, not a model comparison; it runs
-no agent or LLM. Neither can be counted as a new Nemotron result. See the
+qualification gate failed on the first task. The successor R3 run was a
+456-task **evaluator-compatibility preflight**, not a model comparison: 406
+packages were compatible and 50 were not, so it stopped before more training
+or model evaluation. It ran no agent or LLM. Neither the v2 stop nor R3 can be
+counted as a new Nemotron result. See the
 [completed v1 evidence](evidence/lightning-openhands-2026-10-17/REPORT.md),
 [v2 stop report](evidence/mini-gibson-v2-2026-10-18/REPORT.md), and
-[successor protocol](evidence/mini-gibson-successor-2026-10-18/PROTOCOL.md).
+[successor report and full matrix](evidence/mini-gibson-successor-2026-10-18/REPORT.md).
 
 ## Why NeMo Gym is in the story
 

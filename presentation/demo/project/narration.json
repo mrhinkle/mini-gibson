@@ -129,7 +129,7 @@
   "total_word_count": 618,
   "total_duration_seconds": 223.999,
   "synthesis_status": "Generated using confirmed Mark Hinkle voice ID; timestamp alignment from ElevenLabs",
-  "narrative_revision": "Original authorized narration retained; a silent terminal-evidence card is appended and exact compatibility counts remain placeholder-bound until verifier success",
+  "narrative_revision": "Original authorized narration retained; the silent terminal card reports the verified 456/406/50 compatibility result",
   "measurement_status": "Separate v7/v8 development batches; selected adapter-only diagnostics; final held-out quality and less human intervention unproven.",
   "audio_duration_seconds": 206.999388,
   "pacing_revision": {
