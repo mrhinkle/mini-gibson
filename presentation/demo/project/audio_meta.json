@@ -3,13 +3,20 @@
   "voice": "Mark Hinkle",
   "audio_file": "assets/narration.mp3",
   "duration_seconds": 206.999388,
+  "video_duration_seconds": 223.999,
   "captions": "captions.srt",
   "alignment": "assets/narration.alignment.json",
   "mix_gain_db": 3.8,
   "source_mean_db": -29.8,
   "source_max_db": -5.7,
   "predicted_mix_max_db": -1.9,
-  "narrative_revision": "Tool-call truncation, selected response-cap retries, test-boundary failure and proposed shorter-call curriculum; final quality pending",
+  "narrative_revision": "Original authorized narration retained; a silent terminal-evidence card is appended and exact compatibility counts remain placeholder-bound until verifier success",
+  "post_run_silent_card": {
+    "start_seconds": 209.999,
+    "duration_seconds": 14,
+    "audio_added": false,
+    "counts_source": "verified terminal successor summary"
+  },
   "mix_gain_linear": 1.548816619,
   "source_edit_history": [
     {

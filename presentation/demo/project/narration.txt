@@ -19,3 +19,5 @@ Our biggest lesson was tool calling. The seven B adapter passed a forced call bu
 Local traces helped us see those failures. Hosted Langfuse is still proposed. Nemo Gym could organize repeatable trials. Jev could turn locked results into advice for John and me to review. Those connections aren't running.
 
 We want useful work that passes checks and independent review, with less chasing and rescuing from us. That's how we keep the human from becoming the bottleneck. Follow the repository on screen.
+
+[On-screen post-run update; not spoken: the 30B model was connected and evaluated, its exact training manifest and 94-step run were recovered and verified, and the terminal findings card supersedes the two earlier pending statements.]

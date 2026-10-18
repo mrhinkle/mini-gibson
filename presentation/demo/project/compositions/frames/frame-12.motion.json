@@ -1,0 +1,12 @@
+{
+  "scene": "frame-12",
+  "duration": 14,
+  "assertions": [
+    { "kind": "appearsBy", "selector": ".frame-12-title", "bySec": 1.3 },
+    { "kind": "before", "a": ".frame-12-title", "b": ".frame-12-metric-primary" },
+    { "kind": "before", "a": ".frame-12-metric-primary", "b": ".frame-12-deliverable" },
+    { "kind": "staysInFrame", "selector": ".frame-12-metrics" },
+    { "kind": "staysInFrame", "selector": ".frame-12-deliverable" },
+    { "kind": "keepsMoving", "withinSelector": "#root", "maxStaticSec": 2 }
+  ]
+}

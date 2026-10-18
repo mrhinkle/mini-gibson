@@ -44,7 +44,7 @@ Voiceover: Getting started took longer than we expected. We hit overloaded provi
 
 Start: 93.508s. Duration: 18.588s.
 
-Visual: Supplied Hackers still and naming-origin joke; then transition to The Gibson logo, Task → Isolated change → Checks → Review. Model connection remains pending.
+Visual: Supplied Hackers still and naming-origin joke; then transition to The Gibson logo, Task → Isolated change → Checks → Review. A post-run correction notes that the 30B model was subsequently connected and evaluated.
 
 Voiceover: Why The Gibson? In Hackers, it's a ridiculous supercomputer run by a bunch of buffoons. We thought it was apropos. Our Gibson defines tasks, isolates changes, runs checks, and requires independent review. Gibson Environment runs the tools and checks results. Connecting the model is still ahead. The model proposes repairs; checks and approval rules stay in place.
 
@@ -60,9 +60,9 @@ Voiceover: This is our existing Agent Kontrol dashboard. It shows Claude, Grok, 
 
 Start: 127.594s. Duration: 19.569s.
 
-Visual: Good JSON was not enough: 283 source records become 188 train/30 development rows after filtering and real tokenization at 2,048 tokens. Separate 30B OpenHands training record remains unmatched.
+Visual: Good JSON was not enough: 283 source records become 188 train/30 development rows after filtering and real tokenization at 2,048 tokens. A post-run correction notes that the 30B OpenHands training manifest was subsequently recovered and hash-attested.
 
-Voiceover: For the seven B rehearsal, two hundred eighty-three source records became one hundred eighty-eight training rows and thirty development rows. Some examples were broken; others lost the answer at the token limit. We saved and reloaded a small LoRA adapter. The thirty B OpenHands track still needs its training-data record matched to the evaluated adapter.
+Voiceover: The original voiceover says the 30B record still needs matching. The on-screen post-run correction supersedes that sentence: the v1 package recovered the attested manifest, verified all 94 optimizer steps, and bound it to every tuned evaluation row.
 
 ## Frame 9 — A connection is not a finished job.
 
@@ -70,7 +70,7 @@ Start: 147.163s. Duration: 33.589s.
 
 Visual: Connection and required-tool checks pass, but real 7B coding task fails with no edit. Separate exploratory 30B development comparison: 6/24 base, 12/24 adapter. Final quality and human intervention remain unproven.
 
-Voiceover: Our biggest lesson: a working connection isn't a finished job. The seven B adapter passed a required tool call, but failed a real repository change. Automatic mode returned prose; forced calls repeatedly targeted the wrong file. No edit was applied. In the separate thirty B development run, the base passed six of twenty-four tasks; the adapter passed twelve. Those are exploratory development results. We still need to match the training records, lock the comparison, and test on untouched tasks. Better quality and fewer human interruptions are still unproven.
+Voiceover: The current audio reports the tool-calling diagnostics. The final silent card adds the verified v1 comparison and the terminal successor boundary without changing the original spoken track.
 
 ## Frame 10 — Optional extensions — still proposed
 
@@ -91,3 +91,11 @@ Voiceover: We want useful work that passes checks and independent review, with l
 ## Tool-calling revision
 
 Scene09 now reveals three successive beats: separate 7B task failure and 30B v7/v8 counts; selected response-limit diagnostics; then test-boundary failure and proposed training behavior. Scene10 distinguishes local traces used from proposed hosted connections. Final quality remains unproven.
+
+## Post-run correction and final findings
+
+Frames 6 and 8 carry explicit `POST-RUN UPDATE` labels that supersede two stale
+spoken claims: the 30B model was connected and evaluated, and its exact
+training-data manifest was recovered and hash-attested. A final silent card is
+generated from the verified terminal `summary.json`; it reports the v1 result,
+the 456-task preflight boundary, and the operationally sealed holdout.

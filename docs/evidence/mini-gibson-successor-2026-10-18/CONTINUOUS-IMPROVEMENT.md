@@ -4,10 +4,11 @@
 
 Langfuse and Jev answer different questions:
 
-- **Langfuse shows the shape of the coding run.** It gives us a timeline of when
-  the model responded, which tools ran, errors, retries, test runs, time, and
-  token use. The first version does not send source code or message contents.
-- **Jev helps us sort operational problems.** After the real tests have produced
+- **[Langfuse](https://github.com/langfuse/langfuse) shows the shape of the
+  coding run.** It gives us a timeline of when the model responded, which tools
+  ran, errors, retries, test runs, time, and token use. The planned first
+  exporter would not send source code or message contents.
+- **[Jev](https://typesafe.ai/) helps us sort operational problems.** After the real tests have produced
   an immutable result, the current Jev contract can classify a failure or flag
   it for human review using safe counts and status fields.
 - **The local evaluator still decides whether a task passed.** Neither service
@@ -204,3 +205,8 @@ not code inside the networkless evaluator:
 This document authorizes no credential use or hosted request. Enabling either
 service remains an explicit operational step after the exporter, redaction
 tests, and experiment boundary have been independently reviewed.
+
+Official references: [Langfuse documentation](https://langfuse.com/docs),
+[TypeSafe Jev quickstart](https://docs.typesafe.ai/introduction/quickstart), and
+[TypeSafe API reference](https://docs.typesafe.ai/api). The complete ecosystem
+index is the repository-wide [project map](../../PROJECT-MAP.md).

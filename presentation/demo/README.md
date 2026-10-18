@@ -7,6 +7,9 @@ handoff, failed check, and repair waiting for a person?
 [Transcript](transcript.txt) · [Captions](captions.srt) ·
 [Editable project ZIP](mini-gibson-demo-project.zip)
 
+[Plain-language submission summary](../../SUBMISSION.md) ·
+[Project and public-dataset map](../../docs/PROJECT-MAP.md)
+
 [![Tool-calling lessons](poster.png)](mini-gibson-demo.mp4)
 
 This approximately 3:30 demo introduces Mark Hinkle and John Willis, the human
@@ -15,9 +18,16 @@ proposed NeMo Gym, Jev, and Langfuse connections. Narration uses Mark's authoriz
 ElevenLabs voice clone. The editable project uses the frozen audio; no voice API
 credential is required to replay or render it.
 
+The original spoken track predates the final v1 evidence. Two explicit
+`POST-RUN UPDATE` overlays correct its superseded “model connection pending”
+and “training record unmatched” statements. The final render also appends a
+silent findings card generated from the terminal successor summary; the
+transcript labels that correction rather than pretending it was in the frozen
+voice recording.
+
 The “Why The Gibson?” segment uses Mark's supplied still from *Hackers* (1995) and his self-deprecating naming joke, then returns to the engineering process. The [film/image source note](evidence/gibson-name-source.json) records the attribution and asset hash.
 
-The updated tool-calling and observability sections use Mark's authorized voice clone, fitted to the existing 3:30 cut with pitch preserved. Captions and visual cues are synchronized, with a three-second closing hold. See the [audio pacing record](project/audio_meta.json).
+The updated tool-calling and observability sections use Mark's authorized voice clone, fitted to the original 3:30 narrated cut with pitch preserved. Captions and visual cues are synchronized, with a three-second closing hold. The terminal findings card adds 14 silent seconds, bringing the authored deliverable to 3:44. See the [audio pacing record](project/audio_meta.json).
 
 ## What the slow start taught us
 
@@ -28,26 +38,27 @@ Mark reports overloaded providers; the records also document stalled/failed buil
 | Track | What the records establish | What remains unproven |
 | --- | --- | --- |
 | OpenCodeReasoning-Nemotron-7B | 20-step LoRA rehearsal on Brev H100; 188 train / 30 dev rows from 283 source records, at a 2,048-token limit. The subsequent execution report records vLLM 0.11.0 health, model-listing, chat and required-tool checks passing. | The first real repository coding task failed and applied no edit. Endpoint checks do not establish autonomous engineering competence. |
-| Nemotron 3.5 Lightning 30B | A loaded adapter was evaluated with Transformers/PEFT. The first v7 development batch passed **6/24 base** and **12/24 adapter**; a fresh v8 batch passed **3/24 base** and **4/24 adapter**. Controls match within each pair; the two batches have different harness revisions. | Both batches are development observations, not final holdouts. The exact training-data record is unresolved; a complete local optimizer-step receipt was not recovered. |
+| Nemotron 3.5 Lightning 30B | A loaded adapter was evaluated with Transformers/PEFT. The first v7 development batch passed **6/24 base** and **12/24 adapter**; a fresh v8 batch passed **3/24 base** and **4/24 adapter**. The later v1 package recovered the attested training-data manifest and the complete 94-step training record, then froze the paired result at **9/48 base** and **16/48 tuned**. | These are development observations, not final-holdout results. The exact paired uplift missed the preset statistical boundary, and malformed-response incidence became worse, so the adapter was not promoted. |
 
-**The counts are exploratory development observations. Final held-out quality,
-promotion readiness, and reduced human intervention remain unproven.** The 7B
-and 30B tracks use different data and execution paths. The 30B results are not a
-vLLM result, and the 7B run does not prove 30B training completed.
+**The counts are development observations. Final held-out quality, promotion
+readiness, and reduced human intervention remain unproven.** The 7B and 30B
+tracks use different data and execution paths. The 30B results are not a vLLM
+result. The 7B run does not establish 30B training; the later attested v1
+evidence package does establish the completed 94-step 30B run.
 
 The [evidence directory](evidence/README.md) contains sanitized result rows,
 source hashes, the archived v7 provenance lock, a public summary of the original
 7B rehearsal receipt, its metric files, and an endpoint execution-report summary.
 It excludes corpus text, conversations, generated diffs, credentials and hostnames.
 The 7B endpoint summary is documentary evidence; no live endpoint was reprobed
-while producing this demo. A 30B configuration specifying 94 steps is not a
-completed-step receipt.
+while producing this demo. The earlier 94-step configuration alone was not a
+receipt; the later v1 evidence package supplied the verified 94/94 record.
 
-The OpenHands preparation metadata identifies
+The recovered v1 training manifest identifies
 [`nvidia/SWE-Hero-openhands-trajectories`](https://huggingface.co/datasets/nvidia/SWE-Hero-openhands-trajectories)
-at revision `150bc119e52c647216fce285fd801f16b6fd745b`. Its prepared row counts are
-not asserted to be the exact inputs for the evaluated adapter. No source corpus
-or model weights are included here.
+at revision `150bc119e52c647216fce285fd801f16b6fd745b`, with 188 training and 30
+development examples. The manifest is hash-attested in every tuned v1 row. No
+source corpus or model weights are included here.
 
 ## What tool calling taught us
 
@@ -75,7 +86,7 @@ cd presentation/demo/project
 npm run dev
 ```
 
-Render from the pinned HyperFrames 0.8.169 project:
+Render from the pinned HyperFrames 0.8.171 project:
 
 ```bash
 npm run render -- --quality delivery --output ../mini-gibson-demo.mp4
