@@ -2,7 +2,7 @@
 
 This directory is the public-safe evidence package for the preregistered Mini-Gibson v2 final loop. It is updated only from verified remote receipts and frozen repository inputs.
 
-The reporting deadline is `2026-10-18 07:00 America/New_York`. If the experiment has not reached a terminal preregistered decision by that cutoff, the package will contain a complete cutoff report rather than an invented model conclusion.
+The reporting deadline is `2026-10-18 07:00 America/New_York`. The experiment reached a terminal qualification failure at `2026-10-18T03:18:02Z`, before training or model evaluation.
 
 ## Claim boundary
 
@@ -16,7 +16,18 @@ The reporting deadline is `2026-10-18 07:00 America/New_York`. If the experiment
 
 - `REPORT.md` — human-readable finding and decision boundary.
 - `summary.json` — machine-readable current conclusion.
-- `qualification/progress-snapshot.json` — latest verified preparation and qualification checkpoint.
-- `SHA256SUMS` — generated only when a report revision is frozen.
+- `LIMITATIONS.md` — precise scope limits and the safe next experiment boundary.
+- `cost.json` — bounded runtime and cost estimate.
+- `qualification/progress-snapshot.json` — final preparation and qualification checkpoint.
+- `qualification/qualification.jsonl` — public-safe hash-chained header and terminal receipt.
+- `qualification/terminal-result.json` — compact machine-readable terminal boundary.
+- `verify_evidence.py` — hash and receipt verification.
+- `SHA256SUMS` — hashes of every frozen public-safe package file except the manifest itself.
+
+From the repository root, verify the frozen package with:
+
+```sh
+python3 docs/evidence/mini-gibson-v2-2026-10-18/verify_evidence.py
+```
 
 The complete pre-v2 status report remains at `docs/evidence/mini-gibson-final-loop-2026-10-17.md`.

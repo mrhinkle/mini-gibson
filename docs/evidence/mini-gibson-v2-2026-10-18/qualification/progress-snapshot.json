@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "checkpointed_at": "2026-10-18T02:18:47Z",
+  "checkpointed_at": "2026-10-18T03:18:02Z",
   "instance": {
     "name": "weird-white-ocelot",
     "id": "ds7uiptfk",
@@ -11,20 +11,34 @@
     "hourly_cost_usd": 3.96
   },
   "preparation": {
-    "cached": 398,
+    "cached": 456,
     "total": 456,
-    "complete": false,
-    "controller_pid": 123063,
+    "complete": true,
+    "completed_at": "2026-10-18T03:16:37Z",
+    "controller_pid": null,
     "controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
     "body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
+    "material_package_sha256": "380dc5246435877fd98db3a95dc65bf988f8b9f8109993c474bf841807414f8c",
+    "material_package_bytes": 72704000,
+    "image_lock_sha256": "be030e93923feb4de9d57cbff9c4bcaa24e5d47eaf7654aa3e2ca3c69689323d",
+    "image_lock_bytes": 160378,
+    "source_patch_sha256": "d31cdf4be53fc9bb894d4feebb94623328c6fcc4997f7efb263c4ed3e05d33c0",
+    "focused_tests": "116_passed_local_and_remote",
     "cross_vendor_review": "PASS_no_P0_P2"
   },
   "qualification": {
-    "receipts": 0,
+    "receipts": 1,
+    "qualified": 0,
     "total": 456,
-    "status": "running_waiting_for_preparation_complete",
-    "controller_pid": 120355,
-    "controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17"
+    "status": "terminal_unqualified_receipt",
+    "controller_pid": null,
+    "controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17",
+    "terminal_instance_id": "natcap__invest-1365",
+    "terminal_ordinal": 1,
+    "terminal_reason": "all four repeats returned 84 before test execution and lacked the verifier integrity marker",
+    "receipt_sha256": "063304b83ce4b5b36200f480e38164782d6fed3aa05277a4568b2e98bcdc01b2",
+    "journal_sha256": "882fe3bad17a9890ef2a8034b381bbf61b944847fc9b79fc2ed7bd44b566d3ef",
+    "journal_head_sha256": "65dfff54b91464f8f1340357e40e4eba5db2609a643d587c9b1f91a8fdf69cd5"
   },
-  "scientific_claim": "operational_progress_only_no_v2_model_outcomes"
+  "scientific_claim": "frozen_cohort_failed_executability_before_training_no_v2_model_conclusion"
 }

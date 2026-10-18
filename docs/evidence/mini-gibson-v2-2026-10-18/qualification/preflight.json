@@ -1,0 +1,8 @@
+{
+  "candidate_count": 456,
+  "dataset_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+  "final_holdout_status": "sealed_not_read_or_run",
+  "image_lock_sha256": "be030e93923feb4de9d57cbff9c4bcaa24e5d47eaf7654aa3e2ca3c69689323d",
+  "material_package_sha256": "380dc5246435877fd98db3a95dc65bf988f8b9f8109993c474bf841807414f8c",
+  "source_commit": "700e1596559b86df5ddfac2eef5dd1c70bab0abb"
+}

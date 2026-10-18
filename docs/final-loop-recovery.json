@@ -1,12 +1,12 @@
 {
-  "schema_version": 2,
-  "checkpointed_at": "2026-10-18T02:15:41Z",
+  "schema_version": 3,
+  "checkpointed_at": "2026-10-18T03:18:02Z",
   "repository": "mrhinkle/mini-gibson",
   "main_sha_at_evidence_cutoff": "fdd362909ea90d8055781b19167f9d0273b8362e",
   "recovery_document": "docs/FINAL-LOOP-RECOVERY.md",
   "status_report": "docs/evidence/mini-gibson-final-loop-2026-10-18.md",
   "evidence_package": "docs/evidence/mini-gibson-v2-2026-10-18",
-  "experiment_status": "authenticated_preparation_waiting_on_bounded_registry_window",
+  "experiment_status": "terminal_qualification_failure_before_training",
   "final_holdout_state": "sealed",
   "active_gpu_hourly_cost_usd": 3.96,
   "brev": {
@@ -31,7 +31,7 @@
     "docker_authentication": "authenticated_subject_and_pull_permission_verified",
     "docker_hourly_window": {
       "limit": 200,
-      "remaining_at_checkpoint": 0,
+      "remaining_at_checkpoint": null,
       "browser_account_active_subscription": false
     },
     "action_policy": "do_not_purchase_create_stop_or_delete_without_fresh_explicit_confirmation"
@@ -63,17 +63,26 @@
     "freeze_evidence_sha256": "ca1ba1c045a883ef256ee74f45fe21d6a7d24e8962715275d6bb4fc847271210"
   },
   "verification": {
-    "full_pytest": 313,
+    "full_pytest": 316,
+    "pytest_subtests": 170,
+    "unittest": 109,
     "independent_review": "PASS",
-    "image_metadata_cached": 398,
+    "image_metadata_cached": 456,
     "image_metadata_total": 456,
     "preparation_controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
     "preparation_body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
     "qualification_controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17",
-    "qualification_receipts": 0,
-    "docker_qualification_started": false,
+    "material_package_sha256": "380dc5246435877fd98db3a95dc65bf988f8b9f8109993c474bf841807414f8c",
+    "image_lock_sha256": "be030e93923feb4de9d57cbff9c4bcaa24e5d47eaf7654aa3e2ca3c69689323d",
+    "qualification_receipts": 1,
+    "qualified_receipts": 0,
+    "terminal_instance_id": "natcap__invest-1365",
+    "terminal_receipt_sha256": "063304b83ce4b5b36200f480e38164782d6fed3aa05277a4568b2e98bcdc01b2",
+    "qualification_journal_sha256": "882fe3bad17a9890ef2a8034b381bbf61b944847fc9b79fc2ed7bd44b566d3ef",
+    "qualification_journal_head_sha256": "65dfff54b91464f8f1340357e40e4eba5db2609a643d587c9b1f91a8fdf69cd5",
+    "docker_qualification_started": true,
     "v2_training_started": false,
     "formal_v2_outcomes_observed": false
   },
-  "resume_stage": "finish_58_metadata_records_then_qualify_456_candidates"
+  "resume_stage": "experiment_closed_publish_terminal_findings_then_design_successor"
 }
