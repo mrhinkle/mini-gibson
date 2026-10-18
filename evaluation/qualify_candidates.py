@@ -37,7 +37,7 @@ from .cohort import (
     dump_canonical_json,
     validate_lock,
 )
-from .docker_backend import DockerBackend
+from .docker_backend import IMAGE_RE, DockerBackend
 from .freeze_real_cohorts import (
     SOURCE_ROWS,
     SOURCE_SHA256,
@@ -522,6 +522,28 @@ def _read_image_lock(path: Path, plan: Mapping[str, Any]) -> dict[str, Mapping[s
     return result
 
 
+def _docker_repo_digest_matches(locked: object, inspected: object) -> bool:
+    """Match an immutable reference, allowing only Docker Hub prefix elision."""
+
+    if (
+        not isinstance(locked, str)
+        or not IMAGE_RE.fullmatch(locked)
+        or not isinstance(inspected, str)
+        or not IMAGE_RE.fullmatch(inspected)
+    ):
+        return False
+    if inspected == locked:
+        return True
+    prefix = "docker.io/"
+    if not locked.startswith(prefix):
+        return False
+    normalized = locked[len(prefix) :]
+    namespace, separator, _repository = normalized.partition("/")
+    if not separator or "." in namespace or ":" in namespace or namespace == "localhost":
+        return False
+    return inspected == normalized
+
+
 def verify_local_image(entry: Mapping[str, Any], *, docker: str = "docker") -> None:
     """Resolve a locked digest against local Docker metadata without pulling."""
 
@@ -550,7 +572,10 @@ def verify_local_image(entry: Mapping[str, Any], *, docker: str = "docker") -> N
     repo_digests = metadata.get("RepoDigests")
     if (
         not isinstance(repo_digests, list)
-        or entry["reference"] not in repo_digests
+        or not any(
+            _docker_repo_digest_matches(entry["reference"], inspected)
+            for inspected in repo_digests
+        )
         or metadata.get("Os") != "linux"
         or metadata.get("Architecture") != "amd64"
         or not isinstance(metadata.get("Config"), dict)

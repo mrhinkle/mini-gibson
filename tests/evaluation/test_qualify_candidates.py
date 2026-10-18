@@ -37,6 +37,9 @@ PARSER_SOURCE = b"""def parse_log_pytest(output):
 PARSER_SHA = hashlib.sha256(PARSER_SOURCE).hexdigest()
 PARSER = load_pinned_parser_bytes(PARSER_SOURCE, "parse_log_pytest", PARSER_SHA)
 DIGEST = "sha256:" + "a" * 64
+OTHER_DIGEST = "sha256:" + "b" * 64
+NATCAP_DIGEST = "sha256:09439f2cb8d17177ab148b29d22fb9b14bc7e9981c31872b62fd39dfb0b91627"
+NATCAP_REFERENCE = f"docker.io/swerebenchv2/natcap-invest@{NATCAP_DIGEST}"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -253,6 +256,106 @@ def test_image_reference_digest_mismatch_fails_closed(
     path.write_text(json.dumps(lock))
     with pytest.raises(QualificationOrchestrationError, match="reference/tag/digest"):
         _read_image_lock(path, plan)
+
+
+def _mock_image_inspect(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    repo_digests: object,
+    os_name: str = "linux",
+    architecture: str = "amd64",
+    workdir: str = "/testbed",
+) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def inspect(command, **kwargs):
+        calls.append(command)
+        assert kwargs["check"] is False
+        assert kwargs["capture_output"] is True
+        assert kwargs["text"] is True
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                [
+                    {
+                        "RepoDigests": repo_digests,
+                        "Os": os_name,
+                        "Architecture": architecture,
+                        "Config": {"WorkingDir": workdir},
+                    }
+                ]
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(orchestrator.subprocess, "run", inspect)
+    return calls
+
+
+def _natcap_image_entry() -> dict[str, str]:
+    return {
+        "instance_id": "natcap__invest-1365",
+        "image_name": "docker.io/swerebenchv2/natcap-invest:1365-6db2256",
+        "reference": NATCAP_REFERENCE,
+        "digest": NATCAP_DIGEST,
+        "workdir": "/testbed",
+    }
+
+
+@pytest.mark.parametrize(
+    "inspected_reference",
+    [NATCAP_REFERENCE, f"swerebenchv2/natcap-invest@{NATCAP_DIGEST}"],
+)
+def test_verify_local_image_accepts_exact_natcap_docker_hub_normalization(
+    monkeypatch: pytest.MonkeyPatch,
+    inspected_reference: str,
+) -> None:
+    calls = _mock_image_inspect(monkeypatch, repo_digests=[inspected_reference])
+
+    orchestrator.verify_local_image(_natcap_image_entry())
+
+    assert calls == [["docker", "image", "inspect", NATCAP_REFERENCE]]
+
+
+@pytest.mark.parametrize(
+    "inspected_reference",
+    [
+        f"ghcr.io/swerebenchv2/natcap-invest@{NATCAP_DIGEST}",
+        f"index.docker.io/swerebenchv2/natcap-invest@{NATCAP_DIGEST}",
+        f"swerebenchv2/other-repository@{NATCAP_DIGEST}",
+        f"swerebenchv2/natcap-invest@{OTHER_DIGEST}",
+    ],
+)
+def test_verify_local_image_rejects_wrong_registry_repository_or_digest(
+    monkeypatch: pytest.MonkeyPatch,
+    inspected_reference: str,
+) -> None:
+    _mock_image_inspect(monkeypatch, repo_digests=[inspected_reference])
+
+    with pytest.raises(QualificationOrchestrationError, match="locked digest/platform/workdir"):
+        orchestrator.verify_local_image(_natcap_image_entry())
+
+
+@pytest.mark.parametrize(
+    "metadata_override",
+    [
+        {"os_name": "windows"},
+        {"architecture": "arm64"},
+        {"workdir": "/workspace"},
+    ],
+)
+def test_verify_local_image_rejects_platform_or_workdir_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_override: dict[str, str],
+) -> None:
+    _mock_image_inspect(
+        monkeypatch,
+        repo_digests=[f"swerebenchv2/natcap-invest@{NATCAP_DIGEST}"],
+        **metadata_override,
+    )
+
+    with pytest.raises(QualificationOrchestrationError, match="locked digest/platform/workdir"):
+        orchestrator.verify_local_image(_natcap_image_entry())
 
 
 def test_dry_run_never_invokes_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
