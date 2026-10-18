@@ -10,19 +10,23 @@ from __future__ import annotations
 import hashlib
 import inspect
 import io
-import json
 import re
 import shlex
 import sys
 import tarfile
 import uuid
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence
 
 from .cohort import SUPPORTED_LOG_PARSERS, dump_canonical_json
-from .docker_backend import DockerBackend, DockerIsolationError, DockerRunResult, IMAGE_RE
-
+from .docker_backend import (
+    IMAGE_RE,
+    DockerBackend,
+    DockerIsolationError,
+    DockerRunResult,
+)
 
 RECEIPT_SCHEMA = "mini-gibson-rebench-qualification/v1"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -42,6 +46,33 @@ class RebenchVerificationError(ValueError):
 
 ParserCallable = Callable[[str], Mapping[str, str]]
 _PINNED_PARSER_TOKEN = object()
+
+
+class _PinnedTestStatus(str, Enum):
+    """Exact public status contract imported by the pinned upstream parsers."""
+
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+    ERROR = "ERROR"
+
+
+def _sealed_parser_import(name: str, globals=None, locals=None, fromlist=(), level=0):
+    """Resolve the upstream parser's sole project-local import without shadowing.
+
+    SWE-rebench V2's pinned ``log_parsers.py`` imports ``TestStatus`` from its
+    adjacent ``swe_constants.py``.  The four enum values are reproduced here
+    so the *unmodified* upstream parser file can be hash-bound and executed
+    outside an SWE-rebench checkout.  Every other import uses Python's normal
+    importer.  This compatibility code is itself covered by the verifier hash
+    recorded in the qualification journal.
+    """
+
+    if level == 0 and name == "lib.agent.swe_constants":
+        module = type(sys)("lib.agent.swe_constants")
+        module.TestStatus = _PinnedTestStatus
+        return module
+    return __import__(name, globals, locals, fromlist, level)
 
 
 class PinnedParser:
@@ -133,6 +164,9 @@ def load_pinned_parser_bytes(
     module_name = f"_mini_gibson_rebench_parser_{expected_sha256[:16]}"
     module = type(sys)(module_name)
     module.__file__ = f"<sealed-parser:{expected_sha256}>"
+    builtins = dict(vars(__import__("builtins")))
+    builtins["__import__"] = _sealed_parser_import
+    module.__dict__["__builtins__"] = builtins
     try:
         code = compile(source, module.__file__, "exec")
         exec(code, module.__dict__)

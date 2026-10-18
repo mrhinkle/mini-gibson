@@ -46,6 +46,13 @@ report becomes a runnable lock until all 456 receipts qualify.
 The outcome-blind pilot plus development A/B/C candidate sequence is committed
 under
 [`frozen/mini-gibson-v2-sequential-2026-10-17/`](frozen/mini-gibson-v2-sequential-2026-10-17/).
+
+Build its outcome-blind sealed material package and immutable image lock first
+with `python -m evaluation.prepare_qualification_materials`. The preparation
+command uses bounded, resumable metadata caches, authenticates GitHub reads via
+the `gh` CLI, resolves registry manifests without pulling image layers, and
+does not read the final holdout. See
+[`docs/rebench-qualification-runbook.md`](../docs/rebench-qualification-runbook.md).
 It binds the exact public Parquet revision and SHA-256, the pre-plan exclusion
 registry, all 456 ordered task IDs and public fingerprints, and the candidate
 selector/validator/schema source hashes. The committed reports are still
