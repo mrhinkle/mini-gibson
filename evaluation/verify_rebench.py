@@ -1039,7 +1039,7 @@ def _preflight_run(
             99: "image checkout has tracked modifications before patching",
         }
         detail = stage_errors.get(result.returncode, "unclassified mechanics failure")
-        error = error or (
+        error = (
             f"compatibility mechanics failed with return code {result.returncode}: {detail}"
         )
     compatible = bool(

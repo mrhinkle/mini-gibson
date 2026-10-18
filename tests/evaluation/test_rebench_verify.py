@@ -259,6 +259,22 @@ def test_compatibility_preflight_propagates_backend_isolation_failure() -> None:
         )
 
 
+def test_compatibility_preflight_records_exact_mechanics_failure_stage() -> None:
+    receipt = preflight_task(
+        task(),
+        material(),
+        backend=FakeBackend({0: {"returncode": 98}}),
+    )
+
+    assert receipt["compatible"] is False
+    assert receipt["runs"][0]["returncode"] == 98
+    assert receipt["runs"][0]["error"] == (
+        "compatibility mechanics failed with return code 98: "
+        "image HEAD disagrees with the frozen base commit"
+    )
+    assert verify_preflight_receipt(receipt) is True
+
+
 def test_qualification_rejects_unsafe_controls_in_test_identifier() -> None:
     for bad in ("", "bad\0selector", "bad\rselector"):
         with pytest.raises(RebenchVerificationError, match="without NUL"):
