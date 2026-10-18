@@ -11,6 +11,8 @@ show exactly what passed, failed, or was stopped.
 
 We are not submitting a finished autonomous developer. We are submitting the
 repeatable system that helps us improve one without hiding bad results.
+For the model, data, training, and evaluation sequence, see the
+[plain-language LLM story](docs/LLM-STORY.md).
 
 ## Why we built it
 
@@ -84,6 +86,12 @@ see repeated tool-use and recovery patterns. Jev can classify bounded
 operational anomalies after local results are final. Neither tool can change a
 score, authorize a retry, promote an adapter, or unseal the holdout.
 
+We separately exercised [NeMo Gym](integrations/nemo_gym/README.md) locally:
+its pinned upstream verifier example passed five tests, and our synthetic
+Mini Gibson tool-call-format fixture passed one test with four cases. This is
+a working integration smoke, **not** a Nemotron rollout, scored evaluation, or
+claim that Gym participated in the completed model comparison.
+
 ## Hackathon track
 
 Our primary entry is the **Tool-Calling** track. Mini Gibson focuses on valid
@@ -95,6 +103,8 @@ challenge's 33-billion-parameter limit.
 
 - [Main repository](https://github.com/mrhinkle/mini-gibson)
 - [Project, repository, model, and dataset map](docs/PROJECT-MAP.md)
+- [Plain-language LLM story](docs/LLM-STORY.md)
+- [NeMo Gym integration and smoke receipt](integrations/nemo_gym/README.md)
 - [Editable final-findings deck](presentation/final-findings/README.md)
 - [Narrated demo and editable video project](presentation/demo/README.md)
 - [Completed v1 and stopped v2 evidence](docs/evidence/mini-gibson-v2-2026-10-18/REPORT.md)

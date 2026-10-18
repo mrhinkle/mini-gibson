@@ -7,6 +7,7 @@ Experiment repository for the NVIDIA × Red Hat Small Models Hack, October 17–
 **Team: Merge-Geezers. Project: Mini Gibson.**
 
 **Judge-facing overview:** [read the plain-language submission summary](SUBMISSION.md).
+**Model and training narrative:** [the LLM story in plain language](docs/LLM-STORY.md).
 
 ## What we are submitting
 
@@ -64,6 +65,9 @@ holdout remains operationally sealed and unconsumed by the pipeline.
 
 See the demo's [sanitized evidence](presentation/demo/evidence/README.md) for
 the earlier 7B rehearsal, 30B development batches, and tool-calling lessons.
+We also ran a [pinned NeMo Gym verifier smoke](integrations/nemo_gym/README.md)
+and a Mini Gibson-specific synthetic tool-call fixture. Those local checks
+passed, but NeMo Gym did not participate in the completed scored comparison.
 
 ## Question
 
