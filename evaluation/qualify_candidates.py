@@ -228,6 +228,31 @@ def _string_list(value: Any, path: str, *, required: bool = False) -> tuple[str,
     return result
 
 
+def _test_id_list(value: Any, path: str, *, required: bool = False) -> tuple[str, ...]:
+    """Validate opaque parser keys without rewriting legitimate display names.
+
+    Some upstream test frameworks emit parameterized test identifiers whose
+    display name contains embedded newlines.  These values remain JSON string
+    keys and are never interpolated into a shell command. Preserve embedded LF
+    bytes exactly so parser output can be matched against the pinned dataset,
+    while rejecting NUL and carriage return at this boundary.
+    """
+
+    if not isinstance(value, list) or (required and not value):
+        raise QualificationOrchestrationError(f"{path}: expected a JSON array")
+    result = tuple(value)
+    if not all(
+        isinstance(item, str) and item and not set(item) & {"\0", "\r"}
+        for item in result
+    ):
+        raise QualificationOrchestrationError(
+            f"{path}: expected non-empty strings without NUL or carriage return"
+        )
+    if len(set(result)) != len(result):
+        raise QualificationOrchestrationError(f"{path}: duplicate entries")
+    return result
+
+
 def _reject_holdout_paths(repo_root: Path, paths: Iterable[Path]) -> None:
     holdout = (repo_root / "bench").resolve()
     for path in paths:
@@ -453,8 +478,14 @@ def _read_material_package(
                 raise QualificationOrchestrationError(
                     f"{instance_id}: material {material_key} disagrees with pinned dataset"
                 )
-        _string_list(task["fail_to_pass"], f"materials.tasks[{index}].fail_to_pass", required=True)
-        _string_list(task["pass_to_pass"], f"materials.tasks[{index}].pass_to_pass")
+        _test_id_list(
+            task["fail_to_pass"],
+            f"materials.tasks[{index}].fail_to_pass",
+            required=True,
+        )
+        _test_id_list(
+            task["pass_to_pass"], f"materials.tasks[{index}].pass_to_pass"
+        )
         identity = _strict_object(
             task["source_identity"], SOURCE_IDENTITY_KEYS, f"materials.tasks[{index}].source_identity"
         )

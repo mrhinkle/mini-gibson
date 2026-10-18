@@ -169,6 +169,42 @@ def test_qualification_requires_two_fresh_base_fails_and_gold_passes() -> None:
     assert "-old" not in rendered and "+new" not in rendered
 
 
+def test_qualification_preserves_multiline_test_identifiers() -> None:
+    test_id = "Compiles: fun test() {\n    println()\n} (ExampleSpec)"
+    source = (
+        "def parse_log_pytest(output):\n"
+        f"    return {{{test_id!r}: 'passed' if 'GOLD' in output else 'failed'}}\n"
+    ).encode()
+    digest = hashlib.sha256(source).hexdigest()
+    parser = load_pinned_parser_bytes(source, "parse_log_pytest", digest)
+
+    receipt = qualify_task(
+        task(),
+        material(
+            fail_to_pass=(test_id,),
+            pass_to_pass=(),
+            parser_sha256=digest,
+        ),
+        parser=parser,
+        backend=FakeBackend(),
+    )
+
+    assert receipt["qualified"] is True
+    assert all(test_id in run["fail_to_pass_states"] for run in receipt["runs"])
+    assert verify_receipt(receipt) is True
+
+
+def test_qualification_rejects_unsafe_controls_in_test_identifier() -> None:
+    for bad in ("", "bad\0selector", "bad\rselector"):
+        with pytest.raises(RebenchVerificationError, match="without NUL"):
+            qualify_task(
+                task(),
+                material(fail_to_pass=(bad,)),
+                parser=PINNED_PARSER,
+                backend=FakeBackend(),
+            )
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

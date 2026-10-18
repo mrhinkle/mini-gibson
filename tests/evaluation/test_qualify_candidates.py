@@ -19,6 +19,7 @@ from evaluation.qualify_candidates import (
     _read_image_lock,
     _record_hash,
     _reject_holdout_paths,
+    _test_id_list,
     dry_run_report,
     run_pending,
 )
@@ -110,6 +111,18 @@ def tiny_plan() -> dict:
             }
         ]
     }
+
+
+def test_test_id_list_preserves_multiline_parser_keys() -> None:
+    value = ["Compiles: fun test() {\n    println()\n} (ExampleSpec)"]
+    assert _test_id_list(value, "fail_to_pass", required=True) == tuple(value)
+
+    for bad in ("", "bad\0selector", "bad\rselector"):
+        with pytest.raises(QualificationOrchestrationError, match="without NUL"):
+            _test_id_list([bad], "fail_to_pass", required=True)
+
+    with pytest.raises(QualificationOrchestrationError, match="duplicate"):
+        _test_id_list(["same", "same"], "fail_to_pass", required=True)
 
 
 def tiny_inputs(tmp_path: Path) -> SimpleNamespace:

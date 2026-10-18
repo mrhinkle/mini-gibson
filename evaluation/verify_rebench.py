@@ -229,13 +229,23 @@ def _validate_task(task: QualificationTask) -> None:
         raise RebenchVerificationError("qualification timeout must equal the frozen 900 seconds")
 
 
+def _valid_test_id(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and not set(value) & {"\0", "\r"}
+    )
+
+
 def _validate_ids(values: Sequence[str], name: str, *, required: bool) -> None:
     if required and not values:
         raise RebenchVerificationError(f"{name} must not be empty")
     if len(set(values)) != len(values):
         raise RebenchVerificationError(f"{name} contains duplicates")
-    if not all(isinstance(item, str) and item and not set(item) & {"\0", "\r", "\n"} for item in values):
-        raise RebenchVerificationError(f"{name} must contain non-empty single-line strings")
+    if not all(_valid_test_id(item) for item in values):
+        raise RebenchVerificationError(
+            f"{name} must contain non-empty strings without NUL or carriage return"
+        )
 
 
 def _validate_material(material: VerifierMaterial) -> None:
@@ -709,7 +719,7 @@ def _normalize_statuses(raw: Mapping[str, str]) -> dict[str, str]:
         raise RebenchVerificationError("parser did not return a mapping")
     statuses: dict[str, str] = {}
     for key, value in raw.items():
-        if not isinstance(key, str) or not key or not isinstance(value, str):
+        if not _valid_test_id(key) or not isinstance(value, str):
             raise RebenchVerificationError("parser returned a malformed status entry")
         state = value.casefold()
         aliases = {"pass": "passed", "fail": "failed"}
@@ -1096,9 +1106,7 @@ def verify_receipt(receipt: Mapping[str, object]) -> bool:
             normalized: dict[str, str] = {}
             for test_id, state in mapping.items():
                 if (
-                    not isinstance(test_id, str)
-                    or not test_id
-                    or set(test_id) & {"\0", "\r", "\n"}
+                    not _valid_test_id(test_id)
                     or not isinstance(state, str)
                     or state not in STATUS_VALUES | {"missing"}
                 ):
