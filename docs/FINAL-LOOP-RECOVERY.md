@@ -1,19 +1,19 @@
 # Mini-Gibson final-loop recovery checkpoint
 
-Checkpoint refreshed at `2026-10-17T23:54:06Z`. This document separates completed, merged work from the GPU-dependent work that has not run.
+Checkpoint refreshed at `2026-10-18T02:15:41Z`. This document separates completed, merged work from the GPU-dependent work currently executing.
 
 ## Current status
 
-- GitHub `main` at the evidence cutoff: `3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374`.
+- GitHub `main` at the evidence cutoff: `fdd362909ea90d8055781b19167f9d0273b8362e`.
 - Open pull requests: none.
-- Experiment status: infrastructure and outcome-blind cohort freeze complete; v2 qualification, training, and formal evaluation not run.
+- Experiment status: infrastructure and outcome-blind cohort freeze complete; authenticated preparation is 398/456; v2 qualification, training, and formal evaluation have not produced outcomes.
 - Final 35-task Gibson Bench v0.1 holdout: sealed and unconsumed.
-- Brev inventory: only stopped `weird-white-ocelot` (`ds7uiptfk`, 2xA100) is listed. No Brev Connect nodes are listed.
-- The former H100 environments are not listed. Do not assume their ephemeral files still exist.
-- The last start attempt for the A100 environment failed because the Brev account reported exhausted credits. Do not purchase credits or create replacement compute without Mark's explicit billing decision.
-- Active GPU compute rate: `$0/hour` while the listed instance remains stopped.
+- Brev `weird-white-ocelot` (`ds7uiptfk`, 2xA100 80 GB) is running, healthy, and shell-ready at `$3.96/hour`; no Brev Connect nodes are listed.
+- Docker authentication is valid, but the browser-authenticated account has no active subscription and Docker enforces a 200-pull hourly window. Do not purchase or change a subscription without Mark's explicit billing decision.
+- The durable preparation controller is waiting and resuming without discarding its 398 cached records. The authenticated rolling qualification controller is armed behind the two preparation markers.
+- Active GPU compute remains below the approved `$30/hour` total cap.
 
-The complete evidence/status report is [`docs/evidence/mini-gibson-final-loop-2026-10-17.md`](evidence/mini-gibson-final-loop-2026-10-17.md).
+The current evidence/status report is [`docs/evidence/mini-gibson-final-loop-2026-10-18.md`](evidence/mini-gibson-final-loop-2026-10-18.md), with the machine-readable package under [`docs/evidence/mini-gibson-v2-2026-10-18/`](evidence/mini-gibson-v2-2026-10-18/README.md).
 
 ## Safety and claim boundary
 
@@ -72,11 +72,11 @@ The v1 adapter is not promotable. Across 48 fresh development issues it resolved
 
 Tool reliability regressed materially: malformed responses affected `21/48` tuned tasks versus `8/48` base tasks. The one-sided paired degradation p-value was `0.000488`. The supported conclusion is: **promising issue-resolution signal, unsafe tool-format regression, no statistically established upgrade**.
 
-## Resume sequence after Brev credits are restored
+## Active resume sequence
 
-1. Refresh GitHub, Brev inventory, GPU health, disk, and the exact hourly rate before starting anything.
-2. Copy the pinned dataset to durable remote storage and re-verify its SHA-256.
-3. Build the sealed 456-row material/parser/AST package and immutable 456-image lock.
+1. Allow the reviewed authenticated controller to finish the remaining 58 image-metadata records through the bounded registry window.
+2. Verify the sealed 456-row material/parser/AST package, immutable image lock, and both completion markers.
+3. Let the authenticated rolling controller qualify one frozen task at a time, preserving each receipt and stopping on the first terminal or safety failure.
 4. Run `python -m evaluation.qualify_candidates --dry-run` and resolve every reported prerequisite without weakening a gate.
 5. Qualify in bounded batches. Each task must produce two base-fail and two gold-pass receipts through the hardened networkless backend.
 6. Finalize runnable cohort locks and the complete v2 training exclusion registry only after all 456 tasks qualify.
@@ -97,4 +97,4 @@ brev ls nodes --json
 git -C /Users/mrhinkle/Code/mini-gibson fetch origin --prune
 ```
 
-Do not retry `brev start` on a schedule while the credit state is unchanged. Mark must resolve the billing block first.
+Do not stop the running instance, change the Docker subscription, or create replacement compute without fresh explicit confirmation.

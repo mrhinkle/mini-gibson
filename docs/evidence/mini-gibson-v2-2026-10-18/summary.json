@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "evidence_state": "live_checkpoint",
+  "reporting_deadline": "2026-10-18T07:00:00-04:00",
+  "current_conclusion": "v2_unadjudicated_v1_not_promotable",
+  "v1": {
+    "tasks": 48,
+    "base_resolved": 9,
+    "tuned_resolved": 16,
+    "absolute_uplift": 0.14583333333333334,
+    "tuned_only_wins": 12,
+    "base_only_wins": 5,
+    "one_sided_exact_p": 0.0717316,
+    "base_malformed": 8,
+    "tuned_malformed": 21,
+    "malformed_degradation_p": 0.000488,
+    "promotion": false
+  },
+  "v2": {
+    "frozen_candidates": 456,
+    "preparation_complete": false,
+    "image_metadata_cached": 398,
+    "qualification_receipts": 0,
+    "training_started": false,
+    "formal_development_n": 0,
+    "formal_decision": null,
+    "final_holdout": "sealed_unconsumed"
+  },
+  "provenance": {
+    "github_main_at_experiment_start": "fdd362909ea90d8055781b19167f9d0273b8362e",
+    "installed_reviewed_source": "700e1596559b86df5ddfac2eef5dd1c70bab0abb",
+    "dataset_revision": "10483de0f50fe5da545942705a76c6150171af7f",
+    "dataset_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "preparation_controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
+    "preparation_body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
+    "qualification_controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "checkpointed_at": "2026-10-18T02:18:47Z",
+  "instance": {
+    "name": "weird-white-ocelot",
+    "id": "ds7uiptfk",
+    "type": "a100-80gb.2x",
+    "status": "RUNNING",
+    "health": "HEALTHY",
+    "shell": "READY",
+    "hourly_cost_usd": 3.96
+  },
+  "preparation": {
+    "cached": 398,
+    "total": 456,
+    "complete": false,
+    "controller_pid": 123063,
+    "controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
+    "body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
+    "cross_vendor_review": "PASS_no_P0_P2"
+  },
+  "qualification": {
+    "receipts": 0,
+    "total": 456,
+    "status": "running_waiting_for_preparation_complete",
+    "controller_pid": 120355,
+    "controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17"
+  },
+  "scientific_claim": "operational_progress_only_no_v2_model_outcomes"
+}

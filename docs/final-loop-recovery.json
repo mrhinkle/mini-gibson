@@ -1,13 +1,14 @@
 {
   "schema_version": 2,
-  "checkpointed_at": "2026-10-17T23:54:06Z",
+  "checkpointed_at": "2026-10-18T02:15:41Z",
   "repository": "mrhinkle/mini-gibson",
-  "main_sha_at_evidence_cutoff": "3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374",
+  "main_sha_at_evidence_cutoff": "fdd362909ea90d8055781b19167f9d0273b8362e",
   "recovery_document": "docs/FINAL-LOOP-RECOVERY.md",
-  "status_report": "docs/evidence/mini-gibson-final-loop-2026-10-17.md",
-  "experiment_status": "blocked_external_brev_credits",
+  "status_report": "docs/evidence/mini-gibson-final-loop-2026-10-18.md",
+  "evidence_package": "docs/evidence/mini-gibson-v2-2026-10-18",
+  "experiment_status": "authenticated_preparation_waiting_on_bounded_registry_window",
   "final_holdout_state": "sealed",
-  "active_gpu_hourly_cost_usd": 0,
+  "active_gpu_hourly_cost_usd": 3.96,
   "brev": {
     "listed_instances": [
       {
@@ -15,9 +16,10 @@
         "id": "ds7uiptfk",
         "machine": "a100-80gb.2x",
         "gpu": "A100",
-        "status": "STOPPED",
+        "status": "RUNNING",
         "build_status": "COMPLETED",
-        "shell_status": "NOT READY"
+        "shell_status": "READY",
+        "health_status": "HEALTHY"
       }
     ],
     "connect_nodes": [],
@@ -25,7 +27,13 @@
       "mini-gibson-lightning-ft",
       "mini-gibson-ocr7b-lora"
     ],
-    "last_start_attempt": "failed_account_credits_exhausted",
+    "last_start_attempt": "succeeded_after_credits_restored",
+    "docker_authentication": "authenticated_subject_and_pull_permission_verified",
+    "docker_hourly_window": {
+      "limit": 200,
+      "remaining_at_checkpoint": 0,
+      "browser_account_active_subscription": false
+    },
     "action_policy": "do_not_purchase_create_stop_or_delete_without_fresh_explicit_confirmation"
   },
   "merged_prs": {
@@ -55,11 +63,17 @@
     "freeze_evidence_sha256": "ca1ba1c045a883ef256ee74f45fe21d6a7d24e8962715275d6bb4fc847271210"
   },
   "verification": {
-    "full_pytest": 281,
+    "full_pytest": 313,
     "independent_review": "PASS",
+    "image_metadata_cached": 398,
+    "image_metadata_total": 456,
+    "preparation_controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
+    "preparation_body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
+    "qualification_controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17",
+    "qualification_receipts": 0,
     "docker_qualification_started": false,
     "v2_training_started": false,
     "formal_v2_outcomes_observed": false
   },
-  "resume_stage": "restore_brev_credits_then_seal_and_qualify_456_candidates"
+  "resume_stage": "finish_58_metadata_records_then_qualify_456_candidates"
 }
