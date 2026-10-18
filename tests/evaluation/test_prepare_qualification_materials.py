@@ -126,18 +126,28 @@ def test_github_merge_commits_are_batched_and_reused_from_cache(tmp_path: Path) 
         {
             "instance_id": "owner__one-1",
             "repo": "Owner/One",
+            "base_commit": "1" * 40,
             "source_pr_number": 1,
             "source_pr_url": "https://github.com/Owner/One/pull/1",
         },
         {
             "instance_id": "owner__two-2",
             "repo": "Owner/Two",
+            "base_commit": "2" * 40,
             "source_pr_number": 2,
             "source_pr_url": "https://github.com/Owner/Two/pull/2",
         },
     ]
+    records = {
+        candidate["instance_id"]: {
+            "base_commit": candidate["base_commit"],
+            "patch": patch(f"src/{candidate['source_pr_number']}.py"),
+            "test_patch": patch(f"tests/test_{candidate['source_pr_number']}.py"),
+        }
+        for candidate in candidates
+    }
     first = GitHubResolver(tmp_path, max_new_requests=1, runner=runner)
-    assert first.merge_commits(candidates) == {
+    assert first.merge_commits(candidates, records) == {
         "owner__one-1": "a" * 40,
         "owner__two-2": "b" * 40,
     }
@@ -147,7 +157,361 @@ def test_github_merge_commits_are_batched_and_reused_from_cache(tmp_path: Path) 
         max_new_requests=0,
         runner=lambda _command: pytest.fail("resume ignored GitHub cache"),
     )
-    assert resumed.merge_commits(candidates) == first.merge_commits(candidates)
+    assert resumed.merge_commits(candidates, records) == first.merge_commits(
+        candidates, records
+    )
+
+
+def test_github_merge_commit_accepts_only_verified_repository_rename(
+    tmp_path: Path,
+) -> None:
+    candidate = {
+        "instance_id": "owner__old-8",
+        "repo": "Owner/Old",
+        "base_commit": "1" * 40,
+        "source_pr_number": 8,
+        "source_pr_url": "https://github.com/Owner/New/pull/8",
+    }
+    record = {
+        "base_commit": candidate["base_commit"],
+        "patch": patch(),
+        "test_patch": "",
+    }
+
+    def response(source_url: str) -> str:
+        return json.dumps(
+            {
+                "data": {
+                    "r0": {
+                        "nameWithOwner": "Owner/New",
+                        "pullRequest": {
+                            "number": 8,
+                            "url": source_url,
+                            "merged": True,
+                            "mergeCommit": {"oid": "d" * 40},
+                        },
+                    }
+                }
+            }
+        )
+
+    resolver = GitHubResolver(
+        tmp_path / "accepted",
+        max_new_requests=1,
+        runner=lambda _command: response(candidate["source_pr_url"]),
+    )
+    assert resolver.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "d" * 40
+    }
+
+    rejected = dict(candidate)
+    rejected["source_pr_url"] = "https://github.com/Owner/Unrelated/pull/8"
+    resolver = GitHubResolver(
+        tmp_path / "rejected",
+        max_new_requests=1,
+        runner=lambda _command: response("https://github.com/Owner/New/pull/8"),
+    )
+    with pytest.raises(
+        QualificationPreparationError, match="both requested and canonical"
+    ):
+        resolver.merge_commits([rejected], {candidate["instance_id"]: record})
+
+
+def fallback_candidate() -> tuple[dict, dict]:
+    candidate = {
+        "instance_id": "owner__repo-7",
+        "repo": "Owner/Repo",
+        "base_commit": "1" * 40,
+        "source_pr_number": 7,
+        "source_pr_url": "https://github.com/Owner/Repo/pull/7",
+    }
+    record = {
+        "base_commit": candidate["base_commit"],
+        "patch": patch("src/fix.py"),
+        "test_patch": patch("tests/test_fix.py"),
+    }
+    return candidate, record
+
+
+def fallback_runner(*, search_items=None, authoritative_diff=None, ancestry=True):
+    candidate, record = fallback_candidate()
+    merge = "a" * 40
+    branch = "b" * 40
+    message = "Merge pull request #7 from contributor/fix-seven\n\nFix seven"
+    if search_items is None:
+        search_items = [{"sha": merge, "commit": {"message": message}}]
+    if authoritative_diff is None:
+        authoritative_diff = record["patch"] + record["test_patch"]
+
+    def runner(command):
+        rendered = " ".join(command)
+        if "graphql" in command:
+            return json.dumps(
+                {
+                    "data": {
+                        "r0": {"nameWithOwner": "Owner/Repo", "pullRequest": None}
+                    },
+                    "errors": [
+                        {
+                            "type": "NOT_FOUND",
+                            "path": ["r0", "pullRequest"],
+                            "message": "missing",
+                        }
+                    ],
+                }
+            )
+        if "search/commits" in command:
+            return json.dumps(
+                {
+                    "total_count": len(search_items),
+                    "incomplete_results": False,
+                    "items": search_items,
+                }
+            )
+        if f"commits/{merge}" in rendered:
+            return json.dumps(
+                {
+                    "sha": merge,
+                    "commit": {"message": message},
+                    "parents": [{"sha": "c" * 40}, {"sha": branch}],
+                }
+            )
+        if "Accept: application/vnd.github.v3.diff" in rendered:
+            return authoritative_diff
+        if "/compare/" in rendered:
+            base = candidate["base_commit"]
+            return json.dumps(
+                {
+                    "status": "ahead" if ancestry else "diverged",
+                    "base_commit": {"sha": base},
+                    "merge_base_commit": {"sha": base if ancestry else "d" * 40},
+                    "commits": [{"sha": branch}],
+                    "total_commits": 1,
+                }
+            )
+        pytest.fail(f"unexpected command: {command}")
+
+    return runner
+
+
+def test_missing_pr_fallback_binds_exact_merge_topology_ancestry_and_diff(
+    tmp_path: Path,
+) -> None:
+    candidate, record = fallback_candidate()
+    resolver = GitHubResolver(tmp_path, max_new_requests=5, runner=fallback_runner())
+    assert resolver.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "a" * 40
+    }
+    cached = json.loads(resolver._cache_path(candidate["repo"], 7).read_text())
+    assert cached["method"] == "merge_history_fallback"
+    assert cached["evidence"]["parents"] == ["c" * 40, "b" * 40]
+    resumed = GitHubResolver(
+        tmp_path,
+        max_new_requests=0,
+        runner=lambda _command: pytest.fail("resume ignored fallback cache"),
+    )
+    assert resumed.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "a" * 40
+    }
+
+
+@pytest.mark.parametrize("failure", ["missing", "ambiguous", "patch-mismatch"])
+def test_missing_pr_fallback_rejects_unproven_history(
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    candidate, record = fallback_candidate()
+    message = "Merge pull request #7 from contributor/fix-seven\n\nFix seven"
+    kwargs = {}
+    if failure == "missing":
+        kwargs["search_items"] = []
+    elif failure == "ambiguous":
+        kwargs["search_items"] = [
+            {"sha": "a" * 40, "commit": {"message": message}},
+            {"sha": "e" * 40, "commit": {"message": message}},
+        ]
+    else:
+        kwargs["authoritative_diff"] = patch("src/not-the-frozen-patch.py")
+    resolver = GitHubResolver(
+        tmp_path,
+        max_new_requests=5,
+        runner=fallback_runner(**kwargs),
+    )
+    expected = (
+        "missing or ambiguous" if failure != "patch-mismatch" else "does not match"
+    )
+    with pytest.raises(QualificationPreparationError, match=expected):
+        resolver.merge_commits([candidate], {candidate["instance_id"]: record})
+
+
+def transfer_candidate() -> tuple[dict, dict]:
+    candidate = {
+        "instance_id": "old-owner__repo-8",
+        "repo": "Old-Owner/Repo",
+        "base_commit": "1" * 40,
+        "source_pr_number": 8,
+        "source_pr_url": "https://github.com/Old-Owner/Repo/pull/8",
+    }
+    record = {
+        "base_commit": candidate["base_commit"],
+        "patch": patch("src/transferred.py"),
+        "test_patch": patch("tests/test_transferred.py"),
+    }
+    return candidate, record
+
+
+def transfer_runner(
+    *,
+    repositories=None,
+    base_commit=None,
+    authoritative_diff=None,
+    incomplete=False,
+):
+    candidate, record = transfer_candidate()
+    if repositories is None:
+        repositories = ["New-Owner/Repo"]
+    if base_commit is None:
+        base_commit = candidate["base_commit"]
+    if authoritative_diff is None:
+        authoritative_diff = record["patch"] + record["test_patch"]
+
+    def runner(command):
+        rendered = " ".join(command)
+        if "graphql" in command and "r0:repository" in rendered:
+            return json.dumps(
+                {
+                    "data": {"r0": None},
+                    "errors": [
+                        {
+                            "type": "NOT_FOUND",
+                            "path": ["r0"],
+                            "message": "repository missing",
+                        }
+                    ],
+                }
+            )
+        if "search/commits" in command:
+            items = [
+                {
+                    "sha": candidate["base_commit"],
+                    "repository": {"full_name": repository},
+                }
+                for repository in repositories
+            ]
+            return json.dumps(
+                {
+                    "total_count": len(items),
+                    "incomplete_results": incomplete,
+                    "items": items,
+                }
+            )
+        if "graphql" in command and "c0:repository" in rendered:
+            data = {}
+            for index, repository in enumerate(repositories):
+                merge = f"{index + 2:x}" * 40
+                data[f"c{index}"] = {
+                    "nameWithOwner": repository,
+                    "pullRequest": {
+                        "number": 8,
+                        "url": f"https://github.com/{repository}/pull/8",
+                        "merged": True,
+                        "baseRefOid": base_commit,
+                        "headRefOid": f"{index + 8:x}" * 40,
+                        "mergeCommit": {"oid": merge},
+                    },
+                }
+            return json.dumps({"data": data})
+        if "commits/" in rendered:
+            return json.dumps(
+                {
+                    "sha": "2" * 40,
+                    "commit": {"tree": {"sha": "a" * 40}},
+                    "parents": [{"sha": candidate["base_commit"]}],
+                }
+            )
+        if "pulls/8" in rendered and "application/vnd.github.v3.diff" in rendered:
+            return authoritative_diff
+        pytest.fail(f"unexpected command: {command}")
+
+    return runner
+
+
+def test_missing_repository_fallback_binds_transfer_pr_base_and_diff(
+    tmp_path: Path,
+) -> None:
+    candidate, record = transfer_candidate()
+    resolver = GitHubResolver(tmp_path, max_new_requests=5, runner=transfer_runner())
+    assert resolver.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "2" * 40
+    }
+    cached = json.loads(resolver._cache_path(candidate["repo"], 8).read_text())
+    assert cached["method"] == "repository_transfer_fallback"
+    assert cached["canonical_repo"] == "New-Owner/Repo"
+    assert cached["evidence"]["discovery_query"] == candidate["base_commit"]
+    assert cached["evidence"]["discovery_complete"] is True
+    assert cached["evidence"]["discovery_total"] == 1
+    assert cached["evidence"]["pull_request"]["base_commit"] == candidate["base_commit"]
+    assert cached["evidence"]["merge_commit"]["sha"] == "2" * 40
+    resumed = GitHubResolver(
+        tmp_path,
+        max_new_requests=0,
+        runner=lambda _command: pytest.fail("resume ignored transfer cache"),
+    )
+    assert resumed.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "2" * 40
+    }
+
+
+@pytest.mark.parametrize("failure", ["ambiguous", "base-mismatch", "patch-mismatch"])
+def test_missing_repository_fallback_rejects_ambiguous_or_mismatched_transfer(
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    candidate, record = transfer_candidate()
+    kwargs = {}
+    if failure == "ambiguous":
+        kwargs["repositories"] = ["New-Owner/Repo", "Other-Owner/Repo"]
+    elif failure == "base-mismatch":
+        kwargs["base_commit"] = "f" * 40
+    else:
+        kwargs["authoritative_diff"] = patch("src/not-the-frozen-patch.py")
+    resolver = GitHubResolver(
+        tmp_path,
+        max_new_requests=5,
+        runner=transfer_runner(**kwargs),
+    )
+    expected = {
+        "ambiguous": "missing or ambiguous",
+        "base-mismatch": "provenance disagrees",
+        "patch-mismatch": "does not match",
+    }[failure]
+    with pytest.raises(QualificationPreparationError, match=expected):
+        resolver.merge_commits([candidate], {candidate["instance_id"]: record})
+
+
+def test_repository_transfer_fallback_requires_exact_repository_not_found(
+    tmp_path: Path,
+) -> None:
+    candidate, record = transfer_candidate()
+
+    def runner(command):
+        assert "graphql" in command
+        return json.dumps(
+            {
+                "data": {"r0": None},
+                "errors": [
+                    {
+                        "type": "NOT_FOUND",
+                        "path": ["r0", "pullRequest"],
+                        "message": "wrong boundary",
+                    }
+                ],
+            }
+        )
+
+    resolver = GitHubResolver(tmp_path, max_new_requests=1, runner=runner)
+    with pytest.raises(QualificationPreparationError, match="no repository without"):
+        resolver.merge_commits([candidate], {candidate["instance_id"]: record})
 
 
 def test_image_metadata_resolution_uses_no_pull_and_is_resumable(
