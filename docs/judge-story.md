@@ -29,10 +29,11 @@ We started with NVIDIA Nemotron 3.5 Lightning, trained a LoRA adapter on curated
 That is why our deliverable is not a victory claim or a finished autonomous
 developer. It is a reproducible training and evaluation pipeline that can keep
 failed attempts, stop unsafe promotion, and tell us what to improve next. The
-successor experiment screens the same already-frozen 456-task package for evaluator
-compatibility before any further model run. That preflight is infrastructure
-evidence, not model evidence, and the public final holdout remains operationally
-sealed and unconsumed by the pipeline.
+successor experiment is screening the same already-frozen 456-task package for evaluator
+compatibility before another fine-tune or model comparison. Its terminal result
+is still pending. That preflight is infrastructure evidence, not
+model evidence, and the public final holdout remains operationally sealed and
+unconsumed by the pipeline.
 
 The model can change. The coding agent can change. The durable asset is the organization's accumulated engineering experience and the evidence system that enforces it.
 

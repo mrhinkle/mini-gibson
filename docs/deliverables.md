@@ -21,14 +21,14 @@ and source repositories are indexed in [PROJECT-MAP.md](PROJECT-MAP.md).
 ## Evidence
 - Completed v1 base-versus-tuned development comparison.
 - Verified no-promotion decision, including malformed-response safety evidence.
-- Full 456-task successor compatibility journal and matrix at the registered
-  terminal boundary.
+- Active 456-task successor compatibility protocol and recovery record; full
+  terminal matrix pending.
 - Failure taxonomy and immutable run receipts.
-- Verified terminal report, limitations, hashes, and cost record.
+- Verified v1 report and limitations; successor terminal hashes and cost pending.
 
 ## Presentation
-- Recorded 3:44 demo with a terminal-evidence card.
-- Editable six-slide final-findings deck.
+- Recorded 3:30 demo; an updated findings card is drafted but not rendered.
+- Editable six-slide interim findings deck; terminal counts pending.
 - Backup recorded trace.
 - Judge story.
 - Technical report.

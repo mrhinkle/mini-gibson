@@ -19,10 +19,9 @@ signal, but it did not pass the statistical and reliability gates. The pipeline
 did what it was designed to do: it kept the negative evidence and refused to
 promote the adapter.
 
-Submission materials are being finalized on October 18, 2026. Everything
-verified by the repository cutoff will be committed today. If a terminal model
-comparison has not been reached, that result will be reported as inconclusive;
-we will not infer a missing finding. See the
+The completed v1 model comparison is reported separately from the still-running
+successor compatibility screen. This is an interim submission; no v2 model
+comparison or final-holdout result exists. See the
 [project map](docs/PROJECT-MAP.md) for the core repositories, exact model and
 data sources, sealed holdout provenance, and proposed next integrations.
 
@@ -54,9 +53,9 @@ percentage points. The exact paired result did not reach the preset statistical
 boundary (`p=0.0717316`), and tasks affected by malformed responses increased
 from **8 of 48** to **21 of 48** (`p=0.000488`). The adapter was not promoted.
 
-The successor experiment screens all 456 frozen SWE-rebench task packages for
-safe evaluator compatibility before more training or model evaluation. Its
-terminal, public-safe matrix and plain-language conclusion will be published in
+The successor experiment is screening all 456 frozen SWE-rebench task packages
+for safe evaluator compatibility before more training or model evaluation.
+Its terminal, public-safe matrix and plain-language conclusion will be added to
 [`docs/evidence/mini-gibson-successor-2026-10-18/`](docs/evidence/mini-gibson-successor-2026-10-18/).
 That preflight runs no model, agent, parser, or tests, and the 35-task final
 holdout remains operationally sealed and unconsumed by the pipeline.

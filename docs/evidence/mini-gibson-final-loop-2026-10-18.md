@@ -10,9 +10,9 @@ The completed scientific result therefore remains the v1 no-promotion decision: 
 
 The terminal result is operational, not evidence about the model hypothesis: this exact frozen cohort was not executable under the frozen evaluator. None of the preregistered looks at cumulative development N=144, 288, or 432 was reached. The original terminal task will not be selectively repeated; a successor experiment must repair and preflight the evaluator and then freeze a new protocol.
 
-That successor is documented in
+The active successor is documented in
 [`mini-gibson-successor-2026-10-18/`](mini-gibson-successor-2026-10-18/README.md).
-It restarts the complete frozen 456-task order as an outcome-blind compatibility
-preflight. It runs no model, agent, parser, or tests, and it cannot create a new
-model-quality finding. Its terminal public-safe matrix is published only after
-all 456 receipts and hashes verify.
+It restarted the complete frozen 456-task order as an outcome-blind compatibility
+preflight. It runs no model, agent, parser, or tests and cannot produce a new
+model-quality finding. Its full public-safe matrix, terminal report, hashes,
+and cost record will be published only after all 456 receipts verify.

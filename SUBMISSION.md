@@ -53,25 +53,29 @@ fine-tune showed a directional quality signal while making reliability worse.
 We need better tool-call training and a stronger fresh evaluation before we can
 claim an improvement.
 
-## What the successor experiment means
+## What the successor experiment is checking
 
-The successor run checks whether all 456 frozen SWE-rebench task packages can
-be applied safely and consistently before another model comparison. It runs no
-model, agent, parser, or tests. Its result is evidence about evaluator
-compatibility, not model quality.
+The successor is checking the complete frozen set of 456 SWE-rebench task
+packages for safe evaluator compatibility. This screen runs no model, agent,
+parser, or tests. It can tell us which task packages the evaluator can handle;
+it cannot tell us whether the model improved. The run was still in progress at
+this interim submission cutoff, so its complete matrix and terminal conclusion
+are not yet available.
 
-The terminal public-safe matrix, hashes, cost, and plain-language conclusion
-will be frozen in
-[`docs/evidence/mini-gibson-successor-2026-10-18/`](docs/evidence/mini-gibson-successor-2026-10-18/)
-only after all 456 receipts pass independent verification. The 35-task final
-holdout remains operationally sealed and unconsumed by the pipeline.
+The [protocol and recovery record](docs/evidence/mini-gibson-successor-2026-10-18/)
+will be supplemented with the complete matrix, hashes, cost, and conclusion
+only after all 456 receipts verify. The 35-task final holdout remains
+operationally sealed and unconsumed by the pipeline.
+The [time-stamped progress snapshot](docs/evidence/mini-gibson-successor-2026-10-18/INTERIM-STATUS.md)
+is explicitly not a terminal result.
 
 ## What comes next
 
-After a compatible and fully qualified cohort exists, the next experiment can
-train on additional successful OpenHands or Scale-SWE trajectories, with a
-small SWE-smith auxiliary share. A new protocol and fresh development cohort
-must be frozen before looking at outcomes.
+If the full preflight finds incompatibilities, we cannot simply drop them to
+make a smaller cohort. A future run would need a general, outcome-blind evaluator
+repair and a new written protocol for the entire cohort, or a genuinely fresh
+cohort. Only after compatibility and qualification pass can we train on additional successful
+OpenHands or Scale-SWE trajectories, with a small SWE-smith auxiliary share.
 
 Langfuse and Jev are proposed **post-run** analysis tools. Langfuse can help us
 see repeated tool-use and recovery patterns. Jev can classify bounded
@@ -95,6 +99,6 @@ challenge's 33-billion-parameter limit.
 - [Successor protocol and evidence](docs/evidence/mini-gibson-successor-2026-10-18/README.md)
 - [Langfuse and Jev improvement plan](docs/evidence/mini-gibson-successor-2026-10-18/CONTINUOUS-IMPROVEMENT.md)
 
-All submission materials are being finalized on October 18, 2026. Only results
-verified by the repository cutoff will be reported. If a terminal model
-comparison has not been reached, that result remains inconclusive.
+This interim submission reports the completed v1 comparison and the successor
+protocol, not a completed successor result. There is no new v2 model result or
+final-holdout score. A terminal update will follow after all 456 receipts verify.
