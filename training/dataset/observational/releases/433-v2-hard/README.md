@@ -33,6 +33,7 @@ Notes
 - Every row has `provider=CoreWeave` and `provider_metadata.upstream_unique=["CoreWeave"]`.
 - Hard spend cap was $10 (`OBS_SPEND_CAP_USD`). Summed `cost_usd` is $0.974901. OpenRouter `limit_remaining` on the shared key moved from $54.049921 at batch start to $53.053732 after the run (delta $0.996189), which also includes any other use of that key during the window.
 - Secret scan of this directory before handoff: no OpenRouter key material, 1Password references, private-key blocks, or GitHub personal-access tokens.
-- This release is not committed. TEST holdouts were not used.
+- This sanitized release is committed at this versioned public path. It is
+  development-only; TEST holdouts were not used.
 
 - Host paths normalized after review: the collector temp root is written as `<OBS_ROOT>` and other temp paths as `<TMP>`. Byte count and sha256 above are for the normalized file.
