@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "evidence_state": "terminal_qualification_failure",
+  "reporting_deadline": "2026-10-18T07:00:00-04:00",
+  "evidence_cutoff": "2026-10-18T03:18:02Z",
+  "current_conclusion": "v2_unadjudicated_frozen_cohort_not_executable_v1_not_promotable",
+  "v1": {
+    "tasks": 48,
+    "base_resolved": 9,
+    "tuned_resolved": 16,
+    "absolute_uplift": 0.14583333333333334,
+    "tuned_only_wins": 12,
+    "base_only_wins": 5,
+    "one_sided_exact_p": 0.0717316,
+    "base_malformed": 8,
+    "tuned_malformed": 21,
+    "malformed_degradation_p": 0.000488,
+    "promotion": false
+  },
+  "v2": {
+    "frozen_candidates": 456,
+    "preparation_complete": true,
+    "preparation_completed_at": "2026-10-18T03:16:37Z",
+    "image_metadata_cached": 456,
+    "qualification_receipts": 1,
+    "qualified_receipts": 0,
+    "qualification_status": "terminal_unqualified_receipt",
+    "terminal_instance_id": "natcap__invest-1365",
+    "terminal_ordinal": 1,
+    "terminal_receipt_sha256": "063304b83ce4b5b36200f480e38164782d6fed3aa05277a4568b2e98bcdc01b2",
+    "terminal_reason": "all four repeats returned 84 before test execution and lacked the verifier integrity marker",
+    "training_started": false,
+    "formal_development_n": 0,
+    "formal_decision": "not_reached_terminal_qualification_failure",
+    "final_holdout": "sealed_unconsumed"
+  },
+  "provenance": {
+    "github_main_at_experiment_start": "fdd362909ea90d8055781b19167f9d0273b8362e",
+    "installed_reviewed_source": "700e1596559b86df5ddfac2eef5dd1c70bab0abb",
+    "installed_source_patch_sha256": "d31cdf4be53fc9bb894d4feebb94623328c6fcc4997f7efb263c4ed3e05d33c0",
+    "material_package_sha256": "380dc5246435877fd98db3a95dc65bf988f8b9f8109993c474bf841807414f8c",
+    "image_lock_sha256": "be030e93923feb4de9d57cbff9c4bcaa24e5d47eaf7654aa3e2ca3c69689323d",
+    "qualification_journal_sha256": "882fe3bad17a9890ef2a8034b381bbf61b944847fc9b79fc2ed7bd44b566d3ef",
+    "qualification_journal_head_sha256": "65dfff54b91464f8f1340357e40e4eba5db2609a643d587c9b1f91a8fdf69cd5",
+    "remote_recovery_sha256": "7741e484f23b15b3bc172f96405d9c005669109ea07e581049a48d6b24586fec",
+    "dataset_revision": "10483de0f50fe5da545942705a76c6150171af7f",
+    "dataset_sha256": "0e0bf9355f892ad74ae98d4e1c404f39fd6654a8e351ee3e6ab162e4a64cd3ad",
+    "preparation_controller_sha256": "aaa7c777c2db35eff0ec97567309629094cf1bd24ea7984c1a4f9f421cac940e",
+    "preparation_body_sha256": "c0f90a05ab3e891e93205842e866608528bd8562ec71eb292ef48e0152f21754",
+    "qualification_controller_sha256": "df30fefa0b5983bb262567f171f3f5684e6df210759d4f884be804d20b0bec17"
+  },
+  "cost": {
+    "hourly_rate_usd": 3.96,
+    "experiment_window_start": "2026-10-18T00:09:52Z",
+    "terminal_receipt_at": "2026-10-18T03:18:02Z",
+    "estimated_experiment_window_cost_usd": 12.42,
+    "hourly_cap_usd": 30.0,
+    "instance_left_running": true
+  }
+}

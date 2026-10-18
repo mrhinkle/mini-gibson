@@ -37,7 +37,7 @@ from .cohort import (
     dump_canonical_json,
     validate_lock,
 )
-from .docker_backend import DockerBackend
+from .docker_backend import IMAGE_RE, DockerBackend
 from .freeze_real_cohorts import (
     SOURCE_ROWS,
     SOURCE_SHA256,
@@ -223,6 +223,31 @@ def _string_list(value: Any, path: str, *, required: bool = False) -> tuple[str,
     if not isinstance(value, list) or (required and not value):
         raise QualificationOrchestrationError(f"{path}: expected a JSON array")
     result = tuple(_safe_string(item, f"{path}[{index}]") for index, item in enumerate(value))
+    if len(set(result)) != len(result):
+        raise QualificationOrchestrationError(f"{path}: duplicate entries")
+    return result
+
+
+def _test_id_list(value: Any, path: str, *, required: bool = False) -> tuple[str, ...]:
+    """Validate opaque parser keys without rewriting legitimate display names.
+
+    Some upstream test frameworks emit parameterized test identifiers whose
+    display name contains embedded newlines.  These values remain JSON string
+    keys and are never interpolated into a shell command. Preserve embedded LF
+    bytes exactly so parser output can be matched against the pinned dataset,
+    while rejecting NUL and carriage return at this boundary.
+    """
+
+    if not isinstance(value, list) or (required and not value):
+        raise QualificationOrchestrationError(f"{path}: expected a JSON array")
+    result = tuple(value)
+    if not all(
+        isinstance(item, str) and item and not set(item) & {"\0", "\r"}
+        for item in result
+    ):
+        raise QualificationOrchestrationError(
+            f"{path}: expected non-empty strings without NUL or carriage return"
+        )
     if len(set(result)) != len(result):
         raise QualificationOrchestrationError(f"{path}: duplicate entries")
     return result
@@ -453,8 +478,14 @@ def _read_material_package(
                 raise QualificationOrchestrationError(
                     f"{instance_id}: material {material_key} disagrees with pinned dataset"
                 )
-        _string_list(task["fail_to_pass"], f"materials.tasks[{index}].fail_to_pass", required=True)
-        _string_list(task["pass_to_pass"], f"materials.tasks[{index}].pass_to_pass")
+        _test_id_list(
+            task["fail_to_pass"],
+            f"materials.tasks[{index}].fail_to_pass",
+            required=True,
+        )
+        _test_id_list(
+            task["pass_to_pass"], f"materials.tasks[{index}].pass_to_pass"
+        )
         identity = _strict_object(
             task["source_identity"], SOURCE_IDENTITY_KEYS, f"materials.tasks[{index}].source_identity"
         )
@@ -522,6 +553,28 @@ def _read_image_lock(path: Path, plan: Mapping[str, Any]) -> dict[str, Mapping[s
     return result
 
 
+def _docker_repo_digest_matches(locked: object, inspected: object) -> bool:
+    """Match an immutable reference, allowing only Docker Hub prefix elision."""
+
+    if (
+        not isinstance(locked, str)
+        or not IMAGE_RE.fullmatch(locked)
+        or not isinstance(inspected, str)
+        or not IMAGE_RE.fullmatch(inspected)
+    ):
+        return False
+    if inspected == locked:
+        return True
+    prefix = "docker.io/"
+    if not locked.startswith(prefix):
+        return False
+    normalized = locked[len(prefix) :]
+    namespace, separator, _repository = normalized.partition("/")
+    if not separator or "." in namespace or ":" in namespace or namespace == "localhost":
+        return False
+    return inspected == normalized
+
+
 def verify_local_image(entry: Mapping[str, Any], *, docker: str = "docker") -> None:
     """Resolve a locked digest against local Docker metadata without pulling."""
 
@@ -550,7 +603,10 @@ def verify_local_image(entry: Mapping[str, Any], *, docker: str = "docker") -> N
     repo_digests = metadata.get("RepoDigests")
     if (
         not isinstance(repo_digests, list)
-        or entry["reference"] not in repo_digests
+        or not any(
+            _docker_repo_digest_matches(entry["reference"], inspected)
+            for inspected in repo_digests
+        )
         or metadata.get("Os") != "linux"
         or metadata.get("Architecture") != "amd64"
         or not isinstance(metadata.get("Config"), dict)

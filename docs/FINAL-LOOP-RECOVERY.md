@@ -1,19 +1,19 @@
 # Mini-Gibson final-loop recovery checkpoint
 
-Checkpoint refreshed at `2026-10-17T23:54:06Z`. This document separates completed, merged work from the GPU-dependent work that has not run.
+Checkpoint refreshed at `2026-10-18T03:18:02Z`. This document records the terminal boundary of the frozen v2 experiment.
 
 ## Current status
 
-- GitHub `main` at the evidence cutoff: `3a8f751dde5e9f7ff0e3f322f61b81ae6b93d374`.
-- Open pull requests: none.
-- Experiment status: infrastructure and outcome-blind cohort freeze complete; v2 qualification, training, and formal evaluation not run.
+- GitHub `main` at the evidence cutoff: `fdd362909ea90d8055781b19167f9d0273b8362e`.
+- Findings pull request: [#31](https://github.com/mrhinkle/mini-gibson/pull/31).
+- Experiment status: authenticated preparation completed 456/456; the first frozen qualification receipt was terminal and unqualified; v2 training and formal evaluation did not start.
 - Final 35-task Gibson Bench v0.1 holdout: sealed and unconsumed.
-- Brev inventory: only stopped `weird-white-ocelot` (`ds7uiptfk`, 2xA100) is listed. No Brev Connect nodes are listed.
-- The former H100 environments are not listed. Do not assume their ephemeral files still exist.
-- The last start attempt for the A100 environment failed because the Brev account reported exhausted credits. Do not purchase credits or create replacement compute without Mark's explicit billing decision.
-- Active GPU compute rate: `$0/hour` while the listed instance remains stopped.
+- Brev `weird-white-ocelot` (`ds7uiptfk`, 2xA100 80 GB) is running, healthy, and shell-ready at `$3.96/hour`; no Brev Connect nodes are listed.
+- Docker authentication and bounded retries completed preparation without discarding cached records. No subscription or billing change was made.
+- Terminal receipt: `natcap__invest-1365`, ordinal 1, receipt SHA-256 `063304b83ce4b5b36200f480e38164782d6fed3aa05277a4568b2e98bcdc01b2`. All four repeats returned 84 at the clean-worktree precondition and lacked the integrity marker.
+- Active GPU compute remains below the approved `$30/hour` total cap.
 
-The complete evidence/status report is [`docs/evidence/mini-gibson-final-loop-2026-10-17.md`](evidence/mini-gibson-final-loop-2026-10-17.md).
+The current evidence/status report is [`docs/evidence/mini-gibson-final-loop-2026-10-18.md`](evidence/mini-gibson-final-loop-2026-10-18.md), with the machine-readable package under [`docs/evidence/mini-gibson-v2-2026-10-18/`](evidence/mini-gibson-v2-2026-10-18/README.md).
 
 ## Safety and claim boundary
 
@@ -23,7 +23,8 @@ The complete evidence/status report is [`docs/evidence/mini-gibson-final-loop-20
 - Do not create compute that exceeds the approved `$30/hour` total cap.
 - Keep hosted Jev and Langfuse credentials out of scored runs. Local append-only receipts are authoritative.
 - Do not post another Slack update unless Mark explicitly asks.
-- Do not claim that v2 is trained, evaluated, significant, or promotable until the corresponding receipts are committed.
+- Do not rerun, replace, or selectively repeat the terminal frozen task. This experiment is closed before training.
+- Do not claim that v2 is trained, evaluated, significant, or promotable; no v2 model outcome exists.
 
 ## Durable merged state
 
@@ -72,20 +73,14 @@ The v1 adapter is not promotable. Across 48 fresh development issues it resolved
 
 Tool reliability regressed materially: malformed responses affected `21/48` tuned tasks versus `8/48` base tasks. The one-sided paired degradation p-value was `0.000488`. The supported conclusion is: **promising issue-resolution signal, unsafe tool-format regression, no statistically established upgrade**.
 
-## Resume sequence after Brev credits are restored
+## Terminal boundary and safe successor
 
-1. Refresh GitHub, Brev inventory, GPU health, disk, and the exact hourly rate before starting anything.
-2. Copy the pinned dataset to durable remote storage and re-verify its SHA-256.
-3. Build the sealed 456-row material/parser/AST package and immutable 456-image lock.
-4. Run `python -m evaluation.qualify_candidates --dry-run` and resolve every reported prerequisite without weakening a gate.
-5. Qualify in bounded batches. Each task must produce two base-fail and two gold-pass receipts through the hardened networkless backend.
-6. Finalize runnable cohort locks and the complete v2 training exclusion registry only after all 456 tasks qualify.
-7. Select successful executable OpenHands/Scale-SWE trajectories outside the pilot, all 432 development tasks, and the final holdout. Keep SWE-smith auxiliary data at or below the frozen 10–20% cap.
-8. Run a one-step v2 training smoke, then bounded resumable training with remote logs/checkpoints and completion markers.
-9. Use the 24-task pilot to freeze the turn budget.
-10. Evaluate base, v1, and v2 identically at the three formal development looks, applying efficacy, futility, and safety rules exactly.
-11. Open the final holdout only if all development promotion gates pass.
-12. Replace provisional demo findings with final verified results, render and inspect the video, obtain cross-vendor review, and merge through a new PR.
+1. Preserve the sealed preparation hashes, terminal journal, receipt, and remote recovery manifest.
+2. Publish the exact finding through PR #31: the frozen cohort failed executability before training, so v2 remains unadjudicated.
+3. Leave the final holdout sealed and do not reuse the terminal task inside this experiment.
+4. For a successor experiment, repair the clean-worktree ownership/state boundary and preflight every frozen image under the same unprivileged runtime.
+5. Freeze a new protocol and cohort before collecting any new qualification or model outcomes.
+6. Only after that new cohort fully qualifies may v2 training, pilot budget selection, and formal base/v1/v2 evaluation resume.
 
 ## Fast recovery checks
 
@@ -97,4 +92,4 @@ brev ls nodes --json
 git -C /Users/mrhinkle/Code/mini-gibson fetch origin --prune
 ```
 
-Do not retry `brev start` on a schedule while the credit state is unchanged. Mark must resolve the billing block first.
+Do not stop the running instance, change the Docker subscription, or create replacement compute without fresh explicit confirmation. The terminal package estimates `$12.42` through the receipt cutoff; charges continue while the instance remains running.

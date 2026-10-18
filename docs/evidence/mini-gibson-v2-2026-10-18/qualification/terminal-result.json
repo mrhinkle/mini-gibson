@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-18T03:18:02Z",
+  "status": "terminal_qualification_failure",
+  "candidate_count": 456,
+  "receipts_recorded": 1,
+  "qualified_receipts": 0,
+  "remaining_unrun": 455,
+  "terminal_candidate": {
+    "cohort_id": "pilot-budget",
+    "global_ordinal": 1,
+    "selection_rank": 1,
+    "instance_id": "natcap__invest-1365",
+    "receipt_sha256": "063304b83ce4b5b36200f480e38164782d6fed3aa05277a4568b2e98bcdc01b2",
+    "qualified": false,
+    "base_fail_repeats": 0,
+    "gold_pass_repeats": 0,
+    "repeat_returncodes": [84, 84, 84, 84],
+    "repeat_integrity_ok": [false, false, false, false],
+    "repeat_parser_ok": [true, true, true, true],
+    "repeat_error": "missing or duplicate verifier integrity marker"
+  },
+  "boundary": {
+    "runner_exit_84": "clean-worktree precondition failed because git status failed or reported tracked changes",
+    "test_execution_reached": false,
+    "training_started": false,
+    "formal_development_n": 0,
+    "formal_look_reached": false,
+    "final_holdout": "sealed_unconsumed",
+    "model_claim": "none"
+  },
+  "journal": {
+    "sha256": "882fe3bad17a9890ef2a8034b381bbf61b944847fc9b79fc2ed7bd44b566d3ef",
+    "head_sha256": "65dfff54b91464f8f1340357e40e4eba5db2609a643d587c9b1f91a8fdf69cd5",
+    "receipt_verified": true
+  }
+}

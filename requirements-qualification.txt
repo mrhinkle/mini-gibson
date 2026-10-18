@@ -1,0 +1,5 @@
+# CPU-only preparation dependencies for frozen SWE-rebench qualification inputs.
+pyarrow==23.0.1
+tree-sitter==0.26.0
+tree-sitter-language-pack==1.22.1
+pytest==9.1.1

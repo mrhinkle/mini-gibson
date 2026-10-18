@@ -1,0 +1,10 @@
+{
+  "cohort_id": "pilot-budget",
+  "digest": "sha256:09439f2cb8d17177ab148b29d22fb9b14bc7e9981c31872b62fd39dfb0b91627",
+  "global_ordinal": 1,
+  "image_name": "docker.io/swerebenchv2/natcap-invest:1365-6db2256",
+  "instance_id": "natcap__invest-1365",
+  "reference": "docker.io/swerebenchv2/natcap-invest@sha256:09439f2cb8d17177ab148b29d22fb9b14bc7e9981c31872b62fd39dfb0b91627",
+  "selection_rank": 1,
+  "workdir": "/invest"
+}

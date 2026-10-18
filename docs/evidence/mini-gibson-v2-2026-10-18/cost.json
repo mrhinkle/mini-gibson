@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "instance": "weird-white-ocelot",
+  "instance_id": "ds7uiptfk",
+  "instance_type": "a100-80gb.2x",
+  "gpu_count": 2,
+  "gpu_model": "NVIDIA A100 80GB PCIe",
+  "hourly_rate_usd": 3.96,
+  "approved_hourly_cap_usd": 30.0,
+  "experiment_window_start": "2026-10-18T00:09:52Z",
+  "terminal_receipt_at": "2026-10-18T03:18:02Z",
+  "billable_window_hours_estimate": 3.1361,
+  "estimated_experiment_window_cost_usd": 12.42,
+  "method": "durable remote root creation through terminal qualification receipt multiplied by the live Brev hourly rate",
+  "limitations": "This estimate excludes any instance runtime before the durable root existed. The instance remains running because stopping or deleting it requires fresh explicit confirmation, so charges continue after this evidence cutoff."
+}

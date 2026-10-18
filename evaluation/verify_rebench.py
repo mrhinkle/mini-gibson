@@ -10,19 +10,23 @@ from __future__ import annotations
 import hashlib
 import inspect
 import io
-import json
 import re
 import shlex
 import sys
 import tarfile
 import uuid
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence
 
 from .cohort import SUPPORTED_LOG_PARSERS, dump_canonical_json
-from .docker_backend import DockerBackend, DockerIsolationError, DockerRunResult, IMAGE_RE
-
+from .docker_backend import (
+    IMAGE_RE,
+    DockerBackend,
+    DockerIsolationError,
+    DockerRunResult,
+)
 
 RECEIPT_SCHEMA = "mini-gibson-rebench-qualification/v1"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -42,6 +46,33 @@ class RebenchVerificationError(ValueError):
 
 ParserCallable = Callable[[str], Mapping[str, str]]
 _PINNED_PARSER_TOKEN = object()
+
+
+class _PinnedTestStatus(str, Enum):
+    """Exact public status contract imported by the pinned upstream parsers."""
+
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+    ERROR = "ERROR"
+
+
+def _sealed_parser_import(name: str, globals=None, locals=None, fromlist=(), level=0):
+    """Resolve the upstream parser's sole project-local import without shadowing.
+
+    SWE-rebench V2's pinned ``log_parsers.py`` imports ``TestStatus`` from its
+    adjacent ``swe_constants.py``.  The four enum values are reproduced here
+    so the *unmodified* upstream parser file can be hash-bound and executed
+    outside an SWE-rebench checkout.  Every other import uses Python's normal
+    importer.  This compatibility code is itself covered by the verifier hash
+    recorded in the qualification journal.
+    """
+
+    if level == 0 and name == "lib.agent.swe_constants":
+        module = type(sys)("lib.agent.swe_constants")
+        module.TestStatus = _PinnedTestStatus
+        return module
+    return __import__(name, globals, locals, fromlist, level)
 
 
 class PinnedParser:
@@ -133,6 +164,9 @@ def load_pinned_parser_bytes(
     module_name = f"_mini_gibson_rebench_parser_{expected_sha256[:16]}"
     module = type(sys)(module_name)
     module.__file__ = f"<sealed-parser:{expected_sha256}>"
+    builtins = dict(vars(__import__("builtins")))
+    builtins["__import__"] = _sealed_parser_import
+    module.__dict__["__builtins__"] = builtins
     try:
         code = compile(source, module.__file__, "exec")
         exec(code, module.__dict__)
@@ -195,13 +229,23 @@ def _validate_task(task: QualificationTask) -> None:
         raise RebenchVerificationError("qualification timeout must equal the frozen 900 seconds")
 
 
+def _valid_test_id(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and not set(value) & {"\0", "\r"}
+    )
+
+
 def _validate_ids(values: Sequence[str], name: str, *, required: bool) -> None:
     if required and not values:
         raise RebenchVerificationError(f"{name} must not be empty")
     if len(set(values)) != len(values):
         raise RebenchVerificationError(f"{name} contains duplicates")
-    if not all(isinstance(item, str) and item and not set(item) & {"\0", "\r", "\n"} for item in values):
-        raise RebenchVerificationError(f"{name} must contain non-empty single-line strings")
+    if not all(_valid_test_id(item) for item in values):
+        raise RebenchVerificationError(
+            f"{name} must contain non-empty strings without NUL or carriage return"
+        )
 
 
 def _validate_material(material: VerifierMaterial) -> None:
@@ -675,7 +719,7 @@ def _normalize_statuses(raw: Mapping[str, str]) -> dict[str, str]:
         raise RebenchVerificationError("parser did not return a mapping")
     statuses: dict[str, str] = {}
     for key, value in raw.items():
-        if not isinstance(key, str) or not key or not isinstance(value, str):
+        if not _valid_test_id(key) or not isinstance(value, str):
             raise RebenchVerificationError("parser returned a malformed status entry")
         state = value.casefold()
         aliases = {"pass": "passed", "fail": "failed"}
@@ -1062,9 +1106,7 @@ def verify_receipt(receipt: Mapping[str, object]) -> bool:
             normalized: dict[str, str] = {}
             for test_id, state in mapping.items():
                 if (
-                    not isinstance(test_id, str)
-                    or not test_id
-                    or set(test_id) & {"\0", "\r", "\n"}
+                    not _valid_test_id(test_id)
                     or not isinstance(state, str)
                     or state not in STATUS_VALUES | {"missing"}
                 ):
