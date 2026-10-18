@@ -615,6 +615,11 @@ def test_runner_distinguishes_wrong_head_and_dirty_tracked_state(tmp_path: Path)
     assert MARKER_PREFIX.encode() not in dirty.stderr
 
 
+def test_runner_does_not_restore_archive_ownership_without_cap_chown() -> None:
+    script = _runner_script("f" * 32, "a" * 40)
+    assert 'tar --no-same-owner -xf - -C "$stage"' in script
+
+
 @pytest.mark.parametrize(
     "mutated_path",
     ["src/pkg/checks.py", "conftest.py", "pytest.ini", "tox.ini"],

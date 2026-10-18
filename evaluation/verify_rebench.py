@@ -620,7 +620,7 @@ def _runner_script(marker_token: str, base_commit: str) -> str:
 set -u
 stage="$(mktemp -d /tmp/mini-gibson-verifier.XXXXXX)" || exit 80
 trap 'rm -rf "$stage"' EXIT
-tar -xf - -C "$stage" || exit 81
+tar --no-same-owner -xf - -C "$stage" || exit 81
 cd "$PWD" || exit 82
 test -d .git || exit 83
 git_cmd=(git -c safe.directory="$PWD")
