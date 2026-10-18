@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from evaluation.prepare_qualification_materials import (
     GitHubResolver,
     ImageResolver,
     QualificationPreparationError,
+    _run_command,
     _tar_bytes,
     parse_patch_hunks,
 )
@@ -337,9 +339,11 @@ def test_missing_pr_fallback_rejects_unproven_history(
         max_new_requests=5,
         runner=fallback_runner(**kwargs),
     )
-    expected = (
-        "missing or ambiguous" if failure != "patch-mismatch" else "does not match"
-    )
+    expected = {
+        "missing": "no same-name repository",
+        "ambiguous": "fallback is ambiguous",
+        "patch-mismatch": "does not match",
+    }[failure]
     with pytest.raises(QualificationPreparationError, match=expected):
         resolver.merge_commits([candidate], {candidate["instance_id"]: record})
 
@@ -366,6 +370,7 @@ def transfer_runner(
     base_commit=None,
     authoritative_diff=None,
     incomplete=False,
+    initial_boundary="repository",
 ):
     candidate, record = transfer_candidate()
     if repositories is None:
@@ -378,6 +383,24 @@ def transfer_runner(
     def runner(command):
         rendered = " ".join(command)
         if "graphql" in command and "r0:repository" in rendered:
+            if initial_boundary == "pull":
+                return json.dumps(
+                    {
+                        "data": {
+                            "r0": {
+                                "nameWithOwner": candidate["repo"],
+                                "pullRequest": None,
+                            }
+                        },
+                        "errors": [
+                            {
+                                "type": "NOT_FOUND",
+                                "path": ["r0", "pullRequest"],
+                                "message": "pull request missing",
+                            }
+                        ],
+                    }
+                )
             return json.dumps(
                 {
                     "data": {"r0": None},
@@ -389,6 +412,10 @@ def transfer_runner(
                         }
                     ],
                 }
+            )
+        if "search/commits" in command and "Merge pull request" in rendered:
+            return json.dumps(
+                {"total_count": 0, "incomplete_results": False, "items": []}
             )
         if "search/commits" in command:
             items = [
@@ -426,7 +453,10 @@ def transfer_runner(
                 {
                     "sha": "2" * 40,
                     "commit": {"tree": {"sha": "a" * 40}},
-                    "parents": [{"sha": candidate["base_commit"]}],
+                    "parents": [
+                        {"sha": candidate["base_commit"]},
+                        {"sha": "8" * 40},
+                    ],
                 }
             )
         if "pulls/8" in rendered and "application/vnd.github.v3.diff" in rendered:
@@ -460,6 +490,65 @@ def test_missing_repository_fallback_binds_transfer_pr_base_and_diff(
     assert resumed.merge_commits([candidate], {candidate["instance_id"]: record}) == {
         candidate["instance_id"]: "2" * 40
     }
+
+
+def test_missing_pr_then_empty_history_binds_transferred_repository(
+    tmp_path: Path,
+) -> None:
+    candidate, record = transfer_candidate()
+    resolver = GitHubResolver(
+        tmp_path,
+        max_new_requests=6,
+        runner=transfer_runner(initial_boundary="pull"),
+    )
+    assert resolver.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "2" * 40
+    }
+    cached = json.loads(resolver._cache_path(candidate["repo"], 8).read_text())
+    assert cached["method"] == "pr_repository_transfer_fallback"
+    history = cached["evidence"]["requested_repository_history"]
+    assert history == {
+        "query": 'repo:Old-Owner/Repo "Merge pull request #8 from"',
+        "repository": "Old-Owner/Repo",
+        "complete": True,
+        "total": 0,
+        "results": [],
+    }
+    resumed = GitHubResolver(
+        tmp_path,
+        max_new_requests=0,
+        runner=lambda _command: pytest.fail("resume ignored PR-transfer cache"),
+    )
+    assert resumed.merge_commits([candidate], {candidate["instance_id"]: record}) == {
+        candidate["instance_id"]: "2" * 40
+    }
+
+
+@pytest.mark.parametrize("failure", ["ambiguous", "base-mismatch", "patch-mismatch"])
+def test_missing_pr_transfer_rejects_ambiguous_or_mismatched_canonical_repo(
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    candidate, record = transfer_candidate()
+    kwargs = {"initial_boundary": "pull"}
+    if failure == "ambiguous":
+        kwargs["repositories"] = ["New-Owner/Repo", "Other-Owner/Repo"]
+    elif failure == "base-mismatch":
+        kwargs["base_commit"] = "f" * 40
+    else:
+        kwargs["authoritative_diff"] = patch("src/not-the-frozen-patch.py")
+    resolver = GitHubResolver(
+        tmp_path,
+        max_new_requests=6,
+        runner=transfer_runner(**kwargs),
+    )
+    expected = {
+        "ambiguous": "missing or ambiguous",
+        "base-mismatch": "provenance disagrees",
+        "patch-mismatch": "does not match",
+    }[failure]
+    with pytest.raises(QualificationPreparationError, match=expected):
+        resolver.merge_commits([candidate], {candidate["instance_id"]: record})
 
 
 @pytest.mark.parametrize("failure", ["ambiguous", "base-mismatch", "patch-mismatch"])
@@ -554,6 +643,23 @@ def test_image_metadata_resolution_uses_no_pull_and_is_resumable(
         runner=lambda _command: pytest.fail("resume ignored image cache"),
     )
     assert resumed.resolve(name)["workdir"] == "/testbed"
+
+
+def test_docker_metadata_command_preserves_user_for_credential_helper(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("USER", "qualification-runner")
+    observed = {}
+
+    def run(command, **kwargs):
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(
+        "evaluation.prepare_qualification_materials.subprocess.run", run
+    )
+    assert _run_command(["docker", "version"]) == "{}"
+    assert observed["USER"] == "qualification-runner"
 
 
 def test_image_root_workdir_fails_closed(tmp_path: Path) -> None:

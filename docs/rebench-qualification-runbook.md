@@ -44,12 +44,15 @@ batches, caching each PR identity. If and only if GitHub reports an exact
 PR-level `NOT_FOUND`, the builder may recover an exact two-parent
 `Merge pull request #N from ...` commit from that authoritative repository;
 the frozen base must be its branch-head ancestor and the authoritative diff
-must exactly bind the frozen product and test patches. A separate transfer
-fallback runs only on an exact repository-level `NOT_FOUND`: an authenticated,
-complete frozen-base commit search must yield exactly one same-name repository
-whose merged PR number, base commit, merge commit, and diff all match. Missing,
-ambiguous, incomplete, or mismatched evidence fails closed, and every lookup is
-bound into the resumable cache. The builder packages the unmodified
+must exactly bind the frozen product and test patches. Only when that complete
+requested-repository search contains zero exact merge commits may the same
+strict transfer proof run for a missing PR. A transfer proof also runs after an
+exact repository-level `NOT_FOUND`: an authenticated, complete frozen-base
+commit search must yield exactly one different, same-name repository whose
+merged PR number, base commit, two-parent topology, and diff all match. Missing,
+ambiguous, incomplete, or mismatched evidence fails closed, and every lookup,
+including the zero-match requested history, is bound into the resumable cache.
+The builder packages the unmodified
 `lib/agent/log_parsers.py` bytes from SWE-rebench V2 revision
 `c71902a8cf8d2b725f63d51f199f4d3e56f68d2d` and verifies Git blob
 `51c2e178b392f36aedc3c64064a708498ff591f8` before hashing the executed bytes.

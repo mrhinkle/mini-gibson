@@ -199,7 +199,7 @@ def _run_command(command: Sequence[str], *, timeout: int = 120) -> str:
     permitted = (
         ("HOME", "GH_CONFIG_DIR", "GH_HOST", "GH_TOKEN", "GITHUB_TOKEN")
         if executable == "gh"
-        else ("HOME", "DOCKER_CONFIG")
+        else ("HOME", "USER", "DOCKER_CONFIG")
     )
     environment.update(
         {name: os.environ[name] for name in permitted if name in os.environ}
@@ -499,7 +499,10 @@ class GitHubResolver:
                 raise QualificationPreparationError(
                     f"{repo}#{number}: invalid cached fallback provenance"
                 )
-        elif value["method"] == "repository_transfer_fallback":
+        elif value["method"] in {
+            "repository_transfer_fallback",
+            "pr_repository_transfer_fallback",
+        }:
             transfer_keys = {
                 "discovery_query",
                 "discovery_results",
@@ -510,6 +513,8 @@ class GitHubResolver:
                 "canonical_patch_sections_sha256",
                 "authoritative_diff_sha256",
             }
+            if value["method"] == "pr_repository_transfer_fallback":
+                transfer_keys.add("requested_repository_history")
             if set(evidence) != transfer_keys:
                 raise QualificationPreparationError(
                     f"{repo}#{number}: malformed cached repository-transfer evidence"
@@ -517,9 +522,11 @@ class GitHubResolver:
             discovery_results = evidence["discovery_results"]
             pull = evidence["pull_request"]
             commit = evidence["merge_commit"]
+            requested_history = evidence.get("requested_repository_history")
             expected_basename = repo.rsplit("/", 1)[-1].casefold()
             if (
-                evidence["discovery_query"] != record["base_commit"]
+                canonical_repo.casefold() == repo.casefold()
+                or evidence["discovery_query"] != record["base_commit"]
                 or evidence["discovery_complete"] is not True
                 or not isinstance(discovery_results, list)
                 or not discovery_results
@@ -559,18 +566,49 @@ class GitHubResolver:
                 or commit["sha"] != merge_commit
                 or not isinstance(commit["tree"], str)
                 or not GIT_SHA_RE.fullmatch(commit["tree"])
-                or not isinstance(commit["parents"], list)
-                or not commit["parents"]
-                or not all(
-                    isinstance(parent, str) and GIT_SHA_RE.fullmatch(parent)
-                    for parent in commit["parents"]
-                )
+                or commit["parents"] != [pull["base_commit"], pull["head_commit"]]
                 or evidence["canonical_patch_sections_sha256"]
                 != _patch_sections_sha256(_expected_patch_sections(record))
                 or not SHA256_RE.fullmatch(evidence["authoritative_diff_sha256"])
             ):
                 raise QualificationPreparationError(
                     f"{repo}#{number}: invalid cached repository-transfer provenance"
+                )
+            if value["method"] == "pr_repository_transfer_fallback" and (
+                not isinstance(requested_history, dict)
+                or set(requested_history)
+                != {"query", "repository", "complete", "total", "results"}
+                or not isinstance(requested_history["repository"], str)
+                or requested_history["repository"].count("/") != 1
+                or requested_history["repository"].rsplit("/", 1)[-1].casefold()
+                != expected_basename
+                or requested_history["repository"].casefold()
+                == canonical_repo.casefold()
+                or requested_history["query"]
+                != f"repo:{requested_history['repository']} "
+                f'"Merge pull request #{number} from"'
+                or requested_history["complete"] is not True
+                or not isinstance(requested_history["results"], list)
+                or not isinstance(requested_history["total"], int)
+                or isinstance(requested_history["total"], bool)
+                or requested_history["total"] > 100
+                or requested_history["total"] != len(requested_history["results"])
+                or any(
+                    not isinstance(item, dict)
+                    or set(item) != {"sha", "message"}
+                    or not isinstance(item["sha"], str)
+                    or not GIT_SHA_RE.fullmatch(item["sha"])
+                    or not isinstance(item["message"], str)
+                    or not item["message"].splitlines()
+                    or re.fullmatch(
+                        rf"Merge pull request #{number} from [^\r\n]+",
+                        item["message"].splitlines()[0],
+                    )
+                    for item in requested_history["results"]
+                )
+            ):
+                raise QualificationPreparationError(
+                    f"{repo}#{number}: invalid cached requested-repository history"
                 )
             _validate_pr_url(pull["url"], canonical_repo, number)
         else:
@@ -603,6 +641,8 @@ class GitHubResolver:
         self,
         candidate: Mapping[str, Any],
         record: Mapping[str, Any],
+        *,
+        requested_repository_history: Mapping[str, Any] | None = None,
     ) -> str:
         """Recover a transferred repository only from exact authenticated evidence."""
 
@@ -767,6 +807,14 @@ class GitHubResolver:
         selected = next(iter(matches.values()))
         canonical_repo = selected["canonical_repo"]
         pr_record = selected["pull"]
+        if canonical_repo.casefold() == requested_repo.casefold() or (
+            requested_repository_history is not None
+            and canonical_repo.casefold()
+            == requested_repository_history["repository"].casefold()
+        ):
+            raise QualificationPreparationError(
+                f"{requested_repo}#{number}: transfer candidate is not a different repository"
+            )
         _validate_source_pr_url(
             candidate["source_pr_url"], requested_repo, canonical_repo, number
         )
@@ -787,11 +835,8 @@ class GitHubResolver:
         if (
             commit_record["sha"] != pr_record["merge_commit"]
             or not GIT_SHA_RE.fullmatch(commit_record["tree"])
-            or not commit_record["parents"]
-            or not all(
-                isinstance(parent, str) and GIT_SHA_RE.fullmatch(parent)
-                for parent in commit_record["parents"]
-            )
+            or commit_record["parents"]
+            != [pr_record["base_commit"], pr_record["head_commit"]]
         ):
             raise QualificationPreparationError(
                 f"{requested_repo}#{number}: transferred merge commit disagrees"
@@ -811,6 +856,22 @@ class GitHubResolver:
                 f"{requested_repo}#{number}: transferred PR diff does not match frozen product/test patches"
             )
         canonical_patch_sha = _patch_sections_sha256(expected_sections)
+        evidence = {
+            "discovery_query": base_commit,
+            "discovery_results": discovery_results,
+            "discovery_complete": complete,
+            "discovery_total": total,
+            "pull_request": pr_record,
+            "merge_commit": commit_record,
+            "canonical_patch_sections_sha256": canonical_patch_sha,
+            "authoritative_diff_sha256": _sha256_bytes(authoritative_diff.encode()),
+        }
+        method = "repository_transfer_fallback"
+        if requested_repository_history is not None:
+            method = "pr_repository_transfer_fallback"
+            evidence["requested_repository_history"] = dict(
+                requested_repository_history
+            )
         self._store_source_cache(
             requested_repo,
             number,
@@ -820,21 +881,10 @@ class GitHubResolver:
                 "canonical_repo": canonical_repo,
                 "pr_number": number,
                 "source_pr_url": candidate["source_pr_url"],
-                "method": "repository_transfer_fallback",
+                "method": method,
                 "merge_commit_sha": pr_record["merge_commit"],
                 "record_bindings": self._record_bindings(record),
-                "evidence": {
-                    "discovery_query": base_commit,
-                    "discovery_results": discovery_results,
-                    "discovery_complete": complete,
-                    "discovery_total": total,
-                    "pull_request": pr_record,
-                    "merge_commit": commit_record,
-                    "canonical_patch_sections_sha256": canonical_patch_sha,
-                    "authoritative_diff_sha256": _sha256_bytes(
-                        authoritative_diff.encode()
-                    ),
-                },
+                "evidence": evidence,
             },
         )
         return pr_record["merge_commit"]
@@ -870,20 +920,55 @@ class GitHubResolver:
             raise QualificationPreparationError(
                 f"{repo}#{number}: malformed commit-search response"
             ) from exc
-        exact = []
-        for item in items if isinstance(items, list) else ():
-            message = (
-                item.get("commit", {}).get("message")
-                if isinstance(item, dict)
-                else None
+        if (
+            not complete
+            or not isinstance(items, list)
+            or total != len(items)
+            or total > 100
+        ):
+            raise QualificationPreparationError(
+                f"{repo}#{number}: merge-history search is incomplete"
             )
-            if isinstance(message, str) and re.fullmatch(
+        search_results: list[dict[str, str]] = []
+        exact = []
+        for item in items:
+            try:
+                sha = item["sha"]
+                message = item["commit"]["message"]
+            except (KeyError, TypeError) as exc:
+                raise QualificationPreparationError(
+                    f"{repo}#{number}: malformed merge-history result"
+                ) from exc
+            if (
+                not isinstance(sha, str)
+                or not GIT_SHA_RE.fullmatch(sha)
+                or not isinstance(message, str)
+                or not message.splitlines()
+            ):
+                raise QualificationPreparationError(
+                    f"{repo}#{number}: malformed merge-history result"
+                )
+            search_results.append({"sha": sha, "message": message})
+            if re.fullmatch(
                 rf"Merge pull request #{number} from [^\r\n]+", message.splitlines()[0]
             ):
                 exact.append(item)
-        if not complete or total != len(items) or len(exact) != 1:
+        search_results.sort(key=lambda item: (item["sha"], item["message"]))
+        if len(exact) > 1:
             raise QualificationPreparationError(
-                f"{repo}#{number}: merge-history fallback is missing or ambiguous"
+                f"{repo}#{number}: merge-history fallback is ambiguous"
+            )
+        if not exact:
+            return self._repository_transfer_fallback(
+                candidate,
+                record,
+                requested_repository_history={
+                    "query": query,
+                    "repository": canonical_repo,
+                    "complete": complete,
+                    "total": total,
+                    "results": search_results,
+                },
             )
         merge_commit = exact[0].get("sha")
         if not isinstance(merge_commit, str) or not GIT_SHA_RE.fullmatch(merge_commit):
