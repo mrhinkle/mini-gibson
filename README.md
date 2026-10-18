@@ -4,6 +4,8 @@
 
 Experiment repository for the NVIDIA × Red Hat Small Models Hack, October 17–18, 2026.
 
+**Team: Merge-Geezers. Project: Mini Gibson.**
+
 **Judge-facing overview:** [read the plain-language submission summary](SUBMISSION.md).
 
 ## What we are submitting
