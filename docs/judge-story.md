@@ -1,5 +1,7 @@
 # Judge Story
 
+*Team: Merge-Geezers · Project: Mini Gibson*
+
 I am not a software developer.
 
 I've spent more than 30 years around emerging technology—from the early Internet and open source through cloud computing and now AI. My background is technology strategy, operations, workflow, community, and building organizations around new technology.

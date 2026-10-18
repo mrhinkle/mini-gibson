@@ -1,5 +1,7 @@
 # Mini Gibson — submission summary
 
+**Team: Merge-Geezers** · **Project: Mini Gibson**
+
 ## The short version
 
 Mini Gibson is a **training and evaluation pipeline for coding agents**. It
