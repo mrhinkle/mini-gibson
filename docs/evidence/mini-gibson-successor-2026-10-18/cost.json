@@ -1,0 +1,16 @@
+{
+  "approved_hourly_cap_usd": 30.0,
+  "controller_window_hours_estimate": 4.3128,
+  "controller_window_start": "2026-10-18T11:07:48Z",
+  "estimated_controller_window_cost_usd": 17.0794,
+  "gpu_count": 2,
+  "gpu_model": "NVIDIA A100 80GB PCIe",
+  "hourly_rate_usd": 3.96,
+  "instance": "weird-white-ocelot",
+  "instance_id": "ds7uiptfk",
+  "instance_type": "a100-80gb.2x",
+  "limitations": "This estimate covers only the R3 controller window. The instance remains running because stopping it requires fresh explicit confirmation, so charges continue after this evidence cutoff.",
+  "method": "controller start through terminal status timestamp multiplied by the live Brev hourly rate; reconciled to the controller status",
+  "schema_version": 1,
+  "terminal_status_at": "2026-10-18T15:26:34Z"
+}

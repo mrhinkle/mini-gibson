@@ -10,7 +10,7 @@
   "source_mean_db": -29.8,
   "source_max_db": -5.7,
   "predicted_mix_max_db": -1.9,
-  "narrative_revision": "Original authorized narration retained; a silent terminal-evidence card is appended and exact compatibility counts remain placeholder-bound until verifier success",
+  "narrative_revision": "Original authorized narration retained; the final 14-second silent card reports the independently verified terminal 456/406/50 compatibility result",
   "post_run_silent_card": {
     "start_seconds": 209.999,
     "duration_seconds": 14,

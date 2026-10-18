@@ -22,9 +22,9 @@ signal, but it did not pass the statistical and reliability gates. The pipeline
 did what it was designed to do: it kept the negative evidence and refused to
 promote the adapter.
 
-The completed v1 model comparison is reported separately from the still-running
-successor compatibility screen. This is an interim submission; no v2 model
-comparison or final-holdout result exists. See the
+The completed v1 model comparison is reported separately from the completed
+successor compatibility screen. No v2 model comparison or final-holdout result
+exists. See the
 [project map](docs/PROJECT-MAP.md) for the core repositories, exact model and
 data sources, sealed holdout provenance, and proposed next integrations.
 
@@ -38,7 +38,7 @@ linked at their pinned upstream revisions rather than being republished here.
 
 ## Demo and final findings
 
-[Watch the latest 3:30 demo](presentation/demo/mini-gibson-demo.mp4) ·
+[Watch the final 3:44 demo](presentation/demo/mini-gibson-demo.mp4) ·
 [Transcript](presentation/demo/transcript.txt) ·
 [Editable project ZIP](presentation/demo/mini-gibson-demo-project.zip)
 
@@ -56,11 +56,11 @@ percentage points. The exact paired result did not reach the preset statistical
 boundary (`p=0.0717316`), and tasks affected by malformed responses increased
 from **8 of 48** to **21 of 48** (`p=0.000488`). The adapter was not promoted.
 
-The successor experiment is screening all 456 frozen SWE-rebench task packages
+The successor experiment screened all 456 frozen SWE-rebench task packages
 for safe evaluator compatibility before more training or model evaluation.
-Its terminal, public-safe matrix and plain-language conclusion will be added to
-[`docs/evidence/mini-gibson-successor-2026-10-18/`](docs/evidence/mini-gibson-successor-2026-10-18/).
-That preflight runs no model, agent, parser, or tests, and the 35-task final
+**406 were compatible; 50 were incompatible**, so the registered protocol
+stopped before another model run. Its [verified terminal matrix and report](docs/evidence/mini-gibson-successor-2026-10-18/REPORT.md)
+are public. That preflight ran no model, agent, parser, or tests, and the 35-task final
 holdout remains operationally sealed and unconsumed by the pipeline.
 
 See the demo's [sanitized evidence](presentation/demo/evidence/README.md) for

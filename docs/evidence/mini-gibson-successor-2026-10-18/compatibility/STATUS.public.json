@@ -1,0 +1,19 @@
+{
+  "compatible": 406,
+  "current_instance_id": null,
+  "estimated_controller_window_cost_usd": 17.0794,
+  "final_holdout_status": "sealed_not_read_or_run",
+  "formal_model_outcomes_observed": false,
+  "hourly_rate_usd": 3.96,
+  "incompatible": 50,
+  "journal_head_sha256": "fa8b1f7bd1463465918042b5a1933f0d66a85c81e83af04356d89db40fcbfd0e",
+  "manifest_sha256": "0c7ccd4784f334e20cbe0a5647d0c58391ebdcc25cf1229ffb4493cb9245b83a",
+  "rate_limit_retries": 0,
+  "recorded": 456,
+  "remaining": 0,
+  "schema_version": "mini-gibson-compatibility-preflight-controller/v1",
+  "source_commit": "954d6e7290f51b29f5b5b30c2ba00b2556d4fdca",
+  "started_unix": 1792321668,
+  "state": "preflight_complete_incompatible",
+  "updated_unix": 1792337194
+}
