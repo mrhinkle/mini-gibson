@@ -4,10 +4,11 @@
 
 Langfuse and Jev answer different questions:
 
-- **Langfuse shows the shape of the coding run.** It gives us a timeline of when
-  the model responded, which tools ran, errors, retries, test runs, time, and
-  token use. The first version does not send source code or message contents.
-- **Jev helps us sort operational problems.** After the real tests have produced
+- **[Langfuse](https://github.com/langfuse/langfuse) shows the shape of the
+  coding run.** It gives us a timeline of when the model responded, which tools
+  ran, errors, retries, test runs, time, and token use. The planned first
+  exporter would not send source code or message contents.
+- **[Jev](https://typesafe.ai/) helps us sort operational problems.** After the real tests have produced
   an immutable result, the current Jev contract can classify a failure or flag
   it for human review using safe counts and status fields.
 - **The local evaluator still decides whether a task passed.** Neither service
@@ -22,11 +23,12 @@ not use the final holdout while developing.
 
 ## What this does and does not apply to
 
-The active R3 experiment is a **compatibility preflight**, not a model run. It
-checks whether each frozen repository and patch package can be applied safely.
-It deliberately runs no model, agent, parser, or tests. Langfuse therefore has
-no agent trace to display, and Jev has no model behavior to judge. The local
-hash-chained compatibility matrix is the right evidence for this stage.
+R3 is a **compatibility preflight**, not a model run. It checks whether each
+frozen repository and patch package can be applied safely. It deliberately runs
+no model, agent, parser, or tests.
+Langfuse therefore has no agent trace to display, and Jev has no model
+behavior to judge. The local hash-chained compatibility matrix is the right
+evidence for this stage.
 
 Langfuse and Jev become useful only after a future cohort has passed both the
 complete compatibility preflight and deterministic qualification. Their first
@@ -120,13 +122,17 @@ policy hash produces a visible fallback rather than an invented answer.
 
 ## The repeatable improvement loop
 
-The existing successor protocol permits only the frozen base/v1/v2 comparison
-and formal looks at N=144, N=288, and N=432. All 456 frozen tasks—the 24-task
-pilot plus cohorts A, B, and C—and the 35-task final holdout are reserved for
-that frozen sequence. None may serve as the fresh cohort for a change suggested
-by Langfuse or Jev. Hosted analysis waits until the sequence ends at a registered
-success, futility, or safety stop, or after N=432. Nothing learned from cohort A
-may change the arms, prompt, harness, budget, tools, or data for cohorts B or C.
+The R3 successor sequence is still at compatibility. It has reached none of the
+planned base/v1/v2 comparisons or formal looks at N=144, N=288, or N=432.
+If the full matrix contains incompatible tasks, they cannot be dropped to make
+a smaller cohort. A general, outcome-blind evaluator repair and a new protocol
+for the entire frozen cohort, or a genuinely fresh cohort, would be required
+before another model trial. All 456 frozen tasks—the 24-task pilot plus cohorts A, B, and C—and the
+35-task final holdout remain excluded from new training data. None may serve
+as the fresh cohort for a change suggested by Langfuse or Jev. In any future
+sequential model experiment, hosted analysis waits until the registered
+terminal stop, and nothing learned from one development cohort may change the
+arms, prompt, harness, budget, tools, or data for a later cohort.
 
 After the sequence ends, a new model, prompt, harness, tool, budget, or
 training-data hypothesis requires a new preregistered protocol and a fresh
@@ -204,3 +210,8 @@ not code inside the networkless evaluator:
 This document authorizes no credential use or hosted request. Enabling either
 service remains an explicit operational step after the exporter, redaction
 tests, and experiment boundary have been independently reviewed.
+
+Official references: [Langfuse documentation](https://langfuse.com/docs),
+[TypeSafe Jev quickstart](https://docs.typesafe.ai/introduction/quickstart), and
+[TypeSafe API reference](https://docs.typesafe.ai/api). The complete ecosystem
+index is the repository-wide [project map](../../PROJECT-MAP.md).

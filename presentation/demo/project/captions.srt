@@ -281,3 +281,7 @@ That's how we keep the human from becoming the bottleneck.
 71
 00:03:25,225 --> 00:03:26,934
 Follow the repository on screen.
+
+72
+00:03:30,350 --> 00:03:43,600
+Post-run update: the pipeline stopped safely at the registered compatibility boundary.

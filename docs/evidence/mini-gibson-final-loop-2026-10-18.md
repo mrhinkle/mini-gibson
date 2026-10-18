@@ -9,3 +9,10 @@ At `2026-10-18T03:18:02Z`, the first frozen pilot candidate, `natcap__invest-136
 The completed scientific result therefore remains the v1 no-promotion decision: 16/48 resolved for v1 versus 9/48 base, a directional +14.58 percentage points with one-sided exact paired p=0.0717316, alongside a promotion-blocking malformed-response increase from 8/48 to 21/48.
 
 The terminal result is operational, not evidence about the model hypothesis: this exact frozen cohort was not executable under the frozen evaluator. None of the preregistered looks at cumulative development N=144, 288, or 432 was reached. The original terminal task will not be selectively repeated; a successor experiment must repair and preflight the evaluator and then freeze a new protocol.
+
+The active successor is documented in
+[`mini-gibson-successor-2026-10-18/`](mini-gibson-successor-2026-10-18/README.md).
+It restarted the complete frozen 456-task order as an outcome-blind compatibility
+preflight. It runs no model, agent, parser, or tests and cannot produce a new
+model-quality finding. Its full public-safe matrix, terminal report, hashes,
+and cost record will be published only after all 456 receipts verify.

@@ -1,0 +1,71 @@
+<template>
+  <style>
+    @font-face { font-family: FilmSans; src: url('assets/fonts/Arimo-Variable.ttf'); font-weight: 400; }
+    @font-face { font-family: FilmSans; src: url('assets/fonts/Arimo-Variable.ttf'); font-weight: 700; }
+    @font-face { font-family: FilmSans; src: url('assets/fonts/ArchivoBlack-Regular.ttf'); font-weight: 900; }
+    * { box-sizing: border-box; }
+    #root { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; color: #F8FAFC; font-family: FilmSans; background: #08101E; isolation: isolate; }
+    .frame-12-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+    .frame-12-grid { position: absolute; inset: 0; z-index: 1; opacity: 0.17; background-image: repeating-linear-gradient(0deg, transparent 0 71px, rgba(248,250,252,0.18) 72px 73px), repeating-linear-gradient(90deg, transparent 0 119px, rgba(248,250,252,0.13) 120px 121px); }
+    .frame-12-glow { position: absolute; right: -170px; top: -250px; width: 900px; height: 900px; border-radius: 50%; z-index: 1; opacity: 0.35; background: radial-gradient(circle, rgba(255,143,45,0.55) 0%, rgba(255,143,45,0.08) 43%, transparent 72%); will-change: opacity; }
+    .frame-12-eyebrow { position: absolute; left: 100px; top: 62px; z-index: 3; font-size: 24px; font-weight: 700; letter-spacing: 3.4px; color: #FF8F2D; }
+    .frame-12-rule { position: absolute; left: 100px; top: 110px; width: 1720px; height: 3px; z-index: 3; background: #FF8F2D; transform-origin: left center; }
+    .frame-12-signal { position: absolute; right: 108px; top: 143px; width: 138px; height: 138px; z-index: 3; border: 2px dashed rgba(255,143,45,0.78); border-radius: 50%; display: grid; place-items: center; will-change: transform, opacity; }
+    .frame-12-signal::before { content: ''; width: 72px; height: 72px; border-radius: 50%; background: #FF8F2D; box-shadow: 0 0 48px rgba(255,143,45,0.55); }
+    .frame-12-signal-label { position: absolute; right: 116px; top: 292px; z-index: 3; width: 120px; text-align: center; color: #F8FAFC; font-size: 18px; line-height: 1.15; font-weight: 700; letter-spacing: 1.8px; }
+    .frame-12-title { position: absolute; left: 100px; top: 154px; z-index: 3; width: 1460px; font-size: 86px; line-height: 1; font-weight: 900; letter-spacing: -3px; white-space: nowrap; }
+    .frame-12-subtitle { position: absolute; left: 103px; top: 272px; z-index: 3; width: 1370px; font-size: 29px; line-height: 1.25; color: #D8E0EC; }
+    .frame-12-metrics { position: absolute; left: 100px; top: 382px; z-index: 3; width: 1720px; height: 235px; display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 24px; }
+    .frame-12-metric { position: relative; overflow: hidden; min-width: 0; border: 2px solid rgba(248,250,252,0.26); background: rgba(8,16,30,0.78); padding: 30px 34px 26px; will-change: transform, opacity; }
+    .frame-12-metric-primary { border-color: #FF8F2D; background: rgba(255,143,45,0.12); }
+    .frame-12-value { display: block; color: #F8FAFC; font-size: 114px; line-height: 0.94; font-weight: 900; letter-spacing: -4px; white-space: nowrap; }
+    .frame-12-metric-primary .frame-12-value { color: #FF8F2D; font-size: 136px; }
+    .frame-12-label { display: block; margin-top: 19px; color: #D8E0EC; font-size: 22px; line-height: 1.15; font-weight: 700; letter-spacing: 2.2px; }
+    .frame-12-boundary { position: absolute; left: 100px; top: 650px; z-index: 3; width: 1720px; min-height: 80px; border-top: 2px solid rgba(248,250,252,0.28); border-bottom: 2px solid rgba(248,250,252,0.28); display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 40px; padding: 18px 6px; font-size: 25px; font-weight: 700; letter-spacing: 1.2px; color: #F8FAFC; will-change: transform, opacity; }
+    .frame-12-boundary span::before { content: '✓'; color: #FF8F2D; margin-right: 15px; }
+    .frame-12-deliverable { position: absolute; left: 100px; top: 770px; z-index: 3; width: 1490px; display: grid; grid-template-columns: 380px 1fr; gap: 45px; align-items: start; will-change: transform, opacity; }
+    .frame-12-deliverable-label { color: #FF8F2D; font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: 2.4px; }
+    .frame-12-deliverable-copy { color: #F8FAFC; font-size: 38px; line-height: 1.16; font-weight: 700; }
+    .frame-12-source { position: absolute; left: 100px; top: 875px; z-index: 3; color: #AEB9C9; font-size: 21px; letter-spacing: 0.5px; will-change: transform, opacity; }
+    .frame-12-source strong { color: #F8FAFC; font-weight: 700; }
+  </style>
+  <div id="root" data-composition-id="frame-12" data-width="1920" data-height="1080" data-duration="14">
+    <img id="frame-12-background" class="frame-12-bg clip" data-start="0" data-duration="14" data-track-index="0" src="assets/navy-background.png" alt="" />
+    <div class="frame-12-grid" data-layout-ignore></div>
+    <div class="frame-12-glow" data-layout-ignore></div>
+    <div class="frame-12-eyebrow">POST-RUN UPDATE / REGISTERED TERMINAL BOUNDARY</div>
+    <div class="frame-12-rule"></div>
+    <div class="frame-12-signal" data-layout-ignore></div>
+    <div class="frame-12-signal-label">SAFE<br />STOP</div>
+    <div class="frame-12-title">The pipeline stopped safely.</div>
+    <div class="frame-12-subtitle">The v1 adapter was not promoted. The successor found incompatible task packages and stopped before more training or model testing.</div>
+    <div class="frame-12-metrics">
+      <div class="frame-12-metric frame-12-metric-primary"><span class="frame-12-value">456</span><span class="frame-12-label">TASK PACKAGES CHECKED</span></div>
+      <div class="frame-12-metric"><span class="frame-12-value" id="frame-12-compatible">—</span><span class="frame-12-label">COMPATIBLE</span></div>
+      <div class="frame-12-metric"><span class="frame-12-value" id="frame-12-incompatible">—</span><span class="frame-12-label">INCOMPATIBLE</span></div>
+    </div>
+    <div class="frame-12-boundary"><span>No new model result</span><span>Final holdout operationally sealed</span></div>
+    <div class="frame-12-deliverable"><div class="frame-12-deliverable-label">WHAT WE’RE SUBMITTING</div><div class="frame-12-deliverable-copy">A training + evaluation pipeline for safer coding agents.</div></div>
+    <div class="frame-12-source">Evidence, receipts and public datasets → <strong>github.com/mrhinkle/mini-gibson</strong></div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo('.frame-12-eyebrow', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 0.05);
+      tl.fromTo('.frame-12-rule', { scaleX: 0 }, { scaleX: 1, duration: 0.75, ease: 'power3.out' }, 0.08);
+      tl.fromTo('.frame-12-title', { opacity: 0, y: 38 }, { opacity: 1, y: 0, duration: 0.72, ease: 'power3.out' }, 0.45);
+      tl.fromTo('.frame-12-subtitle', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.58, ease: 'power2.out' }, 0.92);
+      tl.fromTo('.frame-12-signal', { opacity: 0, scale: 0.74 }, { opacity: 1, scale: 1, duration: 0.7, ease: 'back.out(1.6)' }, 0.72);
+      tl.fromTo('.frame-12-signal-label', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' }, 1.28);
+      tl.fromTo('.frame-12-metric', { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.68, stagger: 0.18, ease: 'power3.out' }, 1.55);
+      tl.fromTo('.frame-12-boundary', { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, 2.75);
+      tl.fromTo('.frame-12-deliverable', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.62, ease: 'power3.out' }, 3.7);
+      tl.fromTo('.frame-12-source', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 4.55);
+      tl.to('.frame-12-signal', { rotation: 180, duration: 12.3, ease: 'none' }, 1.15);
+      tl.to('.frame-12-glow', { opacity: 0.58, duration: 0.85, repeat: 6, yoyo: true, ease: 'sine.inOut' }, 2.2);
+      tl.to({}, { duration: 14 }, 0);
+      window.__timelines['frame-12'] = tl;
+    }
+  </script>
+</template>

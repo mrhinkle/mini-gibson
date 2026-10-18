@@ -353,5 +353,11 @@
     "start": 205.225284,
     "end": 206.933868,
     "text": "Follow the repository on screen."
+  },
+  {
+    "start": 210.35,
+    "end": 223.6,
+    "text": "Post-run update: the pipeline stopped safely at the registered compatibility boundary.",
+    "delivery": "silent_on_screen_post_run_update"
   }
 ]

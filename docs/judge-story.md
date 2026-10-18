@@ -24,8 +24,20 @@ Mini Gibson asks:
 
 > **Can a small open model learn how an organization engineers software?**
 
-We start with NVIDIA Nemotron 3.5 Lightning. We measure it under a fair baseline. Then we put the same model inside Gibson's evidence-driven environment. Finally, we specialize the model on curated historical Gibson trajectories—not just successful patches, but attempts, failures, reviews, diagnoses, repairs, regression tests, and verified outcomes—and measure again on untouched tasks.
+We started with NVIDIA Nemotron 3.5 Lightning, trained a LoRA adapter on curated engineering trajectories, and compared it with the base model under the same development evaluator. The tuned model resolved 16 of 48 issues versus 9 of 48 for the base model, but the difference did not cross the preset statistical boundary and malformed responses became worse. We did not promote the adapter.
+
+That is why our deliverable is not a victory claim or a finished autonomous
+developer. It is a reproducible training and evaluation pipeline that can keep
+failed attempts, stop unsafe promotion, and tell us what to improve next. The
+successor experiment is screening the same already-frozen 456-task package for evaluator
+compatibility before another fine-tune or model comparison. Its terminal result
+is still pending. That preflight is infrastructure evidence, not
+model evidence, and the public final holdout remains operationally sealed and
+unconsumed by the pipeline.
 
 The model can change. The coding agent can change. The durable asset is the organization's accumulated engineering experience and the evidence system that enforces it.
 
 **Mini Gibson — Small Model. Serious Engineer.**
+
+See the [project map](PROJECT-MAP.md) for the exact repositories, models,
+datasets, and proposed Langfuse and Jev follow-on work.

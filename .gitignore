@@ -6,7 +6,7 @@
 **/or-key*.env
 **/or-spend*.json
 
-# full observational datasets (keep sample + schema only)
+# unversioned observational working outputs (sanitized releases are versioned)
 training/dataset/observational/runs.jsonl
 training/dataset/observational/runs/
 training/dataset/observational/STOP

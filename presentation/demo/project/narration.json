@@ -114,12 +114,22 @@
       "text_start": 3650,
       "text_end": 3844,
       "start_seconds": 197.034183
+    },
+    {
+      "id": "12",
+      "duration_seconds": 14,
+      "screen_headline": "The pipeline stopped safely.",
+      "spoken": "",
+      "word_count": 0,
+      "start_seconds": 209.999,
+      "delivery": "silent_on_screen_post_run_update",
+      "evidence_source": "verified terminal successor summary"
     }
   ],
   "total_word_count": 618,
-  "total_duration_seconds": 209.999,
+  "total_duration_seconds": 223.999,
   "synthesis_status": "Generated using confirmed Mark Hinkle voice ID; timestamp alignment from ElevenLabs",
-  "narrative_revision": "Tool-call truncation, selected response-cap retries, test-boundary failure and proposed shorter-call curriculum; final quality pending",
+  "narrative_revision": "Original authorized narration retained; a silent terminal-evidence card is appended and exact compatibility counts remain placeholder-bound until verifier success",
   "measurement_status": "Separate v7/v8 development batches; selected adapter-only diagnostics; final held-out quality and less human intervention unproven.",
   "audio_duration_seconds": 206.999388,
   "pacing_revision": {
